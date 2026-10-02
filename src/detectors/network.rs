@@ -30,12 +30,21 @@ static HOSTNAME_REGEX: Lazy<Regex> = Lazy::new(|| {
         .expect("Regex Hostname inválida")
 });
 
+use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
+
 #[derive(Default)]
-pub struct IPv4Detector;
+pub struct IPv4Detector {
+    subnet_map: RefCell<HashMap<String, String>>,
+    used_subnets: RefCell<HashSet<String>>,
+}
 
 impl IPv4Detector {
     pub fn new() -> Self {
-        Self
+        Self {
+            subnet_map: RefCell::new(HashMap::new()),
+            used_subnets: RefCell::new(HashSet::new()),
+        }
     }
 
     pub fn detector_type(&self) -> DetectorType {
@@ -55,9 +64,46 @@ impl IPv4Detector {
             .collect()
     }
 
-    /// Genera una dirección IP en el rango reservado de pruebas de la IETF / RFC 5737 (TEST-NET-1: 192.0.2.0/24).
-    pub fn generate_pseudonym(&self, _original: &str) -> String {
+    fn is_private(ip: &Ipv4Addr) -> bool {
+        let octets = ip.octets();
+        octets[0] == 10
+            || (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
+            || (octets[0] == 192 && octets[1] == 168)
+    }
+
+    /// Genera una dirección IP. Si es privada, mantiene coherencia en la subred /24.
+    pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
+
+        if let Ok(ip) = original.parse::<Ipv4Addr>() {
+            if Self::is_private(&ip) {
+                let octets = ip.octets();
+                let subnet_key = format!("{}.{}.{}", octets[0], octets[1], octets[2]);
+
+                let mut map = self.subnet_map.borrow_mut();
+                let mut used = self.used_subnets.borrow_mut();
+
+                // Registrar subred original para que no se pise (si no está ya)
+                used.insert(subnet_key.clone());
+
+                let new_subnet = map.entry(subnet_key).or_insert_with(|| {
+                    loop {
+                        // Generar una subred privada aleatoria en 10.x.x.0/24
+                        let b: u8 = rng.gen_range(0..=255);
+                        let c: u8 = rng.gen_range(0..=255);
+                        let cand = format!("10.{}.{}", b, c);
+                        if !used.contains(&cand) {
+                            used.insert(cand.clone());
+                            break cand;
+                        }
+                    }
+                });
+
+                return format!("{}.{}", new_subnet, octets[3]);
+            }
+        }
+
+        // Para IPs públicas (o fallback), usar el rango TEST-NET-1
         let octet: u8 = rng.gen_range(1..254);
         format!("192.0.2.{}", octet)
     }
