@@ -101,11 +101,28 @@ lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi 
 ```
 
 ### 3. Comando: `scan`
-Escanea un archivo, texto o portapapeles y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos.
+Escanea un archivo, texto o portapapeles y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos. Permite revisar qué se va a cambiar y guardarlo para uso futuro.
 
 * **`-i, --input <FILE>`**: Archivo a escanear.
 * **`-t, --text <STRING>`**: Texto a escanear.
 * **`-c, --clipboard`**: Escanea directamente el contenido del portapapeles.
+* **`-s, --save-mappings <FILE>`**: Guarda los mapeos detectados tras la confirmación interactiva del usuario (ideal para auditoría manual).
+* **`-p, --password <PASSWORD>`**: Contraseña para proteger la bóveda de mapeos si decides guardarla (`.lexi`).
+* **`--ask-password`**: Solicita la contraseña por consola de forma segura.
+* **`-y, --yes`**: Guarda los mapeos detectados automáticamente omitiendo la pregunta de confirmación interactiva `[s/N]`.
+
+*Ejemplo (Auditoría interactiva):*
+```bash
+# Detectará los datos sensibles, los mostrará por pantalla y luego preguntará:
+# "¿Desea guardar los X mapeos detectados en 'mapeos.lexi'? [s/N]: "
+lexishield scan -i documento.txt -s mapeos.lexi --ask-password
+```
+
+*Ejemplo (Auditoría automatizada):*
+```bash
+# Escanea y guarda silenciosamente el diccionario en texto plano JSON
+lexishield scan -c -s mapeos.json -y
+```
 
 ### 4. Comando: `watch` (Monitorización en Tiempo Real)
 Monitoriza continuamente el portapapeles mediante eventos nativos del sistema operativo y supresión de eco. Cada vez que pulses `Ctrl+C` para copiar un texto, LexiShield lo transformará automáticamente.
