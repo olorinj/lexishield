@@ -262,6 +262,27 @@ enum Commands {
 }
 
 /// Resuelve el contenido de entrada desde un archivo, texto o portapapeles.
+/// Resuelve la ruta del archivo de bóveda, añadiendo el directorio por defecto si se provee solo el nombre, y extensión .lexi
+fn resolve_vault_path(user_provided: Option<PathBuf>) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    match user_provided {
+        None => Ok(lexishield::config::get_default_vault_path()?),
+        Some(mut path) => {
+            // Si es solo un nombre de archivo (sin ./ ni directorios)
+            if path.parent().map_or(true, |p| p.as_os_str().is_empty()) {
+                let config_dir = lexishield::config::get_user_config_dir()?;
+                path = config_dir.join(path);
+            }
+            
+            // Si no tiene extensión, añadir ".lexi" por defecto
+            if path.extension().is_none() {
+                path.set_extension("lexi");
+            }
+            
+            Ok(path)
+        }
+    }
+}
+
 fn resolve_input_content(
     input: Option<&Path>,
     text: Option<&str>,
@@ -368,9 +389,7 @@ fn handle_obfuscate(
 
     let is_default = opts.save_mappings.is_none();
     let map_path = if !opts.no_save {
-        opts.save_mappings
-            .clone()
-            .or_else(|| lexishield::config::get_default_vault_path().ok())
+        Some(resolve_vault_path(opts.save_mappings)?)
     } else {
         None
     };
@@ -523,11 +542,7 @@ fn collect_files(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
 
 fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
     let is_default = opts.save_mappings.is_none();
-    let map_path = opts
-        .save_mappings
-        .clone()
-        .or_else(|| lexishield::config::get_default_vault_path().ok())
-        .ok_or("No se pudo resolver la ruta de mapeos por defecto")?;
+    let map_path = resolve_vault_path(opts.save_mappings)?;
 
     let mut engine = ObfuscatorEngine::new(config);
 
@@ -698,9 +713,7 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             ask_password,
         } => {
             let is_default = mappings.is_none();
-            let map_path = mappings
-                .or_else(|| lexishield::config::get_default_vault_path().ok())
-                .unwrap();
+            let map_path = resolve_vault_path(mappings)?;
             let force_ask = is_default && password.is_none();
 
             let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
@@ -721,9 +734,7 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             password,
             new_password,
         } => {
-            let map_path = mappings
-                .or_else(|| lexishield::config::get_default_vault_path().ok())
-                .unwrap();
+            let map_path = resolve_vault_path(mappings)?;
 
             if !map_path.exists() {
                 return Err("El archivo de mapeos especificado no existe.".into());
@@ -755,9 +766,7 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             ask_password,
         } => {
             let is_default = mappings.is_none();
-            let map_path = mappings
-                .or_else(|| lexishield::config::get_default_vault_path().ok())
-                .unwrap();
+            let map_path = resolve_vault_path(mappings)?;
             let force_ask = is_default && password.is_none();
 
             let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
