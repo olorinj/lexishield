@@ -108,6 +108,25 @@ enum DictCommands {
         #[arg(long)]
         ask_password: bool,
     },
+    /// Elimina un mapeo específico de la bóveda (un par original-seudónimo).
+    #[command(alias = "del")]
+    Remove {
+        /// Valor original del mapeo a eliminar.
+        #[arg(short, long)]
+        original: String,
+
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
+        #[arg(short, long)]
+        mappings: Option<PathBuf>,
+
+        /// Contraseña si el archivo de mapeos está cifrado.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de forma interactiva y oculta.
+        #[arg(long)]
+        ask_password: bool,
+    },
     /// Vacía o elimina todos los mapeos del archivo.
     Clear {
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
@@ -803,6 +822,33 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             });
             lexishield::save_mappings_auto(&map_path, &list, pwd.as_deref())?;
             log::info!("Mapeo añadido correctamente a {}", map_path.display());
+        }
+        DictCommands::Remove {
+            original,
+            mappings,
+            password,
+            ask_password,
+        } => {
+            let is_default = mappings.is_none();
+            let map_path = resolve_vault_path(mappings)?;
+            let force_ask = is_default && password.is_none();
+
+            let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
+            
+            if !map_path.exists() {
+                return Err("El archivo de mapeos no existe.".into());
+            }
+
+            let mut list = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
+            let initial_len = list.len();
+            list.retain(|m| m.original != original);
+
+            if list.len() < initial_len {
+                lexishield::save_mappings_auto(&map_path, &list, pwd.as_deref())?;
+                log::info!("Mapeo eliminado correctamente de {}", map_path.display());
+            } else {
+                log::warn!("No se encontró el mapeo '{}' en la bóveda.", original);
+            }
         }
         DictCommands::Clear {
             mappings,
