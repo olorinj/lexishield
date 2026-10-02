@@ -315,25 +315,37 @@ fn handle_obfuscate(
     let content =
         resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
 
-    let mut engine = ObfuscatorEngine::new(config);
-    let detected_count = engine.scan_and_register_mappings(&content)?;
-    log::info!("Detectados {} elementos sensibles.", detected_count);
-
-    let (result, report) = engine.obfuscate_text(&content, opts.format)?;
-
     let is_default = opts.save_mappings.is_none();
     let map_path = if !opts.no_save {
-        opts.save_mappings
+        opts.save_mappings.clone()
             .or_else(|| lexishield::config::get_default_vault_path().ok())
     } else {
         None
     };
 
-    if let Some(map_path) = map_path {
-        // Forzar pregunta de contraseña si es el archivo por defecto y no se pasó una
-        let force_ask = is_default && opts.password.is_none();
+    let mut engine = ObfuscatorEngine::new(config);
 
-        let pwd = resolve_password(opts.password, opts.ask_password || force_ask, None)?;
+    let mut final_pwd = opts.password.clone();
+    if let Some(ref path) = map_path {
+        if path.exists() {
+            let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(path))?;
+            final_pwd = pwd.clone();
+            if let Ok(loaded) = lexishield::load_mappings_auto(path, pwd.as_deref()) {
+                let _ = engine.manager.load_mappings(loaded);
+            }
+        }
+    }
+
+    let newly_added = engine.scan_and_register_mappings(&content)?;
+    log::info!("Detectados {} NUEVOS elementos sensibles.", newly_added.len());
+
+    let (result, report) = engine.obfuscate_text(&content, opts.format)?;
+
+    if let Some(map_path) = map_path {
+        // Forzar pregunta de contraseña si es el archivo por defecto y no se pasó una ni se cargó antes
+        let force_ask = is_default && final_pwd.is_none();
+
+        let pwd = resolve_password(final_pwd, opts.ask_password || force_ask, None)?;
         let mappings = engine.manager.get_mappings();
         lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
         if pwd.is_some() {
@@ -435,12 +447,29 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
     let content =
         resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
 
+    let is_default = opts.save_mappings.is_none();
+    let map_path = opts
+        .save_mappings
+        .clone()
+        .or_else(|| lexishield::config::get_default_vault_path().ok())
+        .ok_or("No se pudo resolver la ruta de mapeos por defecto")?;
+
     let mut engine = ObfuscatorEngine::new(config);
-    let count = engine.scan_and_register_mappings(&content)?;
-    let mappings = engine.manager.get_mappings();
+
+    let mut final_pwd = opts.password.clone();
+    if map_path.exists() {
+        let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(&map_path))?;
+        final_pwd = pwd.clone();
+        if let Ok(loaded) = lexishield::load_mappings_auto(&map_path, pwd.as_deref()) {
+            let _ = engine.manager.load_mappings(loaded);
+        }
+    }
+
+    let mut newly_added = engine.scan_and_register_mappings(&content)?;
+    let count = newly_added.len();
 
     log::info!(
-        "Escaneo completado: {} elementos sensibles identificados.",
+        "Escaneo completado: {} NUEVOS elementos sensibles identificados.",
         count
     );
 
@@ -450,7 +479,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
 
     use std::io::{self, Write};
     let chunk_size = 20;
-    for (i, m) in mappings.iter().enumerate() {
+    for (i, m) in newly_added.iter().enumerate() {
         println!(
             "{}. [{:?}] '{}' -> '{}'",
             i + 1,
@@ -473,12 +502,6 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
             }
         }
     }
-
-    let is_default = opts.save_mappings.is_none();
-    let map_path = opts
-        .save_mappings
-        .or_else(|| lexishield::config::get_default_vault_path().ok())
-        .ok_or("No se pudo resolver la ruta de mapeos por defecto")?;
 
     let mut save = opts.yes;
     let mut omitted_indices: Vec<usize> = Vec::new();
@@ -548,17 +571,21 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
     }
 
     if save {
-        let mut final_mappings = mappings;
         for idx in omitted_indices {
-            if let Some(m) = final_mappings.get_mut(idx) {
+            if let Some(m) = newly_added.get_mut(idx) {
                 m.pseudonym = "=".to_string();
                 m.omitted = true;
                 log::info!("Mapeo {} omitido por elección del usuario.", m.original);
             }
         }
 
-        let force_ask = is_default && opts.password.is_none();
-        let pwd = resolve_password(opts.password, opts.ask_password || force_ask, None)?;
+        // Reinyectamos en el engine para que sobreescriba si los marcamos como omitidos
+        let _ = engine.manager.load_mappings(newly_added);
+
+        let final_mappings = engine.manager.get_mappings();
+
+        let force_ask = is_default && final_pwd.is_none();
+        let pwd = resolve_password(final_pwd, opts.ask_password || force_ask, None)?;
         lexishield::save_mappings_auto(&map_path, &final_mappings, pwd.as_deref())?;
         log::info!("Mapeos guardados correctamente en: {}", map_path.display());
     } else {

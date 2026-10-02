@@ -43,10 +43,10 @@ impl MappingManager {
         }
 
         // Si ya existe el original, comprobamos si está omitido o si coincide el seudónimo
-        if let Some(existing) = self.forward.get(&mapping.original) {
-            if existing.omitted || existing.pseudonym == mapping.pseudonym {
-                return Ok(());
-            }
+        if let Some(existing) = self.forward.get(&mapping.original)
+            && (existing.omitted || existing.pseudonym == mapping.pseudonym)
+        {
+            return Ok(());
         }
 
         // Verificar inyectividad en el sentido inverso: el seudónimo no debe estar ocupado por otro original
@@ -66,11 +66,15 @@ impl MappingManager {
     }
 
     /// Carga múltiples mapeos a la tabla.
-    pub fn load_mappings(&mut self, mappings: Vec<Mapping>) -> Result<(), ObfuscationError> {
+    pub fn load_mappings(&mut self, mappings: Vec<Mapping>) -> Result<Vec<Mapping>, ObfuscationError> {
+        let mut newly_added = Vec::new();
         for m in mappings {
+            if !self.forward.contains_key(&m.original) {
+                newly_added.push(m.clone());
+            }
             self.add_mapping(m)?;
         }
-        Ok(())
+        Ok(newly_added)
     }
 
     /// Obtiene la lista de todos los mapeos activos válidos.

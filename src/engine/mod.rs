@@ -32,15 +32,14 @@ impl ObfuscatorEngine {
     }
 
     /// Escanea el contenido y registra automáticamente los mapeos en el gestor.
-    pub fn scan_and_register_mappings(&mut self, content: &str) -> Result<usize, ObfuscationError> {
+    pub fn scan_and_register_mappings(&mut self, content: &str) -> Result<Vec<Mapping>, ObfuscationError> {
         let detected = self.detectors.scan_text(
             content,
             &self.config.detector_priority_order,
             self.config.min_token_length,
         );
-        let count = detected.len();
-        self.manager.load_mappings(detected)?;
-        Ok(count)
+        let newly_added = self.manager.load_mappings(detected)?;
+        Ok(newly_added)
     }
 
     /// Añade un mapeo manual asegurando inyectividad.
