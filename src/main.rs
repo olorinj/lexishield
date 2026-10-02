@@ -1,12 +1,12 @@
 //! Interfaz de Línea de Comandos (CLI) de LexiShield en Rust.
 
 use clap::{Parser, Subcommand, ValueEnum};
-use lexishield::config::load_config;
+use lexishield::config::{LexiConfig, load_config};
 use lexishield::engine::ObfuscatorEngine;
 use lexishield::logger::init_logger;
 use lexishield::models::{FormatType, Mapping};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(name = "lexishield")]
@@ -98,6 +98,135 @@ enum Commands {
     },
 }
 
+/// Resuelve el contenido de entrada desde un archivo o un argumento de texto directo.
+fn resolve_input_content(
+    input: Option<&Path>,
+    text: Option<&str>,
+) -> Result<String, Box<dyn std::error::Error>> {
+    match (input, text) {
+        (Some(p), _) => Ok(fs::read_to_string(p)?),
+        (_, Some(t)) => Ok(t.to_string()),
+        (None, None) => {
+            log::error!("Debe proporcionar un archivo con --input o texto directo con --text");
+            Err("No se especificó ninguna fuente de entrada válida".into())
+        }
+    }
+}
+
+/// Manejador de la acción de ofuscación.
+fn handle_obfuscate(
+    config: LexiConfig,
+    input: Option<PathBuf>,
+    output: Option<PathBuf>,
+    text: Option<String>,
+    format: FormatType,
+    save_mappings: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let content = resolve_input_content(input.as_deref(), text.as_deref())?;
+
+    let mut engine = ObfuscatorEngine::new(config);
+    let detected_count = engine.scan_and_register_mappings(&content)?;
+    log::info!("Detectados {} elementos sensibles.", detected_count);
+
+    let (result, report) = engine.obfuscate_text(&content, format)?;
+
+    if let Some(map_path) = save_mappings {
+        let mappings = engine.manager.get_mappings();
+        let json_data = serde_json::to_string_pretty(&mappings)?;
+        fs::write(&map_path, json_data)?;
+        log::info!("Mapeos guardados en: {}", map_path.display());
+    }
+
+    match output {
+        Some(out_path) => {
+            fs::write(&out_path, &result)?;
+            log::info!("Resultado guardado en: {}", out_path.display());
+        }
+        None => {
+            println!("{}", result);
+        }
+    }
+
+    log::info!(
+        "Informe: Reemplazos aplicados: {} | Formato: {:?} | Esquema intacto: {} | Sintaxis válida: {} | Tiempo: {:.2}ms",
+        report.replacements_applied,
+        report.format_detected,
+        report.schema_intact,
+        report.syntax_valid,
+        report.elapsed_ms
+    );
+
+    Ok(())
+}
+
+/// Manejador de la acción de desofuscación.
+fn handle_deobfuscate(
+    config: LexiConfig,
+    input: Option<PathBuf>,
+    output: Option<PathBuf>,
+    text: Option<String>,
+    mappings_path: PathBuf,
+    format: FormatType,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let content = resolve_input_content(input.as_deref(), text.as_deref())?;
+
+    let map_data = fs::read_to_string(&mappings_path)?;
+    let loaded_mappings: Vec<Mapping> = serde_json::from_str(&map_data)?;
+
+    let mut engine = ObfuscatorEngine::new(config);
+    engine.manager.load_mappings(loaded_mappings)?;
+
+    let (result, report) = engine.deobfuscate_text(&content, format)?;
+
+    match output {
+        Some(out_path) => {
+            fs::write(&out_path, &result)?;
+            log::info!("Resultado restaurado en: {}", out_path.display());
+        }
+        None => {
+            println!("{}", result);
+        }
+    }
+
+    log::info!(
+        "Informe: Restauraciones aplicadas: {} | Tiempo: {:.2}ms",
+        report.replacements_applied,
+        report.elapsed_ms
+    );
+
+    Ok(())
+}
+
+/// Manejador de la acción de escaneo.
+fn handle_scan(
+    config: LexiConfig,
+    input: Option<PathBuf>,
+    text: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let content = resolve_input_content(input.as_deref(), text.as_deref())?;
+
+    let mut engine = ObfuscatorEngine::new(config);
+    let count = engine.scan_and_register_mappings(&content)?;
+    let mappings = engine.manager.get_mappings();
+
+    log::info!(
+        "Escaneo completado: {} elementos sensibles identificados.",
+        count
+    );
+
+    for (i, m) in mappings.iter().enumerate() {
+        println!(
+            "{}. [{:?}] '{}' -> '{}'",
+            i + 1,
+            m.detector_type,
+            m.original,
+            m.pseudonym
+        );
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger();
     let cli = Cli::parse();
@@ -110,48 +239,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text,
             format,
             save_mappings,
-        } => {
-            let content = match (input.as_ref(), text.as_ref()) {
-                (Some(p), _) => fs::read_to_string(p)?,
-                (_, Some(t)) => t.clone(),
-                (None, None) => {
-                    eprintln!("Error: Debe proporcionar un archivo con --input o texto con --text");
-                    std::process::exit(1);
-                }
-            };
-
-            let mut engine = ObfuscatorEngine::new(config);
-            let detected_count = engine.scan_and_register_mappings(&content)?;
-            println!("Detectados {} elementos sensibles.", detected_count);
-
-            let (result, report) = engine.obfuscate_text(&content, format.into())?;
-
-            if let Some(map_path) = save_mappings {
-                let mappings = engine.manager.get_mappings();
-                let json_data = serde_json::to_string_pretty(&mappings)?;
-                fs::write(&map_path, json_data)?;
-                println!("Mapeos guardados en: {}", map_path.display());
-            }
-
-            match output {
-                Some(out_path) => {
-                    fs::write(&out_path, &result)?;
-                    println!("Resultado guardado en: {}", out_path.display());
-                }
-                None => {
-                    println!("\n--- RESULTADO OFUSCADO ---\n{}", result);
-                }
-            }
-
-            println!(
-                "\nInforme: Reemplazos aplicados: {} | Formato: {:?} | Esquema intacto: {} | Sintaxis válida: {} | Tiempo: {:.2}ms",
-                report.replacements_applied,
-                report.format_detected,
-                report.schema_intact,
-                report.syntax_valid,
-                report.elapsed_ms
-            );
-        }
+        } => handle_obfuscate(config, input, output, text, format.into(), save_mappings),
 
         Commands::Deobfuscate {
             input,
@@ -159,69 +247,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text,
             mappings,
             format,
-        } => {
-            let content = match (input.as_ref(), text.as_ref()) {
-                (Some(p), _) => fs::read_to_string(p)?,
-                (_, Some(t)) => t.clone(),
-                (None, None) => {
-                    eprintln!("Error: Debe proporcionar un archivo con --input o texto con --text");
-                    std::process::exit(1);
-                }
-            };
+        } => handle_deobfuscate(config, input, output, text, mappings, format.into()),
 
-            let map_data = fs::read_to_string(&mappings)?;
-            let loaded_mappings: Vec<Mapping> = serde_json::from_str(&map_data)?;
-
-            let mut engine = ObfuscatorEngine::new(config);
-            engine.manager.load_mappings(loaded_mappings)?;
-
-            let (result, report) = engine.deobfuscate_text(&content, format.into())?;
-
-            match output {
-                Some(out_path) => {
-                    fs::write(&out_path, &result)?;
-                    println!("Resultado restaurado en: {}", out_path.display());
-                }
-                None => {
-                    println!("\n--- RESULTADO DESOFUSCADO ---\n{}", result);
-                }
-            }
-
-            println!(
-                "\nInforme: Restauraciones aplicadas: {} | Tiempo: {:.2}ms",
-                report.replacements_applied, report.elapsed_ms
-            );
-        }
-
-        Commands::Scan { input, text } => {
-            let content = match (input.as_ref(), text.as_ref()) {
-                (Some(p), _) => fs::read_to_string(p)?,
-                (_, Some(t)) => t.clone(),
-                (None, None) => {
-                    eprintln!("Error: Debe proporcionar un archivo con --input o texto con --text");
-                    std::process::exit(1);
-                }
-            };
-
-            let mut engine = ObfuscatorEngine::new(config);
-            let count = engine.scan_and_register_mappings(&content)?;
-            let mappings = engine.manager.get_mappings();
-
-            println!(
-                "Escaneo completado: {} elementos sensibles identificados.\n",
-                count
-            );
-            for (i, m) in mappings.iter().enumerate() {
-                println!(
-                    "{}. [{:?}] '{}' -> '{}'",
-                    i + 1,
-                    m.detector_type,
-                    m.original,
-                    m.pseudonym
-                );
-            }
-        }
+        Commands::Scan { input, text } => handle_scan(config, input, text),
     }
-
-    Ok(())
 }
