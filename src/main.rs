@@ -321,6 +321,7 @@ fn handle_obfuscate(
 
     let (result, report) = engine.obfuscate_text(&content, opts.format)?;
 
+    let is_default = opts.save_mappings.is_none();
     let map_path = if !opts.no_save {
         opts.save_mappings
             .or_else(|| lexishield::config::get_default_vault_path().ok())
@@ -329,7 +330,6 @@ fn handle_obfuscate(
     };
 
     if let Some(map_path) = map_path {
-        let is_default = opts.save_mappings.is_none();
         // Forzar pregunta de contraseña si es el archivo por defecto y no se pasó una
         let force_ask = is_default && opts.password.is_none();
         
@@ -569,6 +569,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             save_mappings,
             password,
             ask_password,
+            no_save,
         } => handle_obfuscate(
             config,
             ObfuscateOptions {
@@ -580,6 +581,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 save_mappings,
                 password,
                 ask_password,
+                no_save,
             },
         ),
 
