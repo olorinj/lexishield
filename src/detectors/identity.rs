@@ -17,7 +17,7 @@ static CREDIT_CARD_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 static PHONE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?:\+34[\s.-]?)?(?:[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})\b")
+    Regex::new(r"\b(?:\+34[\s.-]?)?[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b")
         .expect("Regex Phone inválida")
 });
 
@@ -213,25 +213,55 @@ impl TelephoneDetector {
         DetectorType::Telephone
     }
 
-    /// Comprueba que la coincidencia no forme parte de un SID de Windows (regla estricta contra falsos positivos).
-    fn is_false_positive_sid(full_text: &str, start: usize, end: usize) -> bool {
-        let prefix_start = start.saturating_sub(10);
-        let prefix = &full_text[prefix_start..start];
-        if prefix.contains("S-1-") || prefix.contains("sid") || prefix.contains("Sid") {
+    /// Comprueba que la coincidencia no forme parte de un SID de Windows ni sea un falso positivo común en JSON (como IDs o timestamps).
+    fn is_false_positive_context(full_text: &str, start: usize, end: usize) -> bool {
+        // Regla 1: Descartar si es parte de un SID de Windows
+        let prefix_start = {
+            let mut idx = start.saturating_sub(10);
+            while idx > 0 && !full_text.is_char_boundary(idx) { idx -= 1; }
+            idx
+        };
+        let prefix = &full_text[prefix_start..start].to_lowercase();
+        if prefix.contains("s-1-") || prefix.contains("sid") {
             return true;
         }
-        let suffix_end = (end + 10).min(full_text.len());
+        let suffix_end = {
+            let mut idx = (end + 10).min(full_text.len());
+            while idx < full_text.len() && !full_text.is_char_boundary(idx) { idx += 1; }
+            idx
+        };
         let suffix = &full_text[end..suffix_end];
         if suffix.starts_with('-') {
             return true;
         }
+
+        // Regla 2: Descartar si el contexto indica un campo numérico (ID, Timestamp) en estructurados como JSON/YAML
+        let json_prefix_start = {
+            let mut idx = start.saturating_sub(30);
+            while idx > 0 && !full_text.is_char_boundary(idx) { idx -= 1; }
+            idx
+        };
+        let json_prefix = &full_text[json_prefix_start..start].to_lowercase();
+        if json_prefix.contains("id\"") || json_prefix.contains("id'") || json_prefix.contains("id:") || json_prefix.contains("id=")
+            || json_prefix.contains("timestamp") || json_prefix.contains("date") || json_prefix.contains("time")
+            || json_prefix.contains("created") || json_prefix.contains("updated")
+            || json_prefix.contains("size") || json_prefix.contains("length") || json_prefix.contains("count")
+        {
+            return true;
+        }
+        
+        // Falso positivo si es una fracción decimal (ej. .944430319)
+        if json_prefix.ends_with('.') {
+            return true;
+        }
+
         false
     }
 
     pub fn find_matches<'a>(&self, text: &'a str) -> Vec<(usize, usize, &'a str)> {
         PHONE_REGEX
             .find_iter(text)
-            .filter(|m| !Self::is_false_positive_sid(text, m.start(), m.end()))
+            .filter(|m| !Self::is_false_positive_context(text, m.start(), m.end()))
             .map(|m| (m.start(), m.end(), m.as_str()))
             .collect()
     }
