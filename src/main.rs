@@ -191,6 +191,22 @@ enum Commands {
         /// Escanear el contenido actual del portapapeles.
         #[arg(short, long)]
         clipboard: bool,
+
+        /// Ruta opcional para guardar los mapeos detectados tras confirmar.
+        #[arg(short, long)]
+        save_mappings: Option<PathBuf>,
+
+        /// Contraseña si el archivo de mapeos se guardará cifrado.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de cifrado interactivamente.
+        #[arg(long)]
+        ask_password: bool,
+
+        /// Guardar sin pedir confirmación interactiva.
+        #[arg(short = 'y', long)]
+        yes: bool,
     },
 
     /// Monitoriza el portapapeles en tiempo real (modo escucha nativo).
@@ -373,14 +389,23 @@ fn handle_deobfuscate(
     Ok(())
 }
 
-/// Manejador de la acción de escaneo.
-fn handle_scan(
-    config: LexiConfig,
+struct ScanOptions {
     input: Option<PathBuf>,
     text: Option<String>,
     clipboard: bool,
+    save_mappings: Option<PathBuf>,
+    password: Option<String>,
+    ask_password: bool,
+    yes: bool,
+}
+
+/// Manejador de la acción de escaneo.
+fn handle_scan(
+    config: LexiConfig,
+    opts: ScanOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let content = resolve_input_content(input.as_deref(), text.as_deref(), clipboard)?;
+    let content =
+        resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
 
     let mut engine = ObfuscatorEngine::new(config);
     let count = engine.scan_and_register_mappings(&content)?;
@@ -391,6 +416,10 @@ fn handle_scan(
         count
     );
 
+    if count == 0 {
+        return Ok(());
+    }
+
     for (i, m) in mappings.iter().enumerate() {
         println!(
             "{}. [{:?}] '{}' -> '{}'",
@@ -399,6 +428,33 @@ fn handle_scan(
             m.original,
             m.pseudonym
         );
+    }
+
+    if let Some(map_path) = opts.save_mappings {
+        let mut save = opts.yes;
+        if !save {
+            use std::io::{self, Write};
+            print!(
+                "¿Desea guardar los {} mapeos detectados en '{}'? [s/N]: ",
+                count,
+                map_path.display()
+            );
+            io::stdout().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            let trimmed = input.trim().to_lowercase();
+            if trimmed == "s" || trimmed == "si" || trimmed == "y" || trimmed == "yes" {
+                save = true;
+            }
+        }
+
+        if save {
+            let pwd = resolve_password(opts.password, opts.ask_password, None)?;
+            lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
+            log::info!("Mapeos guardados correctamente en: {}", map_path.display());
+        } else {
+            log::info!("Operación de guardado cancelada.");
+        }
     }
 
     Ok(())
@@ -512,7 +568,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             input,
             text,
             clipboard,
-        } => handle_scan(config, input, text, clipboard),
+            save_mappings,
+            password,
+            ask_password,
+            yes,
+        } => handle_scan(
+            config,
+            ScanOptions {
+                input,
+                text,
+                clipboard,
+                save_mappings,
+                password,
+                ask_password,
+                yes,
+            },
+        ),
 
         Commands::Watch {
             direction,
