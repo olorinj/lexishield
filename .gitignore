@@ -5,3 +5,6 @@ lexishield-linux-amd64
 lexishield-windows-amd64.exe
 lexishield-darwin-amd64
 lexishield-darwin-arm64
+
+# Ignorar el enlace simbólico global de agentes
+.agents
