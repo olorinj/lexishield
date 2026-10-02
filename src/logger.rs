@@ -28,4 +28,3 @@ pub fn init_logger_with_level(level: LevelFilter) {
         log::info!("Logger centralizado inicializado en nivel {:?}", level);
     });
 }
-

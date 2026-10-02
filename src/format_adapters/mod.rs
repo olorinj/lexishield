@@ -62,24 +62,30 @@ impl FormatOrchestrator {
             other => other,
         };
 
-        log::debug!("Procesando contenido con adaptador de formato: {:?}", actual_format);
+        log::debug!(
+            "Procesando contenido con adaptador de formato: {:?}",
+            actual_format
+        );
 
         let (result_text, count) = match actual_format {
             FormatType::Json => {
-                self.json.process_json(content, replacement_map, strict_word_boundaries)?
+                self.json
+                    .process_json(content, replacement_map, strict_word_boundaries)?
             }
             FormatType::Xml => {
-                self.xml.process_xml(content, replacement_map, strict_word_boundaries)?
+                self.xml
+                    .process_xml(content, replacement_map, strict_word_boundaries)?
             }
             FormatType::Log => {
-                self.log.process_log(content, replacement_map, strict_word_boundaries)?
+                self.log
+                    .process_log(content, replacement_map, strict_word_boundaries)?
             }
             FormatType::Plaintext | FormatType::Auto => {
-                self.text.process_text(content, replacement_map, strict_word_boundaries)?
+                self.text
+                    .process_text(content, replacement_map, strict_word_boundaries)?
             }
         };
 
         Ok((result_text, count, actual_format))
     }
 }
-

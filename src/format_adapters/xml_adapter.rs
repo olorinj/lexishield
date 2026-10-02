@@ -60,8 +60,11 @@ impl XmlAdapter {
                         Ok(s) => s.into_owned(),
                         Err(e) => return Err(ObfuscationError::XmlError(e.to_string())),
                     };
-                    let (replaced_text, count) =
-                        apply_single_pass_replacements(&raw_str, replacement_map, strict_word_boundaries);
+                    let (replaced_text, count) = apply_single_pass_replacements(
+                        &raw_str,
+                        replacement_map,
+                        strict_word_boundaries,
+                    );
                     total_replacements += count;
                     writer
                         .write_event(Event::Text(BytesText::new(&replaced_text)))
@@ -72,8 +75,11 @@ impl XmlAdapter {
                         Ok(s) => s,
                         Err(e) => return Err(ObfuscationError::XmlError(e.to_string())),
                     };
-                    let (replaced_text, count) =
-                        apply_single_pass_replacements(raw_str, replacement_map, strict_word_boundaries);
+                    let (replaced_text, count) = apply_single_pass_replacements(
+                        raw_str,
+                        replacement_map,
+                        strict_word_boundaries,
+                    );
                     total_replacements += count;
                     writer
                         .write_event(Event::CData(BytesCData::new(&replaced_text)))
@@ -97,4 +103,3 @@ impl XmlAdapter {
         Ok((result_str, total_replacements))
     }
 }
-

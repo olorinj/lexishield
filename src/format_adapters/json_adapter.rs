@@ -35,18 +35,20 @@ impl JsonAdapter {
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
     ) -> Result<(String, usize), ObfuscationError> {
-        let mut parsed: Value = serde_json::from_str(text)
-            .map_err(ObfuscationError::JsonError)?;
+        let mut parsed: Value = serde_json::from_str(text).map_err(ObfuscationError::JsonError)?;
 
         let mut total_replacements = 0;
-        self.traverse_and_replace(&mut parsed, replacement_map, strict_word_boundaries, &mut total_replacements);
+        self.traverse_and_replace(
+            &mut parsed,
+            replacement_map,
+            strict_word_boundaries,
+            &mut total_replacements,
+        );
 
         let output = if text.contains('\n') {
-            serde_json::to_string_pretty(&parsed)
-                .map_err(ObfuscationError::JsonError)?
+            serde_json::to_string_pretty(&parsed).map_err(ObfuscationError::JsonError)?
         } else {
-            serde_json::to_string(&parsed)
-                .map_err(ObfuscationError::JsonError)?
+            serde_json::to_string(&parsed).map_err(ObfuscationError::JsonError)?
         };
 
         Ok((output, total_replacements))
@@ -63,16 +65,27 @@ impl JsonAdapter {
             Value::Object(map) => {
                 // Las claves (keys) NUNCA se tocan, solo se recorren los valores
                 for (_key, value) in map.iter_mut() {
-                    self.traverse_and_replace(value, replacement_map, strict_word_boundaries, counter);
+                    self.traverse_and_replace(
+                        value,
+                        replacement_map,
+                        strict_word_boundaries,
+                        counter,
+                    );
                 }
             }
             Value::Array(arr) => {
                 for item in arr.iter_mut() {
-                    self.traverse_and_replace(item, replacement_map, strict_word_boundaries, counter);
+                    self.traverse_and_replace(
+                        item,
+                        replacement_map,
+                        strict_word_boundaries,
+                        counter,
+                    );
                 }
             }
             Value::String(s) => {
-                let (replaced, count) = apply_single_pass_replacements(s, replacement_map, strict_word_boundaries);
+                let (replaced, count) =
+                    apply_single_pass_replacements(s, replacement_map, strict_word_boundaries);
                 if count > 0 {
                     *s = replaced;
                     *counter += count;
@@ -83,4 +96,3 @@ impl JsonAdapter {
         }
     }
 }
-

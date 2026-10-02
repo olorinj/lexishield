@@ -65,8 +65,11 @@ impl LogAdapter {
                         val
                     };
 
-                    let (new_val, count) =
-                        apply_single_pass_replacements(raw_val, replacement_map, strict_word_boundaries);
+                    let (new_val, count) = apply_single_pass_replacements(
+                        raw_val,
+                        replacement_map,
+                        strict_word_boundaries,
+                    );
                     total_replacements += count;
 
                     if is_quoted {

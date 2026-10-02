@@ -1,18 +1,19 @@
 //! Detectores de redes, direcciones IP, dominios, hostnames y correos electrónicos.
 
 use crate::models::DetectorType;
-use regex::Regex;
-use rand::Rng;
-use std::net::Ipv4Addr;
 use once_cell::sync::Lazy;
+use rand::Rng;
+use regex::Regex;
+use std::net::Ipv4Addr;
 
-static IPV4_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b").expect("Regex IPv4 inválida")
-});
+static IPV4_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b").expect("Regex IPv4 inválida"));
 
 static IPV6_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b|\b(?:[0-9a-f]{1,4}:){1,7}:[0-9a-f]{1,4}\b")
-        .expect("Regex IPv6 inválida")
+    Regex::new(
+        r"(?i)\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b|\b(?:[0-9a-f]{1,4}:){1,7}:[0-9a-f]{1,4}\b",
+    )
+    .expect("Regex IPv6 inválida")
 });
 
 static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -25,7 +26,8 @@ static DOMAIN_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 static HOSTNAME_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(?:host|srv|server|dc|ws|node|app)-?[a-z0-9]{2,10}\b").expect("Regex Hostname inválida")
+    Regex::new(r"(?i)\b(?:host|srv|server|dc|ws|node|app)-?[a-z0-9]{2,10}\b")
+        .expect("Regex Hostname inválida")
 });
 
 #[derive(Default)]
@@ -165,8 +167,11 @@ impl HostnameDetector {
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
         let id: u32 = rng.gen_range(100..999);
-        let prefix = if original.to_lowercase().starts_with("srv") { "srv" } else { "host" };
+        let prefix = if original.to_lowercase().starts_with("srv") {
+            "srv"
+        } else {
+            "host"
+        };
         format!("{}-anon-{}", prefix, id)
     }
 }
-

@@ -1,21 +1,18 @@
 //! Detectores específicos para identificadores de Windows (SIDs, Logon IDs, Hex IDs).
 
 use crate::models::DetectorType;
-use regex::Regex;
-use rand::Rng;
 use once_cell::sync::Lazy;
+use rand::Rng;
+use regex::Regex;
 
-static SID_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\bS-1-(?:[0-59]|16)(?:-\d+)+\b").expect("Regex de SID inválida")
-});
+static SID_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\bS-1-(?:[0-59]|16)(?:-\d+)+\b").expect("Regex de SID inválida"));
 
-static LOGON_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b0x[0-9a-f]{4,8}\b").expect("Regex de Logon ID inválida")
-});
+static LOGON_ID_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\b0x[0-9a-f]{4,8}\b").expect("Regex de Logon ID inválida"));
 
-static HEX_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b0x[0-9a-f]{9,}\b").expect("Regex de Hex ID inválida")
-});
+static HEX_ID_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\b0x[0-9a-f]{9,}\b").expect("Regex de Hex ID inválida"));
 
 #[derive(Default)]
 pub struct WindowsSidDetector;
@@ -68,7 +65,11 @@ impl WindowsLogonIdDetector {
 
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let len = original.trim_start_matches("0x").trim_start_matches("0X").len().max(4);
+        let len = original
+            .trim_start_matches("0x")
+            .trim_start_matches("0X")
+            .len()
+            .max(4);
         let val: u32 = rng.gen_range(0x1000..0xFFFF_FFFF);
         let is_upper = original.chars().skip(2).any(|c| c.is_ascii_uppercase());
         if is_upper {
@@ -100,7 +101,10 @@ impl WindowsHexIdDetector {
 
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let hex_len = original.trim_start_matches("0x").trim_start_matches("0X").len();
+        let hex_len = original
+            .trim_start_matches("0x")
+            .trim_start_matches("0X")
+            .len();
         let is_upper = original.chars().skip(2).any(|c| c.is_ascii_uppercase());
         let mut hex_str = String::with_capacity(hex_len);
         for _ in 0..hex_len {
@@ -114,4 +118,3 @@ impl WindowsHexIdDetector {
         format!("0x{}", hex_str)
     }
 }
-

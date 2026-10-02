@@ -77,12 +77,13 @@ impl ObfuscatorEngine {
 
         let replacement_map = self.manager.get_replacement_map(reverse);
 
-        let (result_text, replacements_count, detected_format) = self.format_orchestrator.process_content(
-            text,
-            format,
-            &replacement_map,
-            self.config.strict_word_boundaries,
-        )?;
+        let (result_text, replacements_count, detected_format) =
+            self.format_orchestrator.process_content(
+                text,
+                format,
+                &replacement_map,
+                self.config.strict_word_boundaries,
+            )?;
 
         let mut warnings = Vec::new();
         let mut syntax_valid = true;
@@ -138,4 +139,3 @@ impl ObfuscatorEngine {
         Ok(report)
     }
 }
-
