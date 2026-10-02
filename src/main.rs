@@ -60,9 +60,9 @@ impl From<CliDirection> for WatchDirection {
 enum DictCommands {
     /// Lista los mapeos contenidos en un archivo de mapeos (JSON o cifrado .lexi).
     List {
-        /// Ruta al archivo de mapeos.
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
         #[arg(short, long)]
-        mappings: PathBuf,
+        mappings: Option<PathBuf>,
 
         /// Contraseña si el archivo de mapeos está cifrado.
         #[arg(short, long)]
@@ -82,9 +82,9 @@ enum DictCommands {
         #[arg(short, long)]
         pseudonym: String,
 
-        /// Ruta al archivo de mapeos.
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
         #[arg(short, long)]
-        mappings: PathBuf,
+        mappings: Option<PathBuf>,
 
         /// Contraseña para cifrar o actualizar el archivo.
         #[arg(short, long)]
@@ -96,13 +96,17 @@ enum DictCommands {
     },
     /// Vacía o elimina todos los mapeos del archivo.
     Clear {
-        /// Ruta al archivo de mapeos.
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
         #[arg(short, long)]
-        mappings: PathBuf,
+        mappings: Option<PathBuf>,
 
         /// Contraseña si se desea mantener cifrado el archivo vacío.
         #[arg(short, long)]
         password: Option<String>,
+
+        /// Solicitar la contraseña de forma interactiva y oculta.
+        #[arg(long)]
+        ask_password: bool,
     },
 }
 
@@ -141,6 +145,10 @@ enum Commands {
         /// Solicitar la contraseña de cifrado interactivamente.
         #[arg(long)]
         ask_password: bool,
+
+        /// No guardar los mapeos generados (ignora el guardado por defecto).
+        #[arg(long)]
+        no_save: bool,
     },
 
     /// Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada.
@@ -161,9 +169,9 @@ enum Commands {
         #[arg(short, long)]
         clipboard: bool,
 
-        /// Archivo con los mapeos a aplicar (JSON o bóveda cifrada .lexi).
+        /// Archivo con los mapeos a aplicar (JSON o bóveda cifrada .lexi). Si se omite, usa el default.
         #[arg(short, long)]
-        mappings: PathBuf,
+        mappings: Option<PathBuf>,
 
         /// Contraseña para descifrar el archivo de mapeos.
         #[arg(short, long)]
@@ -296,6 +304,7 @@ struct ObfuscateOptions {
     save_mappings: Option<PathBuf>,
     password: Option<String>,
     ask_password: bool,
+    no_save: bool,
 }
 
 /// Manejador de la acción de ofuscación.
@@ -312,10 +321,21 @@ fn handle_obfuscate(
 
     let (result, report) = engine.obfuscate_text(&content, opts.format)?;
 
-    if let Some(map_path) = &opts.save_mappings {
-        let pwd = resolve_password(opts.password, opts.ask_password, None)?;
+    let map_path = if !opts.no_save {
+        opts.save_mappings
+            .or_else(|| lexishield::config::get_default_vault_path().ok())
+    } else {
+        None
+    };
+
+    if let Some(map_path) = map_path {
+        let is_default = opts.save_mappings.is_none();
+        // Forzar pregunta de contraseña si es el archivo por defecto y no se pasó una
+        let force_ask = is_default && opts.password.is_none();
+        
+        let pwd = resolve_password(opts.password, opts.ask_password || force_ask, None)?;
         let mappings = engine.manager.get_mappings();
-        lexishield::save_mappings_auto(map_path, &mappings, pwd.as_deref())?;
+        lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
         if pwd.is_some() {
             log::info!("Mapeos guardados y CIFRADOS en: {}", map_path.display());
         } else {
@@ -348,7 +368,7 @@ struct DeobfuscateOptions {
     output: Option<PathBuf>,
     text: Option<String>,
     clipboard: bool,
-    mappings: PathBuf,
+    mappings: Option<PathBuf>,
     password: Option<String>,
     ask_password: bool,
     format: FormatType,
@@ -362,8 +382,15 @@ fn handle_deobfuscate(
     let content =
         resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
 
-    let pwd = resolve_password(opts.password, opts.ask_password, Some(&opts.mappings))?;
-    let loaded_mappings = lexishield::load_mappings_auto(&opts.mappings, pwd.as_deref())?;
+    let is_default = opts.mappings.is_none();
+    let map_path = opts
+        .mappings
+        .or_else(|| lexishield::config::get_default_vault_path().ok())
+        .ok_or("No se especificó archivo de mapeos y no se pudo usar el default")?;
+
+    let force_ask = is_default && opts.password.is_none();
+    let pwd = resolve_password(opts.password, opts.ask_password || force_ask, Some(&map_path))?;
+    let loaded_mappings = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
 
     let mut engine = ObfuscatorEngine::new(config);
     engine.manager.load_mappings(loaded_mappings)?;
@@ -400,10 +427,7 @@ struct ScanOptions {
 }
 
 /// Manejador de la acción de escaneo.
-fn handle_scan(
-    config: LexiConfig,
-    opts: ScanOptions,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
     let content =
         resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
 
@@ -430,31 +454,36 @@ fn handle_scan(
         );
     }
 
-    if let Some(map_path) = opts.save_mappings {
-        let mut save = opts.yes;
-        if !save {
-            use std::io::{self, Write};
-            print!(
-                "¿Desea guardar los {} mapeos detectados en '{}'? [s/N]: ",
-                count,
-                map_path.display()
-            );
-            io::stdout().flush()?;
-            let mut input = String::new();
-            io::stdin().read_line(&mut input)?;
-            let trimmed = input.trim().to_lowercase();
-            if trimmed == "s" || trimmed == "si" || trimmed == "y" || trimmed == "yes" {
-                save = true;
-            }
-        }
+    let is_default = opts.save_mappings.is_none();
+    let map_path = opts
+        .save_mappings
+        .or_else(|| lexishield::config::get_default_vault_path().ok())
+        .ok_or("No se pudo resolver la ruta de mapeos por defecto")?;
 
-        if save {
-            let pwd = resolve_password(opts.password, opts.ask_password, None)?;
-            lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
-            log::info!("Mapeos guardados correctamente en: {}", map_path.display());
-        } else {
-            log::info!("Operación de guardado cancelada.");
+    let mut save = opts.yes;
+    if !save {
+        use std::io::{self, Write};
+        print!(
+            "¿Desea guardar los {} mapeos detectados en '{}'? [s/N]: ",
+            count,
+            map_path.display()
+        );
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let trimmed = input.trim().to_lowercase();
+        if trimmed == "s" || trimmed == "si" || trimmed == "y" || trimmed == "yes" {
+            save = true;
         }
+    }
+
+    if save {
+        let force_ask = is_default && opts.password.is_none();
+        let pwd = resolve_password(opts.password, opts.ask_password || force_ask, None)?;
+        lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
+        log::info!("Mapeos guardados correctamente en: {}", map_path.display());
+    } else {
+        log::info!("Operación de guardado cancelada.");
     }
 
     Ok(())
@@ -468,9 +497,13 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             password,
             ask_password,
         } => {
-            let pwd = resolve_password(password, ask_password, Some(&mappings))?;
-            let list = lexishield::load_mappings_auto(&mappings, pwd.as_deref())?;
-            println!("Mapeos en {}:", mappings.display());
+            let is_default = mappings.is_none();
+            let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok()).unwrap();
+            let force_ask = is_default && password.is_none();
+            
+            let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
+            let list = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
+            println!("Mapeos en {}:", map_path.display());
             for (i, m) in list.iter().enumerate() {
                 println!(
                     "  {}. [{:?}] '{}' -> '{}'",
@@ -488,9 +521,13 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             password,
             ask_password,
         } => {
-            let pwd = resolve_password(password, ask_password, Some(&mappings))?;
-            let mut list = if mappings.exists() {
-                lexishield::load_mappings_auto(&mappings, pwd.as_deref()).unwrap_or_default()
+            let is_default = mappings.is_none();
+            let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok()).unwrap();
+            let force_ask = is_default && password.is_none();
+
+            let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
+            let mut list = if map_path.exists() {
+                lexishield::load_mappings_auto(&map_path, pwd.as_deref()).unwrap_or_default()
             } else {
                 Vec::new()
             };
@@ -501,12 +538,17 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
                 detector_type: DetectorType::GenericToken,
                 omitted: false,
             });
-            lexishield::save_mappings_auto(&mappings, &list, pwd.as_deref())?;
-            log::info!("Mapeo añadido correctamente a {}", mappings.display());
+            lexishield::save_mappings_auto(&map_path, &list, pwd.as_deref())?;
+            log::info!("Mapeo añadido correctamente a {}", map_path.display());
         }
-        DictCommands::Clear { mappings, password } => {
-            lexishield::save_mappings_auto(&mappings, &[], password.as_deref())?;
-            log::info!("Diccionario vaciado en {}", mappings.display());
+        DictCommands::Clear { mappings, password, ask_password } => {
+            let is_default = mappings.is_none();
+            let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok()).unwrap();
+            let force_ask = is_default && password.is_none();
+
+            let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
+            lexishield::save_mappings_auto(&map_path, &[], pwd.as_deref())?;
+            log::info!("Diccionario vaciado en {}", map_path.display());
         }
     }
     Ok(())
@@ -592,12 +634,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ask_password,
             format,
         } => {
-            let pwd = resolve_password(password, ask_password, mappings.as_deref())?;
+            let is_default = mappings.is_none();
+            let map_path = mappings
+                .or_else(|| lexishield::config::get_default_vault_path().ok());
+                
+            let force_ask = is_default && password.is_none() && map_path.is_some();
+            let pwd = resolve_password(password, ask_password || force_ask, map_path.as_deref())?;
             watch_clipboard_loop(
                 direction.into(),
                 format.into(),
                 config,
-                mappings.as_deref(),
+                map_path.as_deref(),
                 pwd.as_deref(),
             )
         }
