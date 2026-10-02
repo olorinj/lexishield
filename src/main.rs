@@ -72,6 +72,20 @@ enum DictCommands {
         #[arg(long)]
         ask_password: bool,
     },
+    /// Cambia la contraseña de un archivo de mapeos cifrado (Rekey).
+    Rekey {
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
+        #[arg(short, long)]
+        mappings: Option<PathBuf>,
+
+        /// Contraseña original (actual).
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Nueva contraseña (si se omite, se preguntará interactivamente 2 veces).
+        #[arg(short = 'n', long)]
+        new_password: Option<String>,
+    },
     /// Añade un nuevo mapeo manual al archivo de mapeos.
     Add {
         /// Valor original sensible.
@@ -269,6 +283,31 @@ fn resolve_input_content(
 }
 
 /// Resuelve la contraseña ya sea desde CLI, de forma interactiva o detectando si el archivo está cifrado.
+fn check_password_complexity(pwd: &str) {
+    if pwd.len() < 8 {
+        log::warn!("Complejidad de contraseña baja: muy corta (menos de 8 caracteres).");
+    } else if pwd.chars().all(|c| c.is_ascii_lowercase()) {
+        log::warn!("Complejidad de contraseña baja: solo contiene letras minúsculas.");
+    } else if pwd.chars().all(|c| c.is_ascii_digit()) {
+        log::warn!("Complejidad de contraseña baja: solo contiene números.");
+    } else if pwd.chars().all(|c| c.is_alphabetic()) {
+        log::warn!("Complejidad de contraseña baja: no contiene números ni símbolos.");
+    }
+}
+
+fn prompt_new_password(prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
+    loop {
+        let p1 = rpassword::prompt_password(prompt)?;
+        let p2 = rpassword::prompt_password("Confirma la nueva contraseña: ")?;
+        if p1 == p2 {
+            check_password_complexity(&p1);
+            return Ok(p1);
+        } else {
+            println!("Las contraseñas no coinciden. Inténtalo de nuevo.");
+        }
+    }
+}
+
 fn resolve_password(
     cli_pwd: Option<String>,
     ask_pwd: bool,
@@ -277,21 +316,33 @@ fn resolve_password(
     if let Some(p) = cli_pwd {
         return Ok(Some(p));
     }
-    if ask_pwd {
-        let p = rpassword::prompt_password("Introduce la contraseña de la bóveda de mapeos: ")?;
-        return Ok(Some(p));
-    }
-    if let Some(path) = path
-        && path.exists()
-        && let Ok(data) = fs::read(path)
-        && lexishield::is_encrypted_vault(&data)
-    {
+    
+    let exists = path.map_or(false, |p| p.exists());
+    let is_encrypted = if exists {
+        let data = fs::read(path.unwrap()).unwrap_or_default();
+        lexishield::is_encrypted_vault(&data)
+    } else {
+        false
+    };
+
+    if exists && is_encrypted {
         let p = rpassword::prompt_password(format!(
-            "El archivo '{}' está cifrado con contraseña. Introduce la contraseña: ",
-            path.display()
+            "El archivo '{}' está cifrado. Introduce la contraseña actual: ",
+            path.unwrap().display()
         ))?;
         return Ok(Some(p));
     }
+
+    if ask_pwd {
+        if exists && !is_encrypted {
+            let p = prompt_new_password("Introduce una NUEVA contraseña para cifrar la bóveda: ")?;
+            return Ok(Some(p));
+        } else {
+            let p = prompt_new_password("Introduce la contraseña para la NUEVA bóveda de mapeos: ")?;
+            return Ok(Some(p));
+        }
+    }
+
     Ok(None)
 }
 
@@ -664,6 +715,37 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
                     m.pseudonym
                 );
             }
+        }
+        DictCommands::Rekey {
+            mappings,
+            password,
+            new_password,
+        } => {
+            let map_path = mappings
+                .or_else(|| lexishield::config::get_default_vault_path().ok())
+                .unwrap();
+
+            if !map_path.exists() {
+                return Err("El archivo de mapeos especificado no existe.".into());
+            }
+
+            // 1. Pedir la original 1 vez (o tomarla por parámetro)
+            let pwd = resolve_password(password, true, Some(&map_path))?;
+            
+            // Cargar archivo para validar clave original
+            let list = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
+
+            // 2. Pedir nueva contraseña 2 veces (o usar parámetro y validar)
+            let new_pwd = if let Some(np) = new_password {
+                check_password_complexity(&np);
+                np
+            } else {
+                prompt_new_password("Introduce la NUEVA contraseña para el archivo de mapeos: ")?
+            };
+
+            // 3. Guardar con la nueva contraseña
+            lexishield::save_mappings_auto(&map_path, &list, Some(&new_pwd))?;
+            log::info!("Contraseña cambiada correctamente en {}", map_path.display());
         }
         DictCommands::Add {
             original,
