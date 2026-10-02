@@ -332,7 +332,7 @@ fn handle_obfuscate(
     if let Some(map_path) = map_path {
         // Forzar pregunta de contraseña si es el archivo por defecto y no se pasó una
         let force_ask = is_default && opts.password.is_none();
-        
+
         let pwd = resolve_password(opts.password, opts.ask_password || force_ask, None)?;
         let mappings = engine.manager.get_mappings();
         lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
@@ -389,7 +389,11 @@ fn handle_deobfuscate(
         .ok_or("No se especificó archivo de mapeos y no se pudo usar el default")?;
 
     let force_ask = is_default && opts.password.is_none();
-    let pwd = resolve_password(opts.password, opts.ask_password || force_ask, Some(&map_path))?;
+    let pwd = resolve_password(
+        opts.password,
+        opts.ask_password || force_ask,
+        Some(&map_path),
+    )?;
     let loaded_mappings = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
 
     let mut engine = ObfuscatorEngine::new(config);
@@ -444,6 +448,8 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         return Ok(());
     }
 
+    use std::io::{self, Write};
+    let chunk_size = 20;
     for (i, m) in mappings.iter().enumerate() {
         println!(
             "{}. [{:?}] '{}' -> '{}'",
@@ -452,6 +458,20 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
             m.original,
             m.pseudonym
         );
+
+        if (i + 1) % chunk_size == 0 && i + 1 < count {
+            print!(
+                "--- Mostrados {} de {} (Enter para seguir, 'q' para saltar al final) --- ",
+                i + 1,
+                count
+            );
+            io::stdout().flush()?;
+            let mut buf = String::new();
+            io::stdin().read_line(&mut buf)?;
+            if buf.trim().to_lowercase() == "q" {
+                break;
+            }
+        }
     }
 
     let is_default = opts.save_mappings.is_none();
@@ -462,11 +482,10 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
 
     let mut save = opts.yes;
     let mut omitted_indices: Vec<usize> = Vec::new();
-    
+
     if !save {
-        use std::io::{self, Write};
         print!(
-            "¿Desea guardar los {} mapeos en '{}'? [s/N, o números a omitir (ej: 1,3)]: ",
+            "¿Desea guardar los {} mapeos en '{}'? [s/N, o números/rangos a omitir (ej: 1, 3-5)]: ",
             count,
             map_path.display()
         );
@@ -474,21 +493,38 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let trimmed = input.trim().to_lowercase();
-        
+
         if trimmed == "s" || trimmed == "si" || trimmed == "y" || trimmed == "yes" {
             save = true;
         } else if trimmed == "n" || trimmed == "no" || trimmed.is_empty() {
             save = false;
         } else {
             let parts: Vec<&str> = trimmed
-                .split(|c: char| !c.is_ascii_digit())
+                .split(|c: char| c.is_whitespace() || c == ',')
                 .filter(|s| !s.is_empty())
                 .collect();
-                
+
             if !parts.is_empty() {
                 let mut valid = true;
                 for p in parts {
-                    if let Ok(num) = p.parse::<usize>() {
+                    if p.contains('-') {
+                        let (start_str, end_str) = p.split_once('-').unwrap();
+
+                        if let (Ok(start), Ok(end)) =
+                            (start_str.parse::<usize>(), end_str.parse::<usize>())
+                        {
+                            if start > 0 && end >= start && end <= count {
+                                for num in start..=end {
+                                    omitted_indices.push(num - 1);
+                                }
+                            } else {
+                                println!("Aviso: el rango {}-{} es inválido.", start, end);
+                                valid = false;
+                            }
+                        } else {
+                            valid = false;
+                        }
+                    } else if let Ok(num) = p.parse::<usize>() {
                         if num > 0 && num <= count {
                             omitted_indices.push(num - 1);
                         } else {
@@ -541,9 +577,11 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             ask_password,
         } => {
             let is_default = mappings.is_none();
-            let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok()).unwrap();
+            let map_path = mappings
+                .or_else(|| lexishield::config::get_default_vault_path().ok())
+                .unwrap();
             let force_ask = is_default && password.is_none();
-            
+
             let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
             let list = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
             println!("Mapeos en {}:", map_path.display());
@@ -565,7 +603,9 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             ask_password,
         } => {
             let is_default = mappings.is_none();
-            let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok()).unwrap();
+            let map_path = mappings
+                .or_else(|| lexishield::config::get_default_vault_path().ok())
+                .unwrap();
             let force_ask = is_default && password.is_none();
 
             let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
@@ -584,9 +624,15 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             lexishield::save_mappings_auto(&map_path, &list, pwd.as_deref())?;
             log::info!("Mapeo añadido correctamente a {}", map_path.display());
         }
-        DictCommands::Clear { mappings, password, ask_password } => {
+        DictCommands::Clear {
+            mappings,
+            password,
+            ask_password,
+        } => {
             let is_default = mappings.is_none();
-            let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok()).unwrap();
+            let map_path = mappings
+                .or_else(|| lexishield::config::get_default_vault_path().ok())
+                .unwrap();
             let force_ask = is_default && password.is_none();
 
             let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
@@ -680,9 +726,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             format,
         } => {
             let is_default = mappings.is_none();
-            let map_path = mappings
-                .or_else(|| lexishield::config::get_default_vault_path().ok());
-                
+            let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok());
+
             let force_ask = is_default && password.is_none() && map_path.is_some();
             let pwd = resolve_password(password, ask_password || force_ask, map_path.as_deref())?;
             watch_clipboard_loop(
