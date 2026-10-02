@@ -67,7 +67,11 @@ pub struct Mapping {
 }
 
 impl Mapping {
-    pub fn new(original: impl Into<String>, pseudonym: impl Into<String>, detector_type: DetectorType) -> Self {
+    pub fn new(
+        original: impl Into<String>,
+        pseudonym: impl Into<String>,
+        detector_type: DetectorType,
+    ) -> Self {
         let orig = original.into();
         let pseudo = pseudonym.into();
         let omitted = orig == "=" || pseudo == "=";
@@ -140,4 +144,3 @@ impl From<serde_json::Error> for ObfuscationError {
         Self::JsonError(err)
     }
 }
-

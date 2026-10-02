@@ -21,7 +21,11 @@ fn test_mejora_1_json_keys_intact() {
     // Registramos mapeos
     engine
         .manager
-        .add_mapping(Mapping::new("192.168.1.100", "192.0.2.1", DetectorType::IPv4))
+        .add_mapping(Mapping::new(
+            "192.168.1.100",
+            "192.0.2.1",
+            DetectorType::IPv4,
+        ))
         .unwrap();
     engine
         .manager
@@ -70,7 +74,11 @@ fn test_mejora_1_xml_tags_intact() {
         .unwrap();
     engine
         .manager
-        .add_mapping(Mapping::new("admin@corp.es", "anon@example.com", DetectorType::Email))
+        .add_mapping(Mapping::new(
+            "admin@corp.es",
+            "anon@example.com",
+            DetectorType::Email,
+        ))
         .unwrap();
 
     let (obfuscated, report) = engine.obfuscate_text(xml_input, FormatType::Xml).unwrap();
@@ -121,13 +129,17 @@ fn test_mejora_4_bidirectional_roundtrip_injective() {
     assert_eq!(detected_count, 3);
 
     // Ofuscar
-    let (obfuscated, _) = engine.obfuscate_text(original_json, FormatType::Json).unwrap();
+    let (obfuscated, _) = engine
+        .obfuscate_text(original_json, FormatType::Json)
+        .unwrap();
     assert!(!obfuscated.contains("e2f1837a-751a-4c28-98e3-057bfd589d81"));
     assert!(!obfuscated.contains("S-1-5-21-397955417-626881126-188441444-500"));
     assert!(!obfuscated.contains("juan.perez@empresa.com"));
 
     // Desofuscar (proceso inverso 100% fiel)
-    let (restored, _) = engine.deobfuscate_text(&obfuscated, FormatType::Json).unwrap();
+    let (restored, _) = engine
+        .deobfuscate_text(&obfuscated, FormatType::Json)
+        .unwrap();
     assert!(restored.contains("e2f1837a-751a-4c28-98e3-057bfd589d81"));
     assert!(restored.contains("S-1-5-21-397955417-626881126-188441444-500"));
     assert!(restored.contains("juan.perez@empresa.com"));
@@ -173,4 +185,3 @@ fn test_omitted_mapping_with_equals_sign() {
     assert_eq!(result, text);
     assert_eq!(report.replacements_applied, 0);
 }
-

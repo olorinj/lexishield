@@ -97,10 +97,15 @@ pub fn ensure_user_config_initialized() -> Result<PathBuf, ObfuscationError> {
     let config_path = config_dir.join(CONFIG_FILE_NAME);
     if !config_path.exists() {
         let default_config = LexiConfig::default();
-        let content = serde_json::to_string_pretty(&default_config)
-            .map_err(|e| ObfuscationError::ConfigError(format!("Error serializando config: {}", e)))?;
+        let content = serde_json::to_string_pretty(&default_config).map_err(|e| {
+            ObfuscationError::ConfigError(format!("Error serializando config: {}", e))
+        })?;
         fs::write(&config_path, content).map_err(|e| {
-            ObfuscationError::ConfigError(format!("Error escribiendo {}: {}", config_path.display(), e))
+            ObfuscationError::ConfigError(format!(
+                "Error escribiendo {}: {}",
+                config_path.display(),
+                e
+            ))
         })?;
         log::info!("Configuración base copiada a {}", config_path.display());
     }
@@ -115,7 +120,10 @@ pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
         None => match ensure_user_config_initialized() {
             Ok(p) => p,
             Err(err) => {
-                log::warn!("No se pudo inicializar config de usuario ({}); usando valores por defecto", err);
+                log::warn!(
+                    "No se pudo inicializar config de usuario ({}); usando valores por defecto",
+                    err
+                );
                 return LexiConfig::default();
             }
         },
@@ -125,14 +133,21 @@ pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
         Ok(data) => match serde_json::from_str::<LexiConfig>(&data) {
             Ok(cfg) => cfg,
             Err(e) => {
-                log::warn!("Error al parsear {} ({}); usando valores por defecto", path_to_load.display(), e);
+                log::warn!(
+                    "Error al parsear {} ({}); usando valores por defecto",
+                    path_to_load.display(),
+                    e
+                );
                 LexiConfig::default()
             }
         },
         Err(e) => {
-            log::warn!("Error al leer {} ({}); usando valores por defecto", path_to_load.display(), e);
+            log::warn!(
+                "Error al leer {} ({}); usando valores por defecto",
+                path_to_load.display(),
+                e
+            );
             LexiConfig::default()
         }
     }
 }
-

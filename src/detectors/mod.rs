@@ -104,7 +104,8 @@ impl DetectorRegistry {
         min_token_len: usize,
     ) -> Vec<Mapping> {
         let mut found_mappings: Vec<Mapping> = Vec::new();
-        let mut seen_originals: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut seen_originals: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         let mut claimed_spans: Vec<(usize, usize)> = Vec::new();
 
         for &dtype in priority_order {
@@ -129,13 +130,15 @@ impl DetectorRegistry {
 
             for (start, end, matched_str) in matches {
                 // Verificar si el rango se solapa con un patrón más prioritario ya capturado
-                let overlaps = claimed_spans.iter().any(|&(s, e)| (start >= s && start < e) || (end > s && end <= e) || (start <= s && end >= e));
+                let overlaps = claimed_spans.iter().any(|&(s, e)| {
+                    (start >= s && start < e) || (end > s && end <= e) || (start <= s && end >= e)
+                });
                 if overlaps {
                     continue;
                 }
 
                 let candidate = matched_str.trim();
-                
+
                 // Salvaguardas de la Mejora 2: Longitud mínima y palabras protegidas
                 if candidate.len() < min_token_len {
                     // Permitir solo si es un tipo estructurado de alta fidelidad
@@ -145,7 +148,10 @@ impl DetectorRegistry {
                 }
 
                 if is_protected_word(candidate) {
-                    log::debug!("Token descartado por coincidir con palabra protegida: {}", candidate);
+                    log::debug!(
+                        "Token descartado por coincidir con palabra protegida: {}",
+                        candidate
+                    );
                     continue;
                 }
 

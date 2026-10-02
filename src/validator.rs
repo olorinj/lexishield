@@ -38,7 +38,10 @@ impl SyntaxValidator {
         }
     }
 
-    fn validate_json(original: &str, obfuscated: &str) -> Result<ValidationReport, ObfuscationError> {
+    fn validate_json(
+        original: &str,
+        obfuscated: &str,
+    ) -> Result<ValidationReport, ObfuscationError> {
         let orig_val: Value = match serde_json::from_str(original) {
             Ok(v) => v,
             Err(_) => {
@@ -54,7 +57,10 @@ impl SyntaxValidator {
         };
 
         let obf_val: Value = serde_json::from_str(obfuscated).map_err(|e| {
-            ObfuscationError::ValidationError(format!("El JSON ofuscado quedó sintácticamente inválido: {}", e))
+            ObfuscationError::ValidationError(format!(
+                "El JSON ofuscado quedó sintácticamente inválido: {}",
+                e
+            ))
         })?;
 
         let mut orig_keys = HashSet::new();
@@ -109,7 +115,10 @@ impl SyntaxValidator {
         }
     }
 
-    fn validate_xml(original: &str, obfuscated: &str) -> Result<ValidationReport, ObfuscationError> {
+    fn validate_xml(
+        original: &str,
+        obfuscated: &str,
+    ) -> Result<ValidationReport, ObfuscationError> {
         let orig_tags = Self::extract_xml_tags(original);
         let obf_tags = Self::extract_xml_tags(obfuscated);
 
@@ -117,7 +126,9 @@ impl SyntaxValidator {
         let schema_intact = match (&orig_tags, &obf_tags) {
             (Ok(o), Ok(b)) => {
                 if o != b {
-                    issues.push("Las etiquetas XML entre el original y el ofuscado difieren".to_string());
+                    issues.push(
+                        "Las etiquetas XML entre el original y el ofuscado difieren".to_string(),
+                    );
                     false
                 } else {
                     true
@@ -128,7 +139,7 @@ impl SyntaxValidator {
                 return Err(ObfuscationError::ValidationError(format!(
                     "El XML ofuscado contiene errores de parseo: {}",
                     e
-                )))
+                )));
             }
         };
 
@@ -163,4 +174,3 @@ impl SyntaxValidator {
         Ok(tags)
     }
 }
-

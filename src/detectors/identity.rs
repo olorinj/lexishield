@@ -1,14 +1,15 @@
 //! Detectores de identidad personal: DNI/NIE con letra de control real, Tarjetas con Luhn y Teléfonos.
 
 use crate::models::DetectorType;
-use regex::Regex;
-use rand::Rng;
 use once_cell::sync::Lazy;
+use rand::Rng;
+use regex::Regex;
 
 const DNI_LETTERS: &[u8] = b"TRWAGMYFPDXBNJZSQVHLCKE";
 
 static DNI_NIE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(?:([XYZxyz])\s*(\d{7})|(\d{8}))\s*([A-Za-z])\b").expect("Regex DNI/NIE inválida")
+    Regex::new(r"(?i)\b(?:([XYZxyz])\s*(\d{7})|(\d{8}))\s*([A-Za-z])\b")
+        .expect("Regex DNI/NIE inválida")
 });
 
 static CREDIT_CARD_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -16,7 +17,8 @@ static CREDIT_CARD_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 static PHONE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?:\+34[\s.-]?)?(?:[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})\b").expect("Regex Phone inválida")
+    Regex::new(r"(?:\+34[\s.-]?)?(?:[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3})\b")
+        .expect("Regex Phone inválida")
 });
 
 #[derive(Default)]
@@ -75,8 +77,16 @@ impl SpanishDniNieDetector {
         let mut rng = rand::thread_rng();
         let num: u32 = rng.gen_range(10_000_000..99_999_999);
         let letter = Self::calculate_control_letter(num);
-        let is_upper = original.chars().last().map(|c| c.is_ascii_uppercase()).unwrap_or(true);
-        let out_letter = if is_upper { letter } else { letter.to_ascii_lowercase() };
+        let is_upper = original
+            .chars()
+            .last()
+            .map(|c| c.is_ascii_uppercase())
+            .unwrap_or(true);
+        let out_letter = if is_upper {
+            letter
+        } else {
+            letter.to_ascii_lowercase()
+        };
         format!("{:08}{}", num, out_letter)
     }
 }
@@ -148,18 +158,42 @@ impl CreditCardDetector {
         if original.contains('-') {
             format!(
                 "{}{}{}{}-{}{}{}{}-{}{}{}{}-{}{}{}{}",
-                digits[0], digits[1], digits[2], digits[3],
-                digits[4], digits[5], digits[6], digits[7],
-                digits[8], digits[9], digits[10], digits[11],
-                digits[12], digits[13], digits[14], digits[15]
+                digits[0],
+                digits[1],
+                digits[2],
+                digits[3],
+                digits[4],
+                digits[5],
+                digits[6],
+                digits[7],
+                digits[8],
+                digits[9],
+                digits[10],
+                digits[11],
+                digits[12],
+                digits[13],
+                digits[14],
+                digits[15]
             )
         } else if original.contains(' ') {
             format!(
                 "{}{}{}{} {}{}{}{} {}{}{}{} {}{}{}{}",
-                digits[0], digits[1], digits[2], digits[3],
-                digits[4], digits[5], digits[6], digits[7],
-                digits[8], digits[9], digits[10], digits[11],
-                digits[12], digits[13], digits[14], digits[15]
+                digits[0],
+                digits[1],
+                digits[2],
+                digits[3],
+                digits[4],
+                digits[5],
+                digits[6],
+                digits[7],
+                digits[8],
+                digits[9],
+                digits[10],
+                digits[11],
+                digits[12],
+                digits[13],
+                digits[14],
+                digits[15]
             )
         } else {
             digits.iter().map(|d| d.to_string()).collect()
@@ -218,4 +252,3 @@ impl TelephoneDetector {
         }
     }
 }
-

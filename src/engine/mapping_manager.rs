@@ -26,7 +26,10 @@ impl MappingManager {
     pub fn add_mapping(&mut self, mapping: Mapping) -> Result<(), ObfuscationError> {
         // Regla 6: Manejo de comodín de omisión ("=")
         if mapping.original == "=" || mapping.pseudonym == "=" || mapping.omitted {
-            log::debug!("Mapeo marcado como omitido ('='), descartado de sustitución: {}", mapping.original);
+            log::debug!(
+                "Mapeo marcado como omitido ('='), descartado de sustitución: {}",
+                mapping.original
+            );
             return Ok(());
         }
 
@@ -51,7 +54,8 @@ impl MappingManager {
             )));
         }
 
-        self.reverse.insert(mapping.pseudonym.clone(), mapping.original.clone());
+        self.reverse
+            .insert(mapping.pseudonym.clone(), mapping.original.clone());
         self.forward.insert(mapping.original.clone(), mapping);
         Ok(())
     }
@@ -94,4 +98,3 @@ impl MappingManager {
         self.reverse.clear();
     }
 }
-

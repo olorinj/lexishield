@@ -1,7 +1,7 @@
 //! Motor de reemplazo de subcadenas en una sola pasada (Single-Pass Token Replacer).
 
-use std::collections::HashMap;
 use regex::Regex;
+use std::collections::HashMap;
 
 /// Realiza reemplazos en una sola pasada evitando el efecto cascada (A -> B, B -> C).
 ///
@@ -52,4 +52,3 @@ pub fn apply_single_pass_replacements(
 
     (result.into_owned(), replacements_count)
 }
-
