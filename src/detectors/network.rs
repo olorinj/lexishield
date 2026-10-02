@@ -7,7 +7,7 @@ use regex::Regex;
 use std::net::Ipv4Addr;
 
 static IPV4_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b").expect("Regex IPv4 inválida"));
+    Lazy::new(|| Regex::new(r"\b(?:[0-9]{1,3}\\?\.){3}[0-9]{1,3}\b").expect("Regex IPv4 inválida"));
 
 static IPV6_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -30,8 +30,8 @@ static HOSTNAME_REGEX: Lazy<Regex> = Lazy::new(|| {
         .expect("Regex Hostname inválida")
 });
 
-use std::collections::{HashMap, HashSet};
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Default)]
 pub struct IPv4Detector {
@@ -55,7 +55,8 @@ impl IPv4Detector {
         IPV4_REGEX
             .find_iter(text)
             .filter_map(|m| {
-                if m.as_str().parse::<Ipv4Addr>().is_ok() {
+                let clean_str = m.as_str().replace('\\', "");
+                if clean_str.parse::<Ipv4Addr>().is_ok() {
                     Some((m.start(), m.end(), m.as_str()))
                 } else {
                     None
@@ -74,8 +75,12 @@ impl IPv4Detector {
     /// Genera una dirección IP. Si es privada, mantiene coherencia en la subred /24.
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
+        let clean_original = original.replace('\\', "");
+        let has_escapes = original.contains('\\');
 
-        if let Ok(ip) = original.parse::<Ipv4Addr>() {
+        let mut result = String::new();
+
+        if let Ok(ip) = clean_original.parse::<Ipv4Addr>() {
             if Self::is_private(&ip) {
                 let octets = ip.octets();
                 let subnet_key = format!("{}.{}.{}", octets[0], octets[1], octets[2]);
@@ -99,13 +104,21 @@ impl IPv4Detector {
                     }
                 });
 
-                return format!("{}.{}", new_subnet, octets[3]);
+                result = format!("{}.{}", new_subnet, octets[3]);
             }
         }
 
         // Para IPs públicas (o fallback), usar el rango TEST-NET-1
-        let octet: u8 = rng.gen_range(1..254);
-        format!("192.0.2.{}", octet)
+        if result.is_empty() {
+            let octet: u8 = rng.gen_range(1..254);
+            result = format!("192.0.2.{}", octet);
+        }
+
+        if has_escapes {
+            result.replace('.', "\\.")
+        } else {
+            result
+        }
     }
 }
 
