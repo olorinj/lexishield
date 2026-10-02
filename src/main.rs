@@ -317,7 +317,8 @@ fn handle_obfuscate(
 
     let is_default = opts.save_mappings.is_none();
     let map_path = if !opts.no_save {
-        opts.save_mappings.clone()
+        opts.save_mappings
+            .clone()
             .or_else(|| lexishield::config::get_default_vault_path().ok())
     } else {
         None
@@ -326,18 +327,21 @@ fn handle_obfuscate(
     let mut engine = ObfuscatorEngine::new(config);
 
     let mut final_pwd = opts.password.clone();
-    if let Some(ref path) = map_path {
-        if path.exists() {
-            let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(path))?;
-            final_pwd = pwd.clone();
-            if let Ok(loaded) = lexishield::load_mappings_auto(path, pwd.as_deref()) {
-                let _ = engine.manager.load_mappings(loaded);
-            }
+    if let Some(ref path) = map_path
+        && path.exists()
+    {
+        let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(path))?;
+        final_pwd = pwd.clone();
+        if let Ok(loaded) = lexishield::load_mappings_auto(path, pwd.as_deref()) {
+            let _ = engine.manager.load_mappings(loaded);
         }
     }
 
     let newly_added = engine.scan_and_register_mappings(&content)?;
-    log::info!("Detectados {} NUEVOS elementos sensibles.", newly_added.len());
+    log::info!(
+        "Detectados {} NUEVOS elementos sensibles.",
+        newly_added.len()
+    );
 
     let (result, report) = engine.obfuscate_text(&content, opts.format)?;
 
@@ -443,10 +447,30 @@ struct ScanOptions {
 }
 
 /// Manejador de la acción de escaneo.
-fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
-    let content =
-        resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+fn collect_files(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with('.') {
+                    continue; // Saltar archivos ocultos (.git, etc)
+                }
+            }
+            if path.is_dir() {
+                files.extend(collect_files(&path)?);
+            } else if path.is_file() {
+                files.push(path);
+            }
+        }
+    } else {
+        files.push(dir.to_path_buf());
+    }
+    Ok(files)
+}
 
+fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
     let is_default = opts.save_mappings.is_none();
     let map_path = opts
         .save_mappings
@@ -465,7 +489,26 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         }
     }
 
-    let mut newly_added = engine.scan_and_register_mappings(&content)?;
+    let mut newly_added = Vec::new();
+
+    if let Some(ref path) = opts.input {
+        if path.is_dir() {
+            let files = collect_files(path)?;
+            for f in files {
+                if let Ok(content) = fs::read_to_string(&f) {
+                    let mut file_new = engine.scan_and_register_mappings(&content)?;
+                    newly_added.append(&mut file_new);
+                }
+            }
+        } else {
+            let content = resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+            newly_added = engine.scan_and_register_mappings(&content)?;
+        }
+    } else {
+        let content = resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+        newly_added = engine.scan_and_register_mappings(&content)?;
+    }
+
     let count = newly_added.len();
 
     log::info!(
