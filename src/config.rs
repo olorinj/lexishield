@@ -77,6 +77,21 @@ pub fn get_user_config_dir() -> Result<PathBuf, ObfuscationError> {
     Ok(home.join(USER_CONFIG_DIR_NAME))
 }
 
+/// Obtiene la ruta del fichero cifrado de mapeos por defecto.
+pub fn get_default_vault_path() -> Result<PathBuf, ObfuscationError> {
+    let config_dir = get_user_config_dir()?;
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).map_err(|e| {
+            ObfuscationError::ConfigError(format!(
+                "Error al crear directorio de configuración {}: {}",
+                config_dir.display(),
+                e
+            ))
+        })?;
+    }
+    Ok(config_dir.join("default.lexi"))
+}
+
 /// Inicializa el directorio y archivo de configuración en el perfil del usuario.
 ///
 /// Cumple la regla universal: Si el archivo no existe, lo crea con la configuración
