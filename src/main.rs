@@ -461,10 +461,12 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         .ok_or("No se pudo resolver la ruta de mapeos por defecto")?;
 
     let mut save = opts.yes;
+    let mut omitted_indices: Vec<usize> = Vec::new();
+    
     if !save {
         use std::io::{self, Write};
         print!(
-            "¿Desea guardar los {} mapeos detectados en '{}'? [s/N]: ",
+            "¿Desea guardar los {} mapeos en '{}'? [s/N, o números a omitir (ej: 1,3)]: ",
             count,
             map_path.display()
         );
@@ -472,15 +474,56 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let trimmed = input.trim().to_lowercase();
+        
         if trimmed == "s" || trimmed == "si" || trimmed == "y" || trimmed == "yes" {
             save = true;
+        } else if trimmed == "n" || trimmed == "no" || trimmed.is_empty() {
+            save = false;
+        } else {
+            let parts: Vec<&str> = trimmed
+                .split(|c: char| !c.is_ascii_digit())
+                .filter(|s| !s.is_empty())
+                .collect();
+                
+            if !parts.is_empty() {
+                let mut valid = true;
+                for p in parts {
+                    if let Ok(num) = p.parse::<usize>() {
+                        if num > 0 && num <= count {
+                            omitted_indices.push(num - 1);
+                        } else {
+                            println!("Aviso: el número {} está fuera de rango.", num);
+                            valid = false;
+                        }
+                    } else {
+                        valid = false;
+                    }
+                }
+                if valid {
+                    save = true;
+                } else {
+                    println!("Entrada inválida. Cancelando guardado.");
+                    save = false;
+                }
+            } else {
+                save = false;
+            }
         }
     }
 
     if save {
+        let mut final_mappings = mappings;
+        for idx in omitted_indices {
+            if let Some(m) = final_mappings.get_mut(idx) {
+                m.pseudonym = "=".to_string();
+                m.omitted = true;
+                log::info!("Mapeo {} omitido por elección del usuario.", m.original);
+            }
+        }
+
         let force_ask = is_default && opts.password.is_none();
         let pwd = resolve_password(opts.password, opts.ask_password || force_ask, None)?;
-        lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
+        lexishield::save_mappings_auto(&map_path, &final_mappings, pwd.as_deref())?;
         log::info!("Mapeos guardados correctamente en: {}", map_path.display());
     } else {
         log::info!("Operación de guardado cancelada.");
