@@ -107,6 +107,7 @@ pub enum ObfuscationError {
     ValidationError(String),
     InvalidFormat(String),
     ConfigError(String),
+    CryptoError(String),
 }
 
 impl fmt::Display for ObfuscationError {
@@ -119,6 +120,7 @@ impl fmt::Display for ObfuscationError {
             Self::ValidationError(msg) => write!(f, "Error de validación post-ofuscación: {}", msg),
             Self::InvalidFormat(msg) => write!(f, "Formato no válido: {}", msg),
             Self::ConfigError(msg) => write!(f, "Error en configuración: {}", msg),
+            Self::CryptoError(msg) => write!(f, "Error criptográfico/bóveda segura: {}", msg),
         }
     }
 }

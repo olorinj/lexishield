@@ -70,30 +70,34 @@ Ofusca un archivo, texto directo o el portapapeles.
 * **`-t, --text <STRING>`**: Texto directo a procesar (si no se especifica archivo).
 * **`-c, --clipboard`**: Procesa de forma atómica el contenido actual del portapapeles y copia el resultado de vuelta.
 * **`-f, --format <FORMAT>`**: Formato estructurado (`auto`, `json`, `xml`, `log`, `text`). Por defecto es `auto`.
-* **`-s, --save-mappings <FILE>`**: Ruta donde guardar la tabla de mapeos generada en formato JSON para poder revertirla más adelante.
+* **`-s, --save-mappings <FILE>`**: Ruta donde guardar la tabla de mapeos generada (soporta JSON o bóvedas cifradas `.lexi`).
+* **`-p, --password <PASSWORD>`**: Contraseña para cifrar la tabla de mapeos guardada (Argon2id + ChaCha20-Poly1305).
+* **`--ask-password`**: Solicita la contraseña de cifrado interactivamente de forma oculta en consola.
 
 *Ejemplos:*
 ```bash
-# Ofuscar archivo
-lexishield obfuscate -i server_logs.json -o logs_seguros.json -s mapeos.json
+# Ofuscar archivo y guardar mapeos cifrados con contraseña
+lexishield obfuscate -i server_logs.json -o logs_seguros.json -s mapeos.lexi -p "MiContraseña123!"
 
 # Ofuscar directamente lo que tienes copiado en el portapapeles (One-Shot)
 lexishield obfuscate -c
 ```
 
 ### 2. Comando: `deobfuscate`
-Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos JSON guardada previamente.
+Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado).
 
 * **`-i, --input <FILE>`**: Archivo de entrada a desofuscar.
 * **`-o, --output <FILE>`**: Archivo de salida.
 * **`-t, --text <STRING>`**: Texto directo a desofuscar.
 * **`-c, --clipboard`**: Desofusca el texto copiado en el portapapeles y lo reemplaza con el texto real.
-* **`-m, --mappings <FILE>`**: Archivo JSON obligatorio con los mapeos a aplicar.
+* **`-m, --mappings <FILE>`**: Archivo con los mapeos a aplicar (detecta automáticamente si está cifrado o en texto plano).
+* **`-p, --password <PASSWORD>`**: Contraseña de descifrado (si el archivo está protegido).
+* **`--ask-password`**: Pide la contraseña por consola. Si el archivo está cifrado y no pasas contraseña, te la pedirá automáticamente.
 * **`-f, --format <FORMAT>`**: Formato de lectura/escritura (`auto`, `json`, `xml`, `log`, `text`).
 
 *Ejemplo:*
 ```bash
-lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.json
+lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi -p "MiContraseña123!"
 ```
 
 ### 3. Comando: `scan`
@@ -107,24 +111,25 @@ Escanea un archivo, texto o portapapeles y muestra los datos sensibles detectado
 Monitoriza continuamente el portapapeles mediante eventos nativos del sistema operativo y supresión de eco. Cada vez que pulses `Ctrl+C` para copiar un texto, LexiShield lo transformará automáticamente.
 
 * **`-d, --direction <DIRECTION>`**: Dirección de transformación: `obfuscate` (por defecto) o `deobfuscate`.
-* **`-m, --mappings <FILE>`**: Archivo JSON opcional para cargar/sincronizar los mapeos generados.
+* **`-m, --mappings <FILE>`**: Archivo para sincronizar y persistir mapeos (JSON o `.lexi` cifrado).
+* **`-p, --password <PASSWORD>`**: Contraseña si los mapeos van a guardarse o leerse cifrados.
 * **`-f, --format <FORMAT>`**: Formato estructural esperado.
 
 *Ejemplos:*
 ```bash
-# Modo guardián: todo lo que copies se ofuscará en vivo antes de pegarlo a la IA
-lexishield watch --direction obfuscate -m mapeos.json
+# Modo guardián cifrado: todo lo que copies se ofusca y los mapeos se guardan en la bóveda protegida
+lexishield watch --direction obfuscate -m mapeos.lexi -p "MiContraseña123!"
 
-# Modo restauración: todo lo que copies de la IA se desofuscará automáticamente
-lexishield watch --direction deobfuscate -m mapeos.json
+# Modo restauración: todo lo que copies de la IA se desofuscará automáticamente usando la bóveda
+lexishield watch --direction deobfuscate -m mapeos.lexi -p "MiContraseña123!"
 ```
 
 ### 5. Comando: `dict`
-Gestiona manualmente diccionarios de mapeos en formato JSON:
+Gestiona diccionarios de mapeos (soporta tanto JSON plano como bóvedas cifradas):
 
-* **`lexishield dict list -m mapeos.json`**: Lista todos los pares registrados.
-* **`lexishield dict add -o "usuario.real" -p "user0001" -m mapeos.json`**: Inyecta un par personalizado.
-* **`lexishield dict clear -m mapeos.json`**: Vacía el diccionario.
+* **`lexishield dict list -m mapeos.lexi -p "pwd"`**: Lista todos los pares registrados en la bóveda.
+* **`lexishield dict add -o "usuario.real" -p "user0001" -m mapeos.lexi -p "pwd"`**: Inyecta un par en la bóveda.
+* **`lexishield dict clear -m mapeos.lexi -p "pwd"`**: Vacía el diccionario cifrado.
 
 ---
 

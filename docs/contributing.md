@@ -19,3 +19,4 @@ Para compilar el proyecto en todos los sistemas operativos simultáneamente de f
 ```powershell
 .\compilar.ps1 -All
 ```
+

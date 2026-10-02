@@ -4,6 +4,7 @@
 
 pub mod clipboard;
 pub mod config;
+pub mod crypto;
 pub mod detectors;
 pub mod engine;
 pub mod format_adapters;
@@ -13,5 +14,8 @@ pub mod stopwords;
 pub mod validator;
 
 pub use config::LexiConfig;
+pub use crypto::{
+    decrypt_mappings, encrypt_mappings, is_encrypted_vault, load_mappings_auto, save_mappings_auto,
+};
 pub use engine::{MappingManager, ObfuscatorEngine};
 pub use models::{DetectorType, FormatType, Mapping, ObfuscationError, ObfuscationReport};
