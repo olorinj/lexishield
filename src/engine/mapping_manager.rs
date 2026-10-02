@@ -27,9 +27,14 @@ impl MappingManager {
         // Regla 6: Manejo de comodín de omisión ("=")
         if mapping.original == "=" || mapping.pseudonym == "=" || mapping.omitted {
             log::debug!(
-                "Mapeo marcado como omitido ('='), descartado de sustitución: {}",
+                "Mapeo marcado como omitido ('='), se mantendrá original: {}",
                 mapping.original
             );
+            let mut m = mapping.clone();
+            m.omitted = true;
+            m.pseudonym = "=".to_string();
+            self.forward.insert(m.original.clone(), m);
+            // No lo añadimos al reverse map para evitar colisiones con múltiples "="
             return Ok(());
         }
 
@@ -37,11 +42,11 @@ impl MappingManager {
             return Ok(());
         }
 
-        // Si ya existe el original con el mismo seudónimo, no es error
-        if let Some(existing) = self.forward.get(&mapping.original)
-            && existing.pseudonym == mapping.pseudonym
-        {
-            return Ok(());
+        // Si ya existe el original, comprobamos si está omitido o si coincide el seudónimo
+        if let Some(existing) = self.forward.get(&mapping.original) {
+            if existing.omitted || existing.pseudonym == mapping.pseudonym {
+                return Ok(());
+            }
         }
 
         // Verificar inyectividad en el sentido inverso: el seudónimo no debe estar ocupado por otro original
