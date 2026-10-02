@@ -236,6 +236,7 @@ if [ "$keep_intermediate" = false ]; then
         sudo rm -rf "$CARGO_TARGET_DIR"
     fi
     cargo clean
+    rm -rf target/
 fi
 
 echo -e "\n\e[32m========================================================\e[0m"
