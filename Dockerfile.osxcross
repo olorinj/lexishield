@@ -1,0 +1,32 @@
+FROM crazymax/osxcross:latest-ubuntu AS osxcross
+
+FROM rust:latest
+
+# Instalar clang y LLVM, que son requeridos por osxcross para funcionar
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang \
+    llvm \
+    lld \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar el entorno y SDK de macOS compilado
+COPY --from=osxcross /osxcross /osxcross
+
+# Instalar toolchains de rust para macOS
+RUN rustup target add x86_64-apple-darwin
+RUN rustup target add aarch64-apple-darwin
+
+# Configurar variables de entorno
+ENV PATH="/osxcross/bin:$PATH"
+ENV LD_LIBRARY_PATH="/osxcross/lib:$LD_LIBRARY_PATH"
+
+ENV CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER=o64-clang
+ENV CC_x86_64_apple_darwin=o64-clang
+ENV CXX_x86_64_apple_darwin=o64-clang++
+
+ENV CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=oa64-clang
+ENV CC_aarch64_apple_darwin=oa64-clang
+ENV CXX_aarch64_apple_darwin=oa64-clang++
+
+WORKDIR /src
