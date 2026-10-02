@@ -63,7 +63,7 @@ El software en Rust se divide en capas modulares bien delimitadas:
 
 ---
 
-## 💻 Interfaz de línea de comandos (CLI)
+##  Interfaz de línea de comandos (CLI)
 
 El binario `lexishield` proporciona una interfaz por consola directa y eficiente. A diferencia de versiones anteriores, esta versión en Rust centraliza las operaciones en tres comandos principales.
 
@@ -74,25 +74,31 @@ lexishield <COMMAND> [OPTIONS]
 ```
 
 ### 1. Comando: `obfuscate`
-Ofusca un archivo o texto directo de entrada.
+Ofusca un archivo, texto directo o el portapapeles.
 
 * **`-i, --input <FILE>`**: Archivo de entrada a procesar.
 * **`-o, --output <FILE>`**: Archivo de salida donde guardar el resultado.
 * **`-t, --text <STRING>`**: Texto directo a procesar (si no se especifica archivo).
+* **`-c, --clipboard`**: Procesa de forma atómica el contenido actual del portapapeles y copia el resultado de vuelta.
 * **`-f, --format <FORMAT>`**: Formato estructurado (`auto`, `json`, `xml`, `log`, `text`). Por defecto es `auto`.
 * **`-s, --save-mappings <FILE>`**: Ruta donde guardar la tabla de mapeos generada en formato JSON para poder revertirla más adelante.
 
-*Ejemplo:*
+*Ejemplos:*
 ```bash
+# Ofuscar archivo
 lexishield obfuscate -i server_logs.json -o logs_seguros.json -s mapeos.json
+
+# Ofuscar directamente lo que tienes copiado en el portapapeles (One-Shot)
+lexishield obfuscate -c
 ```
 
 ### 2. Comando: `deobfuscate`
-Desofusca un archivo o texto utilizando una tabla de mapeos JSON guardada previamente.
+Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos JSON guardada previamente.
 
 * **`-i, --input <FILE>`**: Archivo de entrada a desofuscar.
 * **`-o, --output <FILE>`**: Archivo de salida.
 * **`-t, --text <STRING>`**: Texto directo a desofuscar.
+* **`-c, --clipboard`**: Desofusca el texto copiado en el portapapeles y lo reemplaza con el texto real.
 * **`-m, --mappings <FILE>`**: Archivo JSON obligatorio con los mapeos a aplicar.
 * **`-f, --format <FORMAT>`**: Formato de lectura/escritura (`auto`, `json`, `xml`, `log`, `text`).
 
@@ -102,10 +108,34 @@ lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.json
 ```
 
 ### 3. Comando: `scan`
-Escanea un archivo o texto y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos.
+Escanea un archivo, texto o portapapeles y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos.
 
 * **`-i, --input <FILE>`**: Archivo a escanear.
 * **`-t, --text <STRING>`**: Texto a escanear.
+* **`-c, --clipboard`**: Escanea directamente el contenido del portapapeles.
+
+### 4. Comando: `watch` (Monitorización en Tiempo Real)
+Monitoriza continuamente el portapapeles mediante eventos nativos del sistema operativo y supresión de eco. Cada vez que pulses `Ctrl+C` para copiar un texto, LexiShield lo transformará automáticamente.
+
+* **`-d, --direction <DIRECTION>`**: Dirección de transformación: `obfuscate` (por defecto) o `deobfuscate`.
+* **`-m, --mappings <FILE>`**: Archivo JSON opcional para cargar/sincronizar los mapeos generados.
+* **`-f, --format <FORMAT>`**: Formato estructural esperado.
+
+*Ejemplos:*
+```bash
+# Modo guardián: todo lo que copies se ofuscará en vivo antes de pegarlo a la IA
+lexishield watch --direction obfuscate -m mapeos.json
+
+# Modo restauración: todo lo que copies de la IA se desofuscará automáticamente
+lexishield watch --direction deobfuscate -m mapeos.json
+```
+
+### 5. Comando: `dict`
+Gestiona manualmente diccionarios de mapeos en formato JSON:
+
+* **`lexishield dict list -m mapeos.json`**: Lista todos los pares registrados.
+* **`lexishield dict add -o "usuario.real" -p "user0001" -m mapeos.json`**: Inyecta un par personalizado.
+* **`lexishield dict clear -m mapeos.json`**: Vacía el diccionario.
 
 ---
 
