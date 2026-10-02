@@ -1,161 +1,155 @@
-# LexiShield
+# LexiShield - Motor de ofuscación semántica para consultas de IA y gestión de mapeos
 
-**LexiShield** es una herramienta de alto rendimiento desarrollada en Rust para la detección, anonimización y sanitización de datos confidenciales, identidades, credenciales y secretos en diversos formatos de archivo (JSON, XML, Texto plano y Logs).
+## 📖 Una historia técnica: Aria, los modelos de IA y el escudo de privacidad
+
+En la era dorada de los Modelos de Inteligencia Artificial (LLMs), **Aria** trabajaba como analista de sistemas y desarrolladora en una gran corporación de telecomunicaciones. Su día a día consistía en resolver complejos errores en los servidores de la empresa. Para acelerar su trabajo, Aria utilizaba asistentes de IA, pasándoles volcados de bases de datos, fragmentos de código, archivos de configuración de Active Directory y archivos de log gigantescos para que la IA le explicara los fallos y sugiriera parches.
+
+Pero un día, el oficial de seguridad del reino de la corporación emitió una advertencia:
+> *“Queda terminantemente prohibido subir datos reales de producción a servicios externos de IA. Si un log contiene la IP de un cliente, su correo real, un identificador SID de Windows o una contraseña de base de datos, estarás vulnerando la privacidad de millones de usuarios”.*
+
+Aria se vio ante un dilema: renunciar a la velocidad que le daban los asistentes de IA o arriesgarse a una fuga de datos. Fue entonces cuando descubrió **LexiShield**.
+
+### El escudo inteligente de Aria
+Aria integró LexiShield como su puente local y seguro hacia la Inteligencia Artificial. La herramienta funcionaba de la siguiente manera:
+
+1. **Ofuscación semántica inteligente:** Antes de enviar un archivo de log plagado de datos reales a la IA, Aria abría su terminal. El motor de LexiShield escaneaba el documento utilizando expresiones regulares avanzadas, detectando correos electrónicos, IPs, nombres de usuario y dominios.
+2. **Generación coherente:** El sistema no ponía asteriscos o tachaduras que confundieran al modelo de lenguaje (ya que la IA necesita saber que tal IP se conecta con tal correo). En su lugar, usaba generadores sintéticos realistas. Una dirección IP real como `192.168.1.104` se transformaba en `192.168.22.84`, y el correo `marta.sanchez@empresa.com` se convertía en `email000001@acme.com`. Todo quedaba registrado de forma segura y privada en un diccionario local de mapeos JSON.
+3. **El envío a la IA:** Aria copiaba el texto ofuscado y lo enviaba al chat de la IA.
+4. **La respuesta del asistente:** La IA leía el texto y respondía de forma impecable: *"El problema reside en que el usuario user000001 tiene un conflicto de credenciales al intentar acceder al servidor IP000001 mediante el puerto 443"*.
+5. **Desofuscación precisa:** Aria tomaba el texto de solución sugerido por la IA y le pedía a LexiShield realizar la desofuscación en sentido inverso pasándole el diccionario. El motor, recorriendo los mapeos de forma estructurada, restauraba de forma exacta los nombres reales, IPs y credenciales corporativas en su máquina local.
+
+¡Aria obtuvo la respuesta exacta mapeada a su entorno real sin que un solo byte de información confidencial saliera de su ordenador!
 
 ---
 
-## 🚀 Sistema de Compilación Multiplataforma Centralizado
+## 🚀 Descripción General
 
-El proyecto incluye un entorno de compilación hermético basado en **Vagrant (Debian 12 Bookworm)** que permite generar binarios optimizados para **Linux**, **Windows** y **macOS (Intel & Apple Silicon)** desde cualquier sistema operativo host sin requerir compiladores, dependencias ni Docker Desktop instalados en tu máquina local.
+**LexiShield** es una herramienta de consola ultrarrápida desarrollada en **Rust** (con binarios independientes libres de dependencias) diseñada para la ofuscación y desofuscación semántica de datos sensibles en archivos de texto estructurado y no estructurado. Su objetivo primordial es actuar como pasarela de anonimización local y segura para compartir contextos con servicios externos sin riesgo de fugas de información.
+
+El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendimiento y un bajo consumo de memoria gracias a las características intrínsecas de Rust.
+
+### Flujo de Operación (Arquitectura)
 
 ```mermaid
 flowchart TD
-    Host["Equipo Host (Windows / Linux / macOS)"] -->|"./compilar.sh o .\compilar.ps1"| Vagrant["Vagrant VM (Debian 12)"]
-    
-    subgraph VM["Entorno Aislado de Compilación"]
-        Vagrant -->|"Rust Nativo"| LinuxBin["lexishield-linux-amd64"]
-        Vagrant -->|"MinGW-w64"| WinBin["lexishield-windows-amd64.exe"]
-        Vagrant -->|"Docker + osxcross"| MacIntel["lexishield-darwin-amd64 (Intel)"]
-        Vagrant -->|"Docker + osxcross"| MacArm["lexishield-darwin-arm64 (Apple Silicon)"]
+    subgraph Local["Entorno Local (Seguro)"]
+        A[Datos Sensibles Originales\nLogs / JSON / XML] -->|lexishield obfuscate| B(LexiShield Engine)
+        B -->|Genera| C[Texto Ofuscado]
+        B -->|Guarda| D[(Diccionario de Mapeos JSON)]
+    end
+
+    subgraph Nube["Servicios de IA (Inseguro)"]
+        C -->|Petición| E(Chatgpt / Claude / etc.)
+        E -->|Respuesta| F[Solución Ofuscada]
     end
     
-    LinuxBin --> Output["Directorio Raíz ./"]
-    WinBin --> Output
-    MacIntel --> Output
-    MacArm --> Output
+    subgraph Restauración["Entorno Local (Seguro)"]
+        F -->|lexishield deobfuscate| G(LexiShield Engine)
+        D -.->|Lee mapeos| G
+        G --> H[Respuesta Final con\nDatos Reales Restaurados]
+    end
 ```
 
 ---
 
-## 📋 Requisitos Previos
+## 🏗️ Arquitectura de Componentes
 
-Solo necesitas tener instalado en tu equipo anfitrión:
-* [VirtualBox](https://www.virtualbox.org/)
-* [Vagrant](https://developer.hashicorp.com/vagrant/downloads)
+El software en Rust se divide en capas modulares bien delimitadas:
 
-*(No necesitas instalar Rust, Visual Studio C++, MSVC linkers ni Docker en tu máquina).*
-
----
-
-## 🛠️ Uso del Compilador
-
-El repositorio incluye dos scripts de compilación interactivos y con soporte para parámetros por línea de comandos:
-
-* **Linux / macOS:** `./compilar.sh [opciones]`
-* **Windows (PowerShell):** `.\compilar.ps1 [opciones]`
-
-### 1. Parámetros y Opciones Disponibles
-
-| Parámetro (Linux/Mac) | Parámetro (Windows) | Descripción |
-| :--- | :--- | :--- |
-| `-a`, `--all` | `-All` (o `-a`) | Compila para **todas las plataformas** (Linux, Windows, macOS Intel y macOS ARM64). |
-| `-l`, `--linux` | `-Linux` (o `-l`) | Compila solo para **Linux x86_64** (`x86_64-unknown-linux-gnu`). |
-| `-w`, `--windows` | `-Windows` (o `-w`) | Compila solo para **Windows x86_64** (`.exe` via MinGW). |
-| `-m`, `--mac` | `-Mac` (o `-m`) | Compila para **macOS** (Intel `x86_64` y Apple Silicon `aarch64`). |
-| `-c`, `--clean` | `-Clean` (o `-c`) | Realiza una limpieza completa (`cargo clean` y temporales) antes de compilar. |
-| `-u`, `--update` | `-Update` (o `-u`) | **Actualiza la máquina virtual** (`vagrant --provision`) y actualiza el toolchain de Rust (`rustup update`). |
-| `-k`, `--keep-vm` | `-KeepVm` (o `-k`) | **Mantiene la máquina virtual encendida** al finalizar la compilación para ejecuciones consecutivas ultrarrápidas. |
-| `--native` | `-Native` | Fuerza la compilación local utilizando las herramientas instaladas en el sistema host (sin usar Vagrant). |
+* **Presentación (CLI):** Gestiona los argumentos por consola mediante `clap`, proporcionando una experiencia rápida y ergonómica.
+* **Motor de ejecución (Engine):** Procesa flujos de datos estructurados. Separa la lógica de reemplazo semántico, gestionando el diccionario en un archivo local JSON o en memoria.
+* **Validadores y Detectores (Detectors):** Módulos altamente especializados (`network.rs`, `identity.rs`, `o365.rs`, `windows.rs`) que actúan como núcleo de clasificación, detectando tipos de datos e invocando sus respectivas reglas de validación y generación sintética.
+* **Formateadores (Format Adapters):** Soporte nativo y estructurado para adaptar inteligentemente la lectura y escritura según el tipo de archivo (Logs crudos, JSON, XML).
 
 ---
 
-### 2. Ejemplos de Uso
+## 💻 Interfaz de línea de comandos (CLI)
 
-#### Modo Interactivo (Pregunta qué plataformas compilar)
-* **Linux / macOS:**
-  ```bash
-  ./compilar.sh
-  ```
-* **Windows:**
-  ```powershell
-  .\compilar.ps1
-  ```
+El binario `lexishield` proporciona una interfaz por consola directa y eficiente. A diferencia de versiones anteriores, esta versión en Rust centraliza las operaciones en tres comandos principales.
 
-#### Compilar Todo en una sola orden
-* **Linux / macOS:**
-  ```bash
-  ./compilar.sh -a
-  ```
-* **Windows:**
-  ```powershell
-  .\compilar.ps1 -All
-  ```
+### Estructura general de comandos
+```bash
+# Formato general
+lexishield <COMMAND> [OPTIONS]
+```
 
-#### Limpiar y compilar todo manteniendo la VM encendida
-Útil durante jornadas de desarrollo para no esperar el arranque de la VM en cada compilación:
-* **Linux / macOS:**
-  ```bash
-  ./compilar.sh -a -c -k
-  ```
-* **Windows:**
-  ```powershell
-  .\compilar.ps1 -All -Clean -KeepVm
-  ```
+### 1. Comando: `obfuscate`
+Ofusca un archivo o texto directo de entrada.
 
-#### Actualizar dependencias y Rust en la VM
-Si se han modificado paquetes base o quieres compilar con la última versión estable de Rust:
-* **Linux / macOS:**
-  ```bash
-  ./compilar.sh -a -u
-  ```
-* **Windows:**
-  ```powershell
-  .\compilar.ps1 -All -Update
-  ```
+* **`-i, --input <FILE>`**: Archivo de entrada a procesar.
+* **`-o, --output <FILE>`**: Archivo de salida donde guardar el resultado.
+* **`-t, --text <STRING>`**: Texto directo a procesar (si no se especifica archivo).
+* **`-f, --format <FORMAT>`**: Formato estructurado (`auto`, `json`, `xml`, `log`, `text`). Por defecto es `auto`.
+* **`-s, --save-mappings <FILE>`**: Ruta donde guardar la tabla de mapeos generada en formato JSON para poder revertirla más adelante.
 
----
+*Ejemplo:*
+```bash
+lexishield obfuscate -i server_logs.json -o logs_seguros.json -s mapeos.json
+```
 
-## 💻 Desarrollo Remoto con VS Code
+### 2. Comando: `deobfuscate`
+Desofusca un archivo o texto utilizando una tabla de mapeos JSON guardada previamente.
 
-Puedes utilizar la máquina virtual de Vagrant no solo para compilar, sino como un **entorno de desarrollo remoto completo**. Esto garantiza que tu entorno de escritura de código (VS Code) sea idéntico al entorno de compilación, y evita tener que instalar Rust, herramientas de desarrollo o Docker en tu equipo anfitrión.
+* **`-i, --input <FILE>`**: Archivo de entrada a desofuscar.
+* **`-o, --output <FILE>`**: Archivo de salida.
+* **`-t, --text <STRING>`**: Texto directo a desofuscar.
+* **`-m, --mappings <FILE>`**: Archivo JSON obligatorio con los mapeos a aplicar.
+* **`-f, --format <FORMAT>`**: Formato de lectura/escritura (`auto`, `json`, `xml`, `log`, `text`).
 
-### Opción 1: Desarrollo Remoto Integrado (Recomendado)
-VS Code puede conectarse directamente a la máquina virtual y ejecutar sus extensiones (como `rust-analyzer`) desde dentro.
+*Ejemplo:*
+```bash
+lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.json
+```
 
-1. Instala la extensión **Remote - SSH** de Microsoft en VS Code.
-2. Extrae la configuración de conexión de Vagrant abriendo una terminal en tu host y ejecutando:
-   ```bash
-   vagrant ssh-config > vagrant-ssh.config
-   ```
-3. En VS Code, abre la paleta de comandos (`F1`), selecciona **Remote-SSH: Open SSH Configuration File...** y añade el contenido del archivo generado a tu archivo de configuración de SSH local (ej. `~/.ssh/config`).
-4. Presiona `F1`, selecciona **Remote-SSH: Connect to Host...** y conéctate al host de tu VM (por ejemplo, `lexishield-vm` o el nombre que apareciera en el archivo de configuración).
-5. Una vez conectado, abre la carpeta `/vagrant` (donde reside el código sincronizado). VS Code te pedirá instalar las herramientas recomendadas (como `rust-analyzer`) en el servidor remoto.
+### 3. Comando: `scan`
+Escanea un archivo o texto y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos.
 
-### Opción 2: Desarrollo Local Híbrido
-Vagrant sincroniza automáticamente tu carpeta local con `/vagrant` en la VM de forma bidireccional en tiempo real.
-1. Edita el código usando VS Code en tu equipo host de forma normal.
-2. Utiliza los scripts de Vagrant (`./compilar.sh` o `.\compilar.ps1`) para verificar, formatear y compilar.
+* **`-i, --input <FILE>`**: Archivo a escanear.
+* **`-t, --text <STRING>`**: Texto a escanear.
 
 ---
 
-## 📦 Binarios Generados
+## ⚙️ Características Técnicas de Soporte
 
-Los archivos ejecutables compilados se copian directamente a la raíz del proyecto:
+### Mapeo Semántico e Identificación de Tokens de Privacidad
+El motor realiza una identificación precisa de la información sensible mediante un pipeline estricto en Rust:
 
-| Archivo | Plataforma Destino | Arquitectura |
-| :--- | :--- | :--- |
-| `lexishield-linux-amd64` | Linux | 64-bit (x86_64) |
-| `lexishield-windows-amd64.exe` | Windows | 64-bit (x86_64) |
-| `lexishield-darwin-amd64` | macOS | 64-bit Intel (x86_64) |
-| `lexishield-darwin-arm64` | macOS | Apple Silicon (M1/M2/M3/M4 - ARM64) |
+1. **Escaneo por Expresiones Regulares:** Búsqueda en texto utilizando patrones regex avanzados y optimizados compilados en memoria.
+2. **Validación Semántica Adicional:** Filtrado activo para eliminar falsos positivos mediante código (ej. validación matemática rigurosa de identificadores fiscales o validación RFC para direcciones IP).
+3. **Clasificación y Reemplazo:** Asignación de la categoría semántica correspondiente priorizando los datos de alta sensibilidad antes de invocar la generación sintética.
+
+#### Detalles de Patrones y Regex Incorporados:
+* **IP Address (IPv4 / IPv6)**: Detecta y valida direcciones de red, evitando IPs de loopback genéricas si se desea.
+* **Email Address**: Direcciones de correo electrónico standard, generando correos ofuscados manteniendo en lo posible el dominio si fuera necesario u ocultándolo por completo.
+* **Windows SID Domain / Account**: Identificadores de seguridad SID de Windows. Consumen una lógica especializada en `windows.rs`.
+* **Microsoft 365 / Entra ID**: Detección de cuentas UPN, tokens y accesos organizacionales en `o365.rs`.
+* **GUID / UUID**: Identificadores únicos globales transformados criptográficamente.
+
+### 🛡️ Generación Inteligente de Pseudónimos (Mapeo Coherente de Tipos)
+LexiShield garantiza que el valor ofuscado generado sea de la misma naturaleza e igual de válido que el original para mantener la coherencia en el análisis de logs. Un UUID será sustituido por un UUID estructuralmente válido diferente; un identificador fiscal español mantendrá su letra de control validada, y una IP conservará el aspecto de una IPv4 o IPv6 según corresponda.
+
+### 📖 Tratamiento de Caracteres Especiales y Formatos Estructurados (XML/JSON)
+
+Para que LexiShield funcione correctamente sin importar cómo estén escritos los archivos, la versión de Rust implementa adaptadores de formato (`json_adapter`, `xml_adapter`, `log_adapter`). 
+
+Cuando se analiza un archivo JSON o XML, el sistema no escanea ciegamente todo el texto rompiendo la estructura de etiquetas. En su lugar, analiza semánticamente los campos de datos y ofusca su contenido preservando estrictamente el esqueleto y la sintaxis del archivo original. Así, puedes subir un JSON ofuscado a una IA y devolverá un JSON completamente válido que luego puedes deserializar en tu código real.
 
 ---
 
-## 🔄 Ciclo de Vida y Mantenimiento de la Máquina Virtual
+## 🛠️ Desarrollo Remoto y Compilación Cruzada Multiplataforma
 
-* **Apagado automático (`vagrant halt`):** Por defecto, los scripts apagan la máquina virtual al terminar para no consumir memoria RAM ni CPU en tu equipo anfitrión.
-* **Encendido manual:**
-  ```bash
-  vagrant up
-  ```
-* **Apagado manual:**
-  ```bash
-  vagrant halt
-  ```
-* **Destruir la máquina virtual (Liberar espacio en disco):**
-  Si deseas borrar por completo el disco virtual para liberar espacio o resetear todo desde cero:
-  ```bash
-  vagrant destroy -f
-  ```
-  *(La próxima vez que compiles, Vagrant volverá a construir y configurar la máquina virtual de manera automática).*
+Dada la exigencia de generar binarios nativos sin alertar a los EDR (antivirus) y la necesidad de compilación cruzada hacia Windows y macOS desde entornos aislados, **el único método oficial de compilación es mediante Vagrant**.
 
+Se ha integrado un sistema de compilación automatizado y aislado que arranca una máquina virtual de Ubuntu, monta un disco ultrarrápido y realiza la generación de los tres binarios (`.exe` de Windows con metadatos incrustados, Linux ELF y macOS Mach-O). 
+
+Para compilar el proyecto en todos los sistemas operativos simultáneamente de forma segura, solo tienes que ejecutar:
+
+**En Linux / macOS:**
+```bash
+./compilar.sh --all
+```
+
+**En Windows:**
+```powershell
+.\compilar.ps1 -All
+```
