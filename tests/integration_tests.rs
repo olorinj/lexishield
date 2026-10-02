@@ -185,3 +185,41 @@ fn test_omitted_mapping_with_equals_sign() {
     assert_eq!(result, text);
     assert_eq!(report.replacements_applied, 0);
 }
+
+#[test]
+fn test_encrypted_vault_save_load_roundtrip() {
+    let temp_dir = std::env::temp_dir();
+    let vault_file = temp_dir.join("test_mapeos.lexi");
+    let json_file = temp_dir.join("test_mapeos.json");
+
+    let mappings = vec![
+        Mapping::new("10.10.10.1", "172.16.0.1", DetectorType::IPv4),
+        Mapping::new("ceo@company.com", "user01@test.com", DetectorType::Email),
+    ];
+
+    let password = "SecretMasterPassword_2026!";
+
+    // 1. Guardar cifrado
+    lexishield::save_mappings_auto(&vault_file, &mappings, Some(password)).unwrap();
+
+    // 2. Cargar sin contraseña debe fallar
+    let err_no_pwd = lexishield::load_mappings_auto(&vault_file, None);
+    assert!(err_no_pwd.is_err());
+
+    // 3. Cargar con contraseña incorrecta debe fallar
+    let err_bad_pwd = lexishield::load_mappings_auto(&vault_file, Some("wrong_password"));
+    assert!(err_bad_pwd.is_err());
+
+    // 4. Cargar con contraseña correcta
+    let loaded = lexishield::load_mappings_auto(&vault_file, Some(password)).unwrap();
+    assert_eq!(mappings, loaded);
+
+    // 5. Guardar en JSON plano sin contraseña
+    lexishield::save_mappings_auto(&json_file, &mappings, None).unwrap();
+    let loaded_json = lexishield::load_mappings_auto(&json_file, None).unwrap();
+    assert_eq!(mappings, loaded_json);
+
+    // Limpieza
+    let _ = std::fs::remove_file(&vault_file);
+    let _ = std::fs::remove_file(&json_file);
+}

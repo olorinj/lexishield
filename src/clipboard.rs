@@ -1,10 +1,10 @@
 //! Gestión y monitorización en tiempo real del portapapeles con arboard y ctrlc.
 
 use crate::config::LexiConfig;
+use crate::crypto::{load_mappings_auto, save_mappings_auto};
 use crate::engine::ObfuscatorEngine;
-use crate::models::{FormatType, Mapping};
+use crate::models::FormatType;
 use arboard::Clipboard;
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,20 +36,20 @@ pub enum WatchDirection {
     Deobfuscate,
 }
 
-/// Bucle de monitorización continua del portapapeles con supresión de eco.
+/// Bucle de monitorización continua del portapapeles con supresión de eco y soporte cifrado.
 pub fn watch_clipboard_loop(
     direction: WatchDirection,
     format: FormatType,
     config: LexiConfig,
     mappings_file: Option<&Path>,
+    password: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut engine = ObfuscatorEngine::new(config);
 
     if let Some(map_path) = mappings_file
         && map_path.exists()
     {
-        let data = fs::read_to_string(map_path)?;
-        let mappings: Vec<Mapping> = serde_json::from_str(&data)?;
+        let mappings = load_mappings_auto(map_path, password)?;
         engine.manager.load_mappings(mappings)?;
         log::info!(
             "Se cargaron {} mapeos previos desde: {:?}",
@@ -97,10 +97,10 @@ pub fn watch_clipboard_loop(
 
                                 if let Some(map_path) = mappings_file {
                                     let current_maps = engine.manager.get_mappings();
-                                    if let Ok(json_str) =
-                                        serde_json::to_string_pretty(&current_maps)
+                                    if let Err(e) =
+                                        save_mappings_auto(map_path, &current_maps, password)
                                     {
-                                        let _ = fs::write(map_path, json_str);
+                                        log::error!("Error al guardar mapeos: {}", e);
                                     }
                                 }
                             } else {

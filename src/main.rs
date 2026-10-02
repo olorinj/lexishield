@@ -58,13 +58,21 @@ impl From<CliDirection> for WatchDirection {
 
 #[derive(Subcommand)]
 enum DictCommands {
-    /// Lista los mapeos contenidos en un archivo JSON.
+    /// Lista los mapeos contenidos en un archivo de mapeos (JSON o cifrado .lexi).
     List {
-        /// Ruta al archivo JSON de mapeos.
+        /// Ruta al archivo de mapeos.
         #[arg(short, long)]
         mappings: PathBuf,
+
+        /// Contraseña si el archivo de mapeos está cifrado.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de forma interactiva y oculta.
+        #[arg(long)]
+        ask_password: bool,
     },
-    /// Añade un nuevo mapeo manual al archivo JSON.
+    /// Añade un nuevo mapeo manual al archivo de mapeos.
     Add {
         /// Valor original sensible.
         #[arg(short, long)]
@@ -74,15 +82,27 @@ enum DictCommands {
         #[arg(short, long)]
         pseudonym: String,
 
-        /// Ruta al archivo JSON de mapeos.
+        /// Ruta al archivo de mapeos.
         #[arg(short, long)]
         mappings: PathBuf,
+
+        /// Contraseña para cifrar o actualizar el archivo.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de forma interactiva y oculta.
+        #[arg(long)]
+        ask_password: bool,
     },
-    /// Vacía o elimina todos los mapeos del archivo JSON.
+    /// Vacía o elimina todos los mapeos del archivo.
     Clear {
-        /// Ruta al archivo JSON de mapeos.
+        /// Ruta al archivo de mapeos.
         #[arg(short, long)]
         mappings: PathBuf,
+
+        /// Contraseña si se desea mantener cifrado el archivo vacío.
+        #[arg(short, long)]
+        password: Option<String>,
     },
 }
 
@@ -110,9 +130,17 @@ enum Commands {
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
 
-        /// Ruta opcional para guardar la tabla de mapeos generada en JSON.
+        /// Ruta opcional para guardar la tabla de mapeos generada (soporta JSON o cifrado).
         #[arg(short, long)]
         save_mappings: Option<PathBuf>,
+
+        /// Contraseña para cifrar la tabla de mapeos guardada (Argon2 + ChaCha20-Poly1305).
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de cifrado interactivamente.
+        #[arg(long)]
+        ask_password: bool,
     },
 
     /// Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada.
@@ -133,9 +161,17 @@ enum Commands {
         #[arg(short, long)]
         clipboard: bool,
 
-        /// Archivo JSON con los mapeos a aplicar.
+        /// Archivo con los mapeos a aplicar (JSON o bóveda cifrada .lexi).
         #[arg(short, long)]
         mappings: PathBuf,
+
+        /// Contraseña para descifrar el archivo de mapeos.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de descifrado interactivamente.
+        #[arg(long)]
+        ask_password: bool,
 
         /// Formato estructural (auto, json, xml, log, text).
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
@@ -163,16 +199,24 @@ enum Commands {
         #[arg(short, long, value_enum, default_value_t = CliDirection::Obfuscate)]
         direction: CliDirection,
 
-        /// Archivo de mapeos a cargar y mantener sincronizado.
+        /// Archivo de mapeos a cargar y mantener sincronizado (JSON o cifrado).
         #[arg(short, long)]
         mappings: Option<PathBuf>,
+
+        /// Contraseña si el archivo de mapeos está o se guardará cifrado.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña interactivamente.
+        #[arg(long)]
+        ask_password: bool,
 
         /// Formato estructural (auto, json, xml, log, text).
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
     },
 
-    /// Gestiona manualmente diccionarios de mapeos en formato JSON.
+    /// Gestiona diccionarios de mapeos (soporta JSON y archivos cifrados .lexi).
     Dict {
         #[command(subcommand)]
         subcommand: DictCommands,
@@ -200,35 +244,73 @@ fn resolve_input_content(
     }
 }
 
-/// Manejador de la acción de ofuscación.
-fn handle_obfuscate(
-    config: LexiConfig,
+/// Resuelve la contraseña ya sea desde CLI, de forma interactiva o detectando si el archivo está cifrado.
+fn resolve_password(
+    cli_pwd: Option<String>,
+    ask_pwd: bool,
+    path: Option<&Path>,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    if let Some(p) = cli_pwd {
+        return Ok(Some(p));
+    }
+    if ask_pwd {
+        let p = rpassword::prompt_password("Introduce la contraseña de la bóveda de mapeos: ")?;
+        return Ok(Some(p));
+    }
+    if let Some(path) = path
+        && path.exists()
+        && let Ok(data) = fs::read(path)
+        && lexishield::is_encrypted_vault(&data)
+    {
+        let p = rpassword::prompt_password(format!(
+            "El archivo '{}' está cifrado con contraseña. Introduce la contraseña: ",
+            path.display()
+        ))?;
+        return Ok(Some(p));
+    }
+    Ok(None)
+}
+
+struct ObfuscateOptions {
     input: Option<PathBuf>,
     output: Option<PathBuf>,
     text: Option<String>,
     clipboard: bool,
     format: FormatType,
     save_mappings: Option<PathBuf>,
+    password: Option<String>,
+    ask_password: bool,
+}
+
+/// Manejador de la acción de ofuscación.
+fn handle_obfuscate(
+    config: LexiConfig,
+    opts: ObfuscateOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let content = resolve_input_content(input.as_deref(), text.as_deref(), clipboard)?;
+    let content =
+        resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
 
     let mut engine = ObfuscatorEngine::new(config);
     let detected_count = engine.scan_and_register_mappings(&content)?;
     log::info!("Detectados {} elementos sensibles.", detected_count);
 
-    let (result, report) = engine.obfuscate_text(&content, format)?;
+    let (result, report) = engine.obfuscate_text(&content, opts.format)?;
 
-    if let Some(map_path) = save_mappings {
+    if let Some(map_path) = &opts.save_mappings {
+        let pwd = resolve_password(opts.password, opts.ask_password, None)?;
         let mappings = engine.manager.get_mappings();
-        let json_data = serde_json::to_string_pretty(&mappings)?;
-        fs::write(&map_path, json_data)?;
-        log::info!("Mapeos guardados en: {}", map_path.display());
+        lexishield::save_mappings_auto(map_path, &mappings, pwd.as_deref())?;
+        if pwd.is_some() {
+            log::info!("Mapeos guardados y CIFRADOS en: {}", map_path.display());
+        } else {
+            log::info!("Mapeos guardados en: {}", map_path.display());
+        }
     }
 
-    if clipboard {
+    if opts.clipboard {
         set_clipboard_text(&result)?;
         log::info!("Resultado ofuscado copiado al portapapeles.");
-    } else if let Some(out_path) = output {
+    } else if let Some(out_path) = opts.output {
         fs::write(&out_path, &result)?;
         log::info!("Resultado guardado en: {}", out_path.display());
     } else {
@@ -245,30 +327,37 @@ fn handle_obfuscate(
     Ok(())
 }
 
-/// Manejador de la acción de desofuscación.
-fn handle_deobfuscate(
-    config: LexiConfig,
+struct DeobfuscateOptions {
     input: Option<PathBuf>,
     output: Option<PathBuf>,
     text: Option<String>,
     clipboard: bool,
-    mappings_path: PathBuf,
+    mappings: PathBuf,
+    password: Option<String>,
+    ask_password: bool,
     format: FormatType,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let content = resolve_input_content(input.as_deref(), text.as_deref(), clipboard)?;
+}
 
-    let map_data = fs::read_to_string(&mappings_path)?;
-    let loaded_mappings: Vec<Mapping> = serde_json::from_str(&map_data)?;
+/// Manejador de la acción de desofuscación.
+fn handle_deobfuscate(
+    config: LexiConfig,
+    opts: DeobfuscateOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let content =
+        resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+
+    let pwd = resolve_password(opts.password, opts.ask_password, Some(&opts.mappings))?;
+    let loaded_mappings = lexishield::load_mappings_auto(&opts.mappings, pwd.as_deref())?;
 
     let mut engine = ObfuscatorEngine::new(config);
     engine.manager.load_mappings(loaded_mappings)?;
 
-    let (result, report) = engine.deobfuscate_text(&content, format)?;
+    let (result, report) = engine.deobfuscate_text(&content, opts.format)?;
 
-    if clipboard {
+    if opts.clipboard {
         set_clipboard_text(&result)?;
         log::info!("Resultado desofuscado copiado al portapapeles.");
-    } else if let Some(out_path) = output {
+    } else if let Some(out_path) = opts.output {
         fs::write(&out_path, &result)?;
         log::info!("Resultado restaurado en: {}", out_path.display());
     } else {
@@ -318,9 +407,13 @@ fn handle_scan(
 /// Manejador del comando Dict.
 fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error>> {
     match subcommand {
-        DictCommands::List { mappings } => {
-            let data = fs::read_to_string(&mappings)?;
-            let list: Vec<Mapping> = serde_json::from_str(&data)?;
+        DictCommands::List {
+            mappings,
+            password,
+            ask_password,
+        } => {
+            let pwd = resolve_password(password, ask_password, Some(&mappings))?;
+            let list = lexishield::load_mappings_auto(&mappings, pwd.as_deref())?;
             println!("Mapeos en {}:", mappings.display());
             for (i, m) in list.iter().enumerate() {
                 println!(
@@ -336,10 +429,12 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             original,
             pseudonym,
             mappings,
+            password,
+            ask_password,
         } => {
-            let mut list: Vec<Mapping> = if mappings.exists() {
-                let data = fs::read_to_string(&mappings)?;
-                serde_json::from_str(&data).unwrap_or_default()
+            let pwd = resolve_password(password, ask_password, Some(&mappings))?;
+            let mut list = if mappings.exists() {
+                lexishield::load_mappings_auto(&mappings, pwd.as_deref()).unwrap_or_default()
             } else {
                 Vec::new()
             };
@@ -350,12 +445,11 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
                 detector_type: DetectorType::GenericToken,
                 omitted: false,
             });
-            let json = serde_json::to_string_pretty(&list)?;
-            fs::write(&mappings, json)?;
+            lexishield::save_mappings_auto(&mappings, &list, pwd.as_deref())?;
             log::info!("Mapeo añadido correctamente a {}", mappings.display());
         }
-        DictCommands::Clear { mappings } => {
-            fs::write(&mappings, "[]")?;
+        DictCommands::Clear { mappings, password } => {
+            lexishield::save_mappings_auto(&mappings, &[], password.as_deref())?;
             log::info!("Diccionario vaciado en {}", mappings.display());
         }
     }
@@ -375,14 +469,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             clipboard,
             format,
             save_mappings,
+            password,
+            ask_password,
         } => handle_obfuscate(
             config,
-            input,
-            output,
-            text,
-            clipboard,
-            format.into(),
-            save_mappings,
+            ObfuscateOptions {
+                input,
+                output,
+                text,
+                clipboard,
+                format: format.into(),
+                save_mappings,
+                password,
+                ask_password,
+            },
         ),
 
         Commands::Deobfuscate {
@@ -391,15 +491,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             text,
             clipboard,
             mappings,
+            password,
+            ask_password,
             format,
         } => handle_deobfuscate(
             config,
-            input,
-            output,
-            text,
-            clipboard,
-            mappings,
-            format.into(),
+            DeobfuscateOptions {
+                input,
+                output,
+                text,
+                clipboard,
+                mappings,
+                password,
+                ask_password,
+                format: format.into(),
+            },
         ),
 
         Commands::Scan {
@@ -411,8 +517,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Watch {
             direction,
             mappings,
+            password,
+            ask_password,
             format,
-        } => watch_clipboard_loop(direction.into(), format.into(), config, mappings.as_deref()),
+        } => {
+            let pwd = resolve_password(password, ask_password, mappings.as_deref())?;
+            watch_clipboard_loop(
+                direction.into(),
+                format.into(),
+                config,
+                mappings.as_deref(),
+                pwd.as_deref(),
+            )
+        }
 
         Commands::Dict { subcommand } => handle_dict(subcommand),
     }
