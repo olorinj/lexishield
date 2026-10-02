@@ -2,6 +2,7 @@
 //!
 //! Implementación en Rust de alta eficiencia, bajo consumo de memoria y tolerancia cero a colisiones.
 
+pub mod clipboard;
 pub mod config;
 pub mod detectors;
 pub mod engine;

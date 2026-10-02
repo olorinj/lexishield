@@ -14,7 +14,7 @@ fn main() {
         res.set("ProductName", "LexiShield");
         res.set("OriginalFilename", "lexishield.exe");
         res.set("LegalCopyright", "Copyright (C) 2026");
-        res.set("CompanyName", "Academia");
+        res.set("CompanyName", "Julio C. Semper");
         res.set("FileVersion", "0.1.0.0");
         res.set("ProductVersion", "0.1.0.0");
 
