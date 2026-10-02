@@ -122,6 +122,17 @@ enum DictCommands {
         #[arg(long)]
         ask_password: bool,
     },
+    /// Elimina permanentemente un archivo de mapeos (¡CUIDADO: Irreversible!).
+    #[command(alias = "rm")]
+    Delete {
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
+        #[arg(short, long)]
+        mappings: Option<PathBuf>,
+
+        /// Confirma la eliminación sin preguntar.
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -263,21 +274,23 @@ enum Commands {
 
 /// Resuelve el contenido de entrada desde un archivo, texto o portapapeles.
 /// Resuelve la ruta del archivo de bóveda, añadiendo el directorio por defecto si se provee solo el nombre, y extensión .lexi
-fn resolve_vault_path(user_provided: Option<PathBuf>) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn resolve_vault_path(
+    user_provided: Option<PathBuf>,
+) -> Result<PathBuf, Box<dyn std::error::Error>> {
     match user_provided {
         None => Ok(lexishield::config::get_default_vault_path()?),
         Some(mut path) => {
             // Si es solo un nombre de archivo (sin ./ ni directorios)
-            if path.parent().map_or(true, |p| p.as_os_str().is_empty()) {
+            if path.parent().is_none_or(|p| p.as_os_str().is_empty()) {
                 let config_dir = lexishield::config::get_user_config_dir()?;
                 path = config_dir.join(path);
             }
-            
+
             // Si no tiene extensión, añadir ".lexi" por defecto
             if path.extension().is_none() {
                 path.set_extension("lexi");
             }
-            
+
             Ok(path)
         }
     }
@@ -337,8 +350,8 @@ fn resolve_password(
     if let Some(p) = cli_pwd {
         return Ok(Some(p));
     }
-    
-    let exists = path.map_or(false, |p| p.exists());
+
+    let exists = path.is_some_and(|p| p.exists());
     let is_encrypted = if exists {
         let data = fs::read(path.unwrap()).unwrap_or_default();
         lexishield::is_encrypted_vault(&data)
@@ -359,7 +372,8 @@ fn resolve_password(
             let p = prompt_new_password("Introduce una NUEVA contraseña para cifrar la bóveda: ")?;
             return Ok(Some(p));
         } else {
-            let p = prompt_new_password("Introduce la contraseña para la NUEVA bóveda de mapeos: ")?;
+            let p =
+                prompt_new_password("Introduce la contraseña para la NUEVA bóveda de mapeos: ")?;
             return Ok(Some(p));
         }
     }
@@ -523,10 +537,10 @@ fn collect_files(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with('.') {
-                    continue; // Saltar archivos ocultos (.git, etc)
-                }
+            if let Some(name) = path.file_name().and_then(|n| n.to_str())
+                && name.starts_with('.')
+            {
+                continue; // Saltar archivos ocultos (.git, etc)
             }
             if path.is_dir() {
                 files.extend(collect_files(&path)?);
@@ -567,11 +581,13 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
                 }
             }
         } else {
-            let content = resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+            let content =
+                resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
             newly_added = engine.scan_and_register_mappings(&content)?;
         }
     } else {
-        let content = resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+        let content =
+            resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
         newly_added = engine.scan_and_register_mappings(&content)?;
     }
 
@@ -742,7 +758,7 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
 
             // 1. Pedir la original 1 vez (o tomarla por parámetro)
             let pwd = resolve_password(password, true, Some(&map_path))?;
-            
+
             // Cargar archivo para validar clave original
             let list = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
 
@@ -756,7 +772,10 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
 
             // 3. Guardar con la nueva contraseña
             lexishield::save_mappings_auto(&map_path, &list, Some(&new_pwd))?;
-            log::info!("Contraseña cambiada correctamente en {}", map_path.display());
+            log::info!(
+                "Contraseña cambiada correctamente en {}",
+                map_path.display()
+            );
         }
         DictCommands::Add {
             original,
@@ -791,14 +810,37 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             ask_password,
         } => {
             let is_default = mappings.is_none();
-            let map_path = mappings
-                .or_else(|| lexishield::config::get_default_vault_path().ok())
-                .unwrap();
+            let map_path = resolve_vault_path(mappings)?;
             let force_ask = is_default && password.is_none();
 
             let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
             lexishield::save_mappings_auto(&map_path, &[], pwd.as_deref())?;
             log::info!("Diccionario vaciado en {}", map_path.display());
+        }
+        DictCommands::Delete { mappings, yes } => {
+            let map_path = resolve_vault_path(mappings)?;
+            if !map_path.exists() {
+                return Err("El archivo de mapeos especificado no existe.".into());
+            }
+
+            if !yes {
+                use std::io::{self, Write};
+                print!(
+                    "⚠️  ¡ATENCIÓN! Vas a eliminar de forma IRREVERSIBLE la bóveda de mapeos '{}'.\nSi lo haces, NO podrás desofuscar los textos procesados con este archivo.\n¿Estás completamente seguro? [s/N]: ",
+                    map_path.display()
+                );
+                io::stdout().flush()?;
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                let trimmed = input.trim().to_lowercase();
+                if trimmed != "s" && trimmed != "si" && trimmed != "y" && trimmed != "yes" {
+                    log::info!("Operación cancelada.");
+                    return Ok(());
+                }
+            }
+
+            fs::remove_file(&map_path)?;
+            log::info!("Bóveda de mapeos eliminada: {}", map_path.display());
         }
     }
     Ok(())
