@@ -56,6 +56,9 @@ try {
 
         if ($Clean) {
             cargo clean
+            if (Test-Path ".\target") {
+                Remove-Item -Recurse -Force ".\target" -ErrorAction SilentlyContinue
+            }
         }
 
         cargo clippy --release --fix --allow-dirty -- -D warnings
