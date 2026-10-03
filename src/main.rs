@@ -573,6 +573,93 @@ fn collect_files(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     Ok(files)
 }
 
+fn format_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{} B", bytes)
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else if bytes < 1024 * 1024 * 1024 {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    } else {
+        format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+/// Escanea un archivo línea por línea con reporte de progreso en tiempo real (bytes leídos / tamaño total).
+fn scan_file_with_progress(
+    engine: &mut ObfuscatorEngine,
+    path: &Path,
+    prefix_tag: &str,
+    display_name: &str,
+) -> Result<Vec<Mapping>, Box<dyn std::error::Error>> {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader, Write};
+
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(e) => {
+            log::warn!("No se pudo abrir el archivo '{}': {}", path.display(), e);
+            return Ok(Vec::new());
+        }
+    };
+
+    let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let mut reader = BufReader::with_capacity(64 * 1024, file);
+    let mut newly_added = Vec::new();
+    let mut bytes_read = 0u64;
+    let mut last_update = std::time::Instant::now();
+    let mut byte_buf = Vec::new();
+
+    print!(
+        "\r  {}[ 0 B / {} ] (0.0%) Analizando: {} \x1b[K",
+        prefix_tag,
+        format_size(total_bytes),
+        display_name
+    );
+    let _ = std::io::stdout().flush();
+
+    loop {
+        byte_buf.clear();
+        let n = reader.read_until(b'\n', &mut byte_buf)?;
+        if n == 0 {
+            break;
+        }
+        bytes_read += n as u64;
+
+        let line = String::from_utf8_lossy(&byte_buf);
+        let mut file_new = engine.scan_and_register_mappings(&line)?;
+        newly_added.append(&mut file_new);
+
+        if last_update.elapsed().as_millis() >= 80 || bytes_read >= total_bytes {
+            let pct = if total_bytes > 0 {
+                ((bytes_read as f64 / total_bytes as f64) * 100.0).min(100.0)
+            } else {
+                100.0
+            };
+            print!(
+                "\r  {}[ {} / {} ] ({:.1}%) Analizando: {} \x1b[K",
+                prefix_tag,
+                format_size(bytes_read),
+                format_size(total_bytes),
+                pct,
+                display_name
+            );
+            let _ = std::io::stdout().flush();
+            last_update = std::time::Instant::now();
+        }
+    }
+
+    println!(
+        "\r  {}[ {} / {} ] (100.0%) Analizado: {} \x1b[K",
+        prefix_tag,
+        format_size(total_bytes),
+        format_size(total_bytes),
+        display_name
+    );
+
+    Ok(newly_added)
+}
+
 fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
     let is_default = opts.save_mappings.is_none();
     let map_path = resolve_vault_path(opts.save_mappings)?;
@@ -602,26 +689,27 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
             for (idx, f) in files.iter().enumerate() {
                 let current = idx + 1;
                 let rel_path = f.strip_prefix(path).unwrap_or(f);
-                println!(
-                    "  [{}/{}] Analizando: {}",
-                    current,
-                    total,
-                    rel_path.display()
-                );
-                if let Ok(content) = fs::read_to_string(f) {
-                    let mut file_new = engine.scan_and_register_mappings(&content)?;
-                    newly_added.append(&mut file_new);
-                }
+                let prefix_tag = format!("[{}/{}] ", current, total);
+                let mut file_new = scan_file_with_progress(
+                    &mut engine,
+                    f,
+                    &prefix_tag,
+                    &rel_path.display().to_string(),
+                )?;
+                newly_added.append(&mut file_new);
             }
         } else {
-            let content =
-                resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
-            println!("🔍 Analizando archivo: {}", path.display());
-            newly_added = engine.scan_and_register_mappings(&content)?;
+            println!("🔍 Escaneando archivo '{}'...", path.display());
+            newly_added =
+                scan_file_with_progress(&mut engine, path, "", &path.display().to_string())?;
         }
     } else {
         let content =
             resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+        println!(
+            "🔍 Analizando texto en memoria ({})...",
+            format_size(content.len() as u64)
+        );
         newly_added = engine.scan_and_register_mappings(&content)?;
     }
 

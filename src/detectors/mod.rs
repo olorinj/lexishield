@@ -129,10 +129,9 @@ impl DetectorRegistry {
             };
 
             for (start, end, matched_str) in matches {
-                // Verificar si el rango se solapa con un patrón más prioritario ya capturado
-                let overlaps = claimed_spans.iter().any(|&(s, e)| {
-                    (start >= s && start < e) || (end > s && end <= e) || (start <= s && end >= e)
-                });
+                // Verificar si el rango se solapa con un patrón más prioritario ya capturado (búsqueda binaria O(log N))
+                let idx = claimed_spans.partition_point(|&(s, _)| s < end);
+                let overlaps = idx > 0 && claimed_spans[idx - 1].1 > start;
                 if overlaps {
                     continue;
                 }
@@ -155,7 +154,8 @@ impl DetectorRegistry {
                     continue;
                 }
 
-                claimed_spans.push((start, end));
+                let ins_idx = claimed_spans.partition_point(|&(s, _)| s < start);
+                claimed_spans.insert(ins_idx, (start, end));
 
                 if !seen_originals.contains(candidate) {
                     seen_originals.insert(candidate.to_string());
