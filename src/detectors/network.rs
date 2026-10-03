@@ -78,26 +78,35 @@ impl IPv4Detector {
         let clean_original = original.replace('\\', "");
         let has_escapes = original.contains('\\');
 
-        let mut result = String::new();
-
-        if let Ok(ip) = clean_original.parse::<Ipv4Addr>()
-            && Self::is_private(&ip)
-        {
+        let result = if let Ok(ip) = clean_original.parse::<Ipv4Addr>() {
             let octets = ip.octets();
+            let is_priv = Self::is_private(&ip);
             let subnet_key = format!("{}.{}.{}", octets[0], octets[1], octets[2]);
 
             let mut map = self.subnet_map.borrow_mut();
             let mut used = self.used_subnets.borrow_mut();
 
-            // Registrar subred original para que no se pise (si no está ya)
+            // Registrar subred original para que no se asigne como seudónimo a otra
             used.insert(subnet_key.clone());
 
             let new_subnet = map.entry(subnet_key).or_insert_with(|| {
                 loop {
-                    // Generar una subred privada aleatoria en 10.x.x.0/24
-                    let b: u8 = rng.gen_range(0..=255);
-                    let c: u8 = rng.gen_range(0..=255);
-                    let cand = format!("10.{}.{}", b, c);
+                    let cand = if is_priv {
+                        // Subredes privadas en 10.x.y.0/24 (65.536 subredes disponibles)
+                        let b: u8 = rng.gen_range(0..=255);
+                        let c: u8 = rng.gen_range(0..=255);
+                        format!("10.{}.{}", b, c)
+                    } else {
+                        // Subredes públicas seguras en espacios no reservados (millones de subredes disponibles)
+                        let a: u8 = rng.gen_range(11..=220);
+                        if a == 127 || a == 169 || a == 172 || a == 192 {
+                            continue;
+                        }
+                        let b: u8 = rng.gen_range(1..=254);
+                        let c: u8 = rng.gen_range(1..=254);
+                        format!("{}.{}.{}", a, b, c)
+                    };
+
                     if !used.contains(&cand) {
                         used.insert(cand.clone());
                         break cand;
@@ -105,14 +114,14 @@ impl IPv4Detector {
                 }
             });
 
-            result = format!("{}.{}", new_subnet, octets[3]);
-        }
-
-        // Para IPs públicas (o fallback), usar el rango TEST-NET-1
-        if result.is_empty() {
-            let octet: u8 = rng.gen_range(1..254);
-            result = format!("192.0.2.{}", octet);
-        }
+            format!("{}.{}", new_subnet, octets[3])
+        } else {
+            let a: u8 = rng.gen_range(11..=220);
+            let b: u8 = rng.gen_range(1..=254);
+            let c: u8 = rng.gen_range(1..=254);
+            let d: u8 = rng.gen_range(1..=254);
+            format!("{}.{}.{}.{}", a, b, c, d)
+        };
 
         if has_escapes {
             result.replace('.', "\\.")
@@ -172,7 +181,7 @@ impl EmailDetector {
     /// Genera un correo seguro bajo el dominio reservado RFC 2606 (example.com).
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u32 = rng.gen_range(1000..9999);
+        let id: u64 = rng.gen_range(100_000..999_999_999);
         format!("user_{}@example.com", id)
     }
 }
@@ -199,7 +208,7 @@ impl DomainDetector {
     /// Genera un dominio RFC 2606 seguro (.example.com).
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u32 = rng.gen_range(100..999);
+        let id: u64 = rng.gen_range(100_000..999_999_999);
         format!("service{}.example.com", id)
     }
 }
@@ -225,7 +234,7 @@ impl HostnameDetector {
 
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u32 = rng.gen_range(100..999);
+        let id: u64 = rng.gen_range(100_000..999_999_999);
         let prefix = if original.to_lowercase().starts_with("srv") {
             "srv"
         } else {

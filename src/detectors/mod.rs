@@ -106,6 +106,8 @@ impl DetectorRegistry {
         let mut found_mappings: Vec<Mapping> = Vec::new();
         let mut seen_originals: std::collections::HashSet<String> =
             std::collections::HashSet::new();
+        let mut seen_pseudonyms: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         let mut claimed_spans: Vec<(usize, usize)> = Vec::new();
 
         for &dtype in priority_order {
@@ -159,7 +161,13 @@ impl DetectorRegistry {
 
                 if !seen_originals.contains(candidate) {
                     seen_originals.insert(candidate.to_string());
-                    let pseudonym = self.generate_pseudonym_for(candidate, dtype);
+                    let mut pseudonym = self.generate_pseudonym_for(candidate, dtype);
+                    let mut attempts = 0;
+                    while seen_pseudonyms.contains(&pseudonym) && attempts < 100 {
+                        pseudonym = self.generate_pseudonym_for(candidate, dtype);
+                        attempts += 1;
+                    }
+                    seen_pseudonyms.insert(pseudonym.clone());
                     found_mappings.push(Mapping::new(candidate, pseudonym, dtype));
                 }
             }
