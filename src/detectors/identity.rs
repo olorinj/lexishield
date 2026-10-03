@@ -470,19 +470,60 @@ impl TelephoneDetector {
             .collect()
     }
 
+    /// Genera un número de teléfono sintético respetando exactamente el formato, espacios y delimitadores del original.
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let p1: u32 = rng.gen_range(600..699);
-        let p2: u32 = rng.gen_range(100..999);
-        let p3: u32 = rng.gen_range(100..999);
-        if original.starts_with("+34") {
-            format!("+34 {} {} {}", p1, p2, p3)
-        } else if original.contains('-') {
-            format!("{}-{}-{}", p1, p2, p3)
-        } else if original.contains(' ') {
-            format!("{} {} {}", p1, p2, p3)
+
+        // 1. Identificar si tiene prefijo +34
+        let (prefix, body) = if let Some(stripped) = original.strip_prefix("+34") {
+            ("+34", stripped)
         } else {
-            format!("{}{}{}", p1, p2, p3)
+            ("", original)
+        };
+
+        // 2. Determinar primer dígito del cuerpo (mantener tipo móvil/fijo)
+        let first_digit_orig = body.chars().find(|c| c.is_ascii_digit()).unwrap_or('6');
+        let first_digit = match first_digit_orig {
+            '6' | '7' => {
+                if rng.gen_bool(0.5) {
+                    '6'
+                } else {
+                    '7'
+                }
+            }
+            '8' | '9' => {
+                if rng.gen_bool(0.5) {
+                    '8'
+                } else {
+                    '9'
+                }
+            }
+            _ => '6',
+        };
+
+        let mut new_digits = Vec::with_capacity(9);
+        new_digits.push(first_digit);
+        for _ in 1..9 {
+            let d: u32 = rng.gen_range(0..=9);
+            new_digits.push(char::from_digit(d, 10).unwrap_or('0'));
         }
+
+        let mut digit_iter = new_digits.into_iter();
+        let mut result = String::with_capacity(original.len());
+        result.push_str(prefix);
+
+        for c in body.chars() {
+            if c.is_ascii_digit() {
+                if let Some(next_digit) = digit_iter.next() {
+                    result.push(next_digit);
+                } else {
+                    result.push(c);
+                }
+            } else {
+                result.push(c);
+            }
+        }
+
+        result
     }
 }
