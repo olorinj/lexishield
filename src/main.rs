@@ -593,8 +593,22 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
     if let Some(ref path) = opts.input {
         if path.is_dir() {
             let files = collect_files(path)?;
-            for f in files {
-                if let Ok(content) = fs::read_to_string(&f) {
+            let total = files.len();
+            println!(
+                "🔍 Escaneando directorio '{}' ({} archivos)...",
+                path.display(),
+                total
+            );
+            for (idx, f) in files.iter().enumerate() {
+                let current = idx + 1;
+                let rel_path = f.strip_prefix(path).unwrap_or(f);
+                println!(
+                    "  [{}/{}] Analizando: {}",
+                    current,
+                    total,
+                    rel_path.display()
+                );
+                if let Ok(content) = fs::read_to_string(f) {
                     let mut file_new = engine.scan_and_register_mappings(&content)?;
                     newly_added.append(&mut file_new);
                 }
@@ -602,6 +616,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         } else {
             let content =
                 resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+            println!("🔍 Analizando archivo: {}", path.display());
             newly_added = engine.scan_and_register_mappings(&content)?;
         }
     } else {
@@ -834,7 +849,7 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
             let force_ask = is_default && password.is_none();
 
             let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
-            
+
             if !map_path.exists() {
                 return Err("El archivo de mapeos no existe.".into());
             }
