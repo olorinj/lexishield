@@ -73,9 +73,9 @@ impl MappingManager {
         let mut newly_added = Vec::new();
         for m in mappings {
             if !self.forward.contains_key(&m.original) {
-                newly_added.push(m.clone());
+                self.add_mapping(m.clone())?;
+                newly_added.push(m);
             }
-            self.add_mapping(m)?;
         }
         Ok(newly_added)
     }
