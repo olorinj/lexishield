@@ -755,20 +755,19 @@ fn parse_omitted_indices(input: &str, total_count: usize) -> Option<Vec<usize>> 
 
     for p in parts {
         if p.contains('-') {
-            if let Some((start_str, end_str)) = p.split_once('-') {
-                if let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>())
-                {
-                    if start > 0 && end >= start && end <= total_count {
-                        for num in start..=end {
-                            indices.push(num - 1);
-                        }
-                        any_valid = true;
-                    } else {
-                        println!(
-                            "⚠️  Aviso: el rango '{}-{}' está fuera de los límites (1-{}).",
-                            start, end, total_count
-                        );
+            if let Some((start_str, end_str)) = p.split_once('-')
+                && let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>())
+            {
+                if start > 0 && end >= start && end <= total_count {
+                    for num in start..=end {
+                        indices.push(num - 1);
                     }
+                    any_valid = true;
+                } else {
+                    println!(
+                        "⚠️  Aviso: el rango '{}-{}' está fuera de los límites (1-{}).",
+                        start, end, total_count
+                    );
                 }
             }
         } else if let Ok(num) = p.parse::<usize>() {
