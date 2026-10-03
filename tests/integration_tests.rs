@@ -126,7 +126,7 @@ fn test_mejora_4_bidirectional_roundtrip_injective() {
 
     // Escaneo y registro automático
     let detected_count = engine.scan_and_register_mappings(original_json).unwrap();
-    assert_eq!(detected_count, 3);
+    assert_eq!(detected_count.len(), 3);
 
     // Ofuscar
     let (obfuscated, _) = engine
