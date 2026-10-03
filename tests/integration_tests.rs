@@ -179,6 +179,26 @@ fn test_mejora_5_semantically_valid_checksums() {
     let matches = cc_detector.find_matches(&text_with_hashes);
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0].2, valid_visa);
+
+    // Validar preservación estricta de formato en generador de teléfonos
+    use lexishield::detectors::identity::TelephoneDetector;
+    let phone_detector = TelephoneDetector::new();
+
+    // Caso 1: +34 sin espacios
+    let p1 = phone_detector.generate_pseudonym("+34640052795");
+    assert!(p1.starts_with("+34"));
+    assert_eq!(p1.len(), 12);
+    assert!(!p1.contains(' '));
+
+    // Caso 2: +34 con espacios
+    let p2 = phone_detector.generate_pseudonym("+34 640 052 795");
+    assert_eq!(p2.matches(' ').count(), 3);
+    assert_eq!(p2.len(), 15);
+
+    // Caso 3: Guiones
+    let p3 = phone_detector.generate_pseudonym("640-052-795");
+    assert_eq!(p3.matches('-').count(), 2);
+    assert_eq!(p3.len(), 11);
 }
 
 #[test]
