@@ -36,11 +36,26 @@ impl ObfuscatorEngine {
         &mut self,
         content: &str,
     ) -> Result<Vec<Mapping>, ObfuscationError> {
-        let detected = self.detectors.scan_text(
+        let mut detected = self.detectors.scan_text(
             content,
             &self.config.detector_priority_order,
             self.config.min_token_length,
         );
+
+        // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
+        for m in &mut detected {
+            if self.manager.contains_original(&m.original) {
+                continue;
+            }
+            let mut attempts = 0;
+            while self.manager.has_pseudonym(&m.pseudonym) && attempts < 1000 {
+                m.pseudonym = self
+                    .detectors
+                    .generate_pseudonym_for(&m.original, m.detector_type);
+                attempts += 1;
+            }
+        }
+
         let newly_added = self.manager.load_mappings(detected)?;
         Ok(newly_added)
     }

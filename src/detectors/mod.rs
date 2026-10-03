@@ -88,7 +88,8 @@ impl DetectorRegistry {
             DetectorType::O365OriginatingServer => self.o365_server.generate_pseudonym(original),
             DetectorType::AttachmentFileName => self.attachment.generate_pseudonym(original),
             DetectorType::GenericToken => {
-                let id: u32 = rand::random::<u32>() % 9000 + 1000;
+                let id: u64 =
+                    rand::Rng::gen_range(&mut rand::thread_rng(), 100_000_000..999_999_999);
                 format!("ANON_{}", id)
             }
         }

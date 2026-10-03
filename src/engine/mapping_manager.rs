@@ -85,6 +85,16 @@ impl MappingManager {
         self.forward.values().cloned().collect()
     }
 
+    /// Comprueba si ya existe un valor original registrado en el gestor.
+    pub fn contains_original(&self, original: &str) -> bool {
+        self.forward.contains_key(original)
+    }
+
+    /// Comprueba si ya existe un seudónimo ocupado en el gestor.
+    pub fn has_pseudonym(&self, pseudonym: &str) -> bool {
+        self.reverse.contains_key(pseudonym)
+    }
+
     /// Obtiene el mapa directo de sustitución (Original -> Seudónimo o Seudónimo -> Original si reverse es True).
     pub fn get_replacement_map(&self, reverse: bool) -> HashMap<String, String> {
         let mut map = HashMap::with_capacity(self.forward.len());
