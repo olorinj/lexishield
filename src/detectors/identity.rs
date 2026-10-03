@@ -103,10 +103,106 @@ impl CreditCardDetector {
         DetectorType::CreditCard
     }
 
-    /// Algoritmo de Luhn (Módulo 10) para validación de tarjetas de crédito.
+    /// Valida si un prefijo y longitud corresponden a una red de tarjetas conocida (IIN/BIN).
+    pub fn is_valid_iin(digits: &[u32]) -> bool {
+        let len = digits.len();
+        if !(13..=19).contains(&len) {
+            return false;
+        }
+
+        let first = digits[0];
+        let first2 = if len >= 2 {
+            digits[0] * 10 + digits[1]
+        } else {
+            0
+        };
+        let first4 = if len >= 4 {
+            digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3]
+        } else {
+            0
+        };
+        let first6 = if len >= 6 {
+            digits[0] * 100_000
+                + digits[1] * 10_000
+                + digits[2] * 1000
+                + digits[3] * 100
+                + digits[4] * 10
+                + digits[5]
+        } else {
+            0
+        };
+
+        // Visa: 4 (longitud 13, 16, 19)
+        if first == 4 && (len == 13 || len == 16 || len == 19) {
+            return true;
+        }
+
+        // Mastercard: 51..=55, 2221..=2720 (longitud 16)
+        if len == 16 {
+            if (51..=55).contains(&first2) {
+                return true;
+            }
+            if (2221..=2720).contains(&first4) {
+                return true;
+            }
+        }
+
+        // American Express: 34, 37 (longitud 15)
+        if (first2 == 34 || first2 == 37) && len == 15 {
+            return true;
+        }
+
+        // Discover: 6011, 644..=649, 65, 622126..=622925 (longitud 16, 19)
+        if len == 16 || len == 19 {
+            if first4 == 6011 || (644..=649).contains(&first4) || first2 == 65 {
+                return true;
+            }
+            if (622126..=622925).contains(&first6) {
+                return true;
+            }
+        }
+
+        // Diners Club / Carte Blanche: 300..=305, 36, 38 (longitud 14..=19)
+        if (300..=305).contains(&first4) || first2 == 36 || first2 == 38 {
+            return true;
+        }
+
+        // JCB: 3528..=3589 (longitud 16..=19)
+        if (3528..=3589).contains(&first4) && len >= 16 {
+            return true;
+        }
+
+        // Maestro: 50, 56..=58, 6 (longitud 12..=19)
+        if first2 == 50 || (56..=58).contains(&first2) {
+            return true;
+        }
+
+        // UnionPay: 62 (longitud 16..=19)
+        if first2 == 62 && len >= 16 {
+            return true;
+        }
+
+        // Mir: 2200..=2204 (longitud 16)
+        if (2200..=2204).contains(&first4) && len == 16 {
+            return true;
+        }
+
+        false
+    }
+
+    /// Algoritmo de Luhn (Módulo 10) para validación de tarjetas de crédito con comprobación de IIN.
     pub fn is_luhn_valid(number: &str) -> bool {
         let digits: Vec<u32> = number.chars().filter_map(|c| c.to_digit(10)).collect();
-        if digits.len() < 13 || digits.len() > 19 {
+        if !(13..=19).contains(&digits.len()) {
+            return false;
+        }
+
+        // Descartar secuencias homogéneas (como 0000000000000000)
+        if digits.iter().all(|&d| d == digits[0]) {
+            return false;
+        }
+
+        if !Self::is_valid_iin(&digits) {
             return false;
         }
 
@@ -124,10 +220,104 @@ impl CreditCardDetector {
         sum % 10 == 0
     }
 
+    /// Comprueba que la coincidencia no sea parte de un hash, nombre de archivo o identificador contiguo.
+    pub fn is_isolated_credit_card(text: &str, start: usize, end: usize) -> bool {
+        // 1. Carácter inmediatamente anterior
+        if start > 0 {
+            let prev_char = text[..start].chars().last().unwrap_or(' ');
+            if prev_char.is_ascii_alphanumeric() || prev_char == '_' {
+                return false;
+            }
+            // Si está precedido por delimitadores comunes de rutas/hashes (-, ., :, /, \)
+            if ['-', '.', ':', '/', '\\'].contains(&prev_char) && start > 1 {
+                let before_delim = text[..start - prev_char.len_utf8()]
+                    .chars()
+                    .last()
+                    .unwrap_or(' ');
+                if before_delim.is_ascii_alphanumeric() {
+                    return false;
+                }
+            }
+        }
+
+        // 2. Carácter inmediatamente posterior
+        if end < text.len() {
+            let next_char = text[end..].chars().next().unwrap_or(' ');
+            if next_char.is_ascii_alphanumeric() || next_char == '_' {
+                return false;
+            }
+            // Si está seguido por delimitadores comunes de rutas/hashes (-, ., :, /, \)
+            if ['-', '.', ':', '/', '\\'].contains(&next_char)
+                && end + next_char.len_utf8() < text.len()
+            {
+                let after_delim = text[end + next_char.len_utf8()..]
+                    .chars()
+                    .next()
+                    .unwrap_or(' ');
+                if after_delim.is_ascii_alphanumeric() {
+                    return false;
+                }
+            }
+        }
+
+        // 3. Inspeccionar el token delimitado circundante
+        let token_start = text[..start]
+            .rfind(|c: char| {
+                c.is_whitespace()
+                    || [
+                        '"', '\'', '<', '>', '(', ')', '{', '}', '[', ']', ',', ';', '\r', '\n',
+                    ]
+                    .contains(&c)
+            })
+            .map(|idx| idx + 1)
+            .unwrap_or(0);
+        let token_end = text[end..]
+            .find(|c: char| {
+                c.is_whitespace()
+                    || [
+                        '"', '\'', '<', '>', '(', ')', '{', '}', '[', ']', ',', ';', '\r', '\n',
+                    ]
+                    .contains(&c)
+            })
+            .map(|idx| end + idx)
+            .unwrap_or(text.len());
+
+        let surrounding = &text[token_start..token_end];
+        // Si el token circundante contiene letras alfabéticas o de hash, no es una tarjeta real
+        if surrounding.chars().any(|c| c.is_ascii_alphabetic()) {
+            return false;
+        }
+
+        // 4. Comprobar si el contexto previo indica un hash o checksum conocido
+        let ctx_start = {
+            let mut idx = start.saturating_sub(40);
+            while idx > 0 && !text.is_char_boundary(idx) {
+                idx -= 1;
+            }
+            idx
+        };
+        let ctx_prefix = text[ctx_start..start].to_lowercase();
+        if ctx_prefix.contains("sha")
+            || ctx_prefix.contains("md5")
+            || ctx_prefix.contains("hash")
+            || ctx_prefix.contains("checksum")
+            || ctx_prefix.contains("digest")
+            || ctx_prefix.contains("etag")
+            || ctx_prefix.contains("commit")
+        {
+            return false;
+        }
+
+        true
+    }
+
     pub fn find_matches<'a>(&self, text: &'a str) -> Vec<(usize, usize, &'a str)> {
         CREDIT_CARD_REGEX
             .find_iter(text)
-            .filter(|m| Self::is_luhn_valid(m.as_str()))
+            .filter(|m| {
+                Self::is_luhn_valid(m.as_str())
+                    && Self::is_isolated_credit_card(text, m.start(), m.end())
+            })
             .map(|m| (m.start(), m.end(), m.as_str()))
             .collect()
     }

@@ -33,6 +33,12 @@ impl MappingManager {
             let mut m = mapping.clone();
             m.omitted = true;
             m.pseudonym = "=".to_string();
+            if let Some(old) = self.forward.get(&m.original)
+                && !old.omitted
+                && old.pseudonym != "="
+            {
+                self.reverse.remove(&old.pseudonym);
+            }
             self.forward.insert(m.original.clone(), m);
             // No lo añadimos al reverse map para evitar colisiones con múltiples "="
             return Ok(());
