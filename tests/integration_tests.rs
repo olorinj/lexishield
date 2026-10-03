@@ -165,9 +165,20 @@ fn test_mejora_5_semantically_valid_checksums() {
     let generated_cc = cc_detector.generate_pseudonym("4532-1234-5678-9010");
     assert!(
         CreditCardDetector::is_luhn_valid(&generated_cc),
-        "La tarjeta generada {} debe cumplir el algoritmo de Luhn",
+        "La tarjeta generada {} debe cumplir el algoritmo de Luhn y prefijo IIN",
         generated_cc
     );
+
+    // Validar que hashes, timestamps y archivos no se detecten como tarjetas de crédito
+    let valid_visa = "4532-1234-5678-9014";
+    assert!(CreditCardDetector::is_luhn_valid(valid_visa));
+    let text_with_hashes = format!(
+        "hash: 9ea8998d9c0389f02c4380b430ab01e6.png, sha256: 3f567904257fbe3c94487f0db0302579, time: 1741335363000, 20250307081603123, card: {}",
+        valid_visa
+    );
+    let matches = cc_detector.find_matches(&text_with_hashes);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].2, valid_visa);
 }
 
 #[test]

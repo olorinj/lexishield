@@ -786,77 +786,31 @@ fn parse_omitted_indices(input: &str, total_count: usize) -> Option<Vec<usize>> 
     if any_valid { Some(indices) } else { None }
 }
 
-fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
-    let is_default = opts.save_mappings.is_none();
-    let map_path = resolve_vault_path(opts.save_mappings)?;
-
-    let mut engine = ObfuscatorEngine::new(config);
-
-    let mut final_pwd = opts.password.clone();
-    if map_path.exists() {
-        let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(&map_path))?;
-        final_pwd = pwd.clone();
-        if let Ok(loaded) = lexishield::load_mappings_auto(&map_path, pwd.as_deref()) {
-            let _ = engine.manager.load_mappings(loaded);
-        }
-    }
-
-    let mut newly_added = Vec::new();
-
-    if let Some(ref path) = opts.input {
-        if path.is_dir() {
-            let files = collect_files(path)?;
-            let total = files.len();
-            println!(
-                "🔍 Escaneando directorio '{}' ({} archivos)...",
-                path.display(),
-                total
-            );
-            for (idx, f) in files.iter().enumerate() {
-                let current = idx + 1;
-                let rel_path = f.strip_prefix(path).unwrap_or(f);
-                let prefix_tag = format!("[{}/{}] ", current, total);
-                let mut file_new = scan_file_with_progress(
-                    &mut engine,
-                    f,
-                    &prefix_tag,
-                    &rel_path.display().to_string(),
-                )?;
-                newly_added.append(&mut file_new);
-            }
-        } else {
-            println!("🔍 Escaneando archivo '{}'...", path.display());
-            newly_added =
-                scan_file_with_progress(&mut engine, path, "", &path.display().to_string())?;
-        }
-    } else {
-        let content =
-            resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
-        println!(
-            "🔍 Analizando texto en memoria ({})...",
-            format_size(content.len() as u64)
-        );
-        newly_added = engine.scan_and_register_mappings(&content)?;
-    }
-
-    let count = newly_added.len();
-
-    log::info!(
-        "Escaneo completado: {} NUEVOS elementos sensibles identificados.",
-        count
-    );
-
+/// Muestra y gestiona interactivamente los nuevos mapeos detectados en un archivo concreto.
+fn prompt_file_mappings(
+    file_display_name: &str,
+    mappings: &mut [Mapping],
+    engine: &mut ObfuscatorEngine,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::{self, Write};
+    let count = mappings.len();
     if count == 0 {
         return Ok(());
     }
 
-    use std::io::{self, Write};
+    println!(
+        "\n📄 Nuevos elementos detectados en '{}' ({} nuevo{}):",
+        file_display_name,
+        count,
+        if count == 1 { "" } else { "s" }
+    );
+
     let mut omitted_indices: Vec<usize> = Vec::new();
     let chunk_size = 20;
 
-    for (i, m) in newly_added.iter().enumerate() {
+    for (i, m) in mappings.iter().enumerate() {
         println!(
-            "{}. [{:?}] '{}' -> '{}'",
+            "  {}. [{:?}] '{}' -> '{}'",
             i + 1,
             m.detector_type,
             m.original,
@@ -887,77 +841,159 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         }
     }
 
-    let mut save = opts.yes;
+    omitted_indices.sort_unstable();
+    omitted_indices.dedup();
 
-    if !save {
-        omitted_indices.sort_unstable();
-        omitted_indices.dedup();
+    let omitted_msg = if !omitted_indices.is_empty() {
+        format!(
+            " ({} marcados previamente para omitir)",
+            omitted_indices.len()
+        )
+    } else {
+        String::new()
+    };
 
-        let omitted_msg = if !omitted_indices.is_empty() {
-            format!(
-                " ({} marcados previamente para omitir)",
-                omitted_indices.len()
-            )
-        } else {
-            String::new()
-        };
+    print!(
+        "¿Aceptar estos mapeos para '{}'{}? [S/n, o números adicionales a omitir (ej: 1, 3-5)]: ",
+        file_display_name, omitted_msg
+    );
+    io::stdout().flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let trimmed = input.trim();
 
-        print!(
-            "¿Desea guardar los {} mapeos en '{}'{}? [S/n, o números adicionales a omitir (ej: 1, 3-5)]: ",
-            count,
-            map_path.display(),
-            omitted_msg
-        );
-        io::stdout().flush()?;
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let trimmed = input.trim();
+    if trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("s")
+        || trimmed.eq_ignore_ascii_case("si")
+        || trimmed.eq_ignore_ascii_case("y")
+        || trimmed.eq_ignore_ascii_case("yes")
+    {
+        // Aceptar con las omisiones seleccionadas
+    } else if trimmed.eq_ignore_ascii_case("n") || trimmed.eq_ignore_ascii_case("no") {
+        for idx in 0..count {
+            omitted_indices.push(idx);
+        }
+    } else if let Some(mut newly_omitted) = parse_omitted_indices(trimmed, count) {
+        let om_display: Vec<String> = newly_omitted
+            .iter()
+            .map(|idx| (idx + 1).to_string())
+            .collect();
+        println!("  -> Marcados para OMITIR: {}", om_display.join(", "));
+        omitted_indices.append(&mut newly_omitted);
+    }
 
-        if trimmed.is_empty()
-            || trimmed.eq_ignore_ascii_case("s")
-            || trimmed.eq_ignore_ascii_case("si")
-            || trimmed.eq_ignore_ascii_case("y")
-            || trimmed.eq_ignore_ascii_case("yes")
-        {
-            save = true;
-        } else if trimmed.eq_ignore_ascii_case("n") || trimmed.eq_ignore_ascii_case("no") {
-            save = false;
-        } else if let Some(mut newly_omitted) = parse_omitted_indices(trimmed, count) {
-            let om_display: Vec<String> = newly_omitted
-                .iter()
-                .map(|idx| (idx + 1).to_string())
-                .collect();
-            println!("  -> Marcados para OMITIR: {}", om_display.join(", "));
-            omitted_indices.append(&mut newly_omitted);
-            save = true;
-        } else {
-            println!("Entrada no reconocida. No se guardarán los cambios.");
-            save = false;
+    omitted_indices.sort_unstable();
+    omitted_indices.dedup();
+
+    for &idx in &omitted_indices {
+        if let Some(m) = mappings.get_mut(idx) {
+            m.pseudonym = "=".to_string();
+            m.omitted = true;
+            let _ = engine.manager.add_mapping(m.clone());
+            log::info!("Mapeo '{}' omitido por elección del usuario.", m.original);
         }
     }
 
-    if save {
-        omitted_indices.sort_unstable();
-        omitted_indices.dedup();
+    println!();
+    Ok(())
+}
 
-        for &idx in &omitted_indices {
-            if let Some(m) = newly_added.get_mut(idx) {
-                m.pseudonym = "=".to_string();
-                m.omitted = true;
-                let _ = engine.manager.add_mapping(m.clone());
-                log::info!("Mapeo '{}' omitido por elección del usuario.", m.original);
+fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
+    let is_default = opts.save_mappings.is_none();
+    let map_path = resolve_vault_path(opts.save_mappings)?;
+
+    let mut engine = ObfuscatorEngine::new(config);
+
+    let mut final_pwd = opts.password.clone();
+    if map_path.exists() {
+        let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(&map_path))?;
+        final_pwd = pwd.clone();
+        if let Ok(loaded) = lexishield::load_mappings_auto(&map_path, pwd.as_deref()) {
+            let _ = engine.manager.load_mappings(loaded);
+        }
+    }
+
+    let mut total_discovered = 0usize;
+
+    if let Some(ref path) = opts.input {
+        if path.is_dir() {
+            let files = collect_files(path)?;
+            let total = files.len();
+            println!(
+                "🔍 Escaneando directorio '{}' ({} archivos)...",
+                path.display(),
+                total
+            );
+            for (idx, f) in files.iter().enumerate() {
+                let current = idx + 1;
+                let rel_path = f.strip_prefix(path).unwrap_or(f);
+                let prefix_tag = format!("[{}/{}] ", current, total);
+                let mut file_new = scan_file_with_progress(
+                    &mut engine,
+                    f,
+                    &prefix_tag,
+                    &rel_path.display().to_string(),
+                )?;
+
+                if !file_new.is_empty() {
+                    total_discovered += file_new.len();
+                    if !opts.yes {
+                        let disp = format!("[{}/{}] {}", current, total, rel_path.display());
+                        prompt_file_mappings(&disp, &mut file_new, &mut engine)?;
+                    }
+                }
+            }
+        } else {
+            println!("🔍 Escaneando archivo '{}'...", path.display());
+            let mut file_new =
+                scan_file_with_progress(&mut engine, path, "", &path.display().to_string())?;
+            if !file_new.is_empty() {
+                total_discovered += file_new.len();
+                if !opts.yes {
+                    prompt_file_mappings(&path.display().to_string(), &mut file_new, &mut engine)?;
+                }
             }
         }
-
-        let final_mappings = engine.manager.get_mappings();
-
-        let force_ask = is_default && final_pwd.is_none();
-        let pwd = resolve_password(final_pwd, opts.ask_password || force_ask, None)?;
-        lexishield::save_mappings_auto(&map_path, &final_mappings, pwd.as_deref())?;
-        log::info!("Mapeos guardados correctamente en: {}", map_path.display());
     } else {
-        log::info!("Operación de guardado cancelada.");
+        let content =
+            resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+        println!(
+            "🔍 Analizando texto en memoria ({})...",
+            format_size(content.len() as u64)
+        );
+        let mut text_new = engine.scan_and_register_mappings(&content)?;
+        if !text_new.is_empty() {
+            total_discovered += text_new.len();
+            if !opts.yes {
+                prompt_file_mappings("Texto / Portapapeles", &mut text_new, &mut engine)?;
+            }
+        }
     }
+
+    log::info!(
+        "Escaneo completado: {} nuevos elementos sensibles identificados en total.",
+        total_discovered
+    );
+
+    if total_discovered == 0 {
+        println!("\n✨ Escaneo completado: no se encontraron nuevos elementos sensibles.");
+        return Ok(());
+    }
+
+    let final_mappings = engine.manager.get_mappings();
+    let omitted_count = final_mappings.iter().filter(|m| m.omitted).count();
+    let active_count = final_mappings.len() - omitted_count;
+
+    let force_ask = is_default && final_pwd.is_none();
+    let pwd = resolve_password(final_pwd, opts.ask_password || force_ask, None)?;
+    lexishield::save_mappings_auto(&map_path, &final_mappings, pwd.as_deref())?;
+    println!(
+        "\n💾 Se han guardado {} mapeos ({} activos, {} omitidos) en '{}'.",
+        final_mappings.len(),
+        active_count,
+        omitted_count,
+        map_path.display()
+    );
 
     Ok(())
 }
