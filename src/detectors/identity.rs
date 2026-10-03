@@ -218,7 +218,9 @@ impl TelephoneDetector {
         // Regla 1: Descartar si es parte de un SID de Windows
         let prefix_start = {
             let mut idx = start.saturating_sub(10);
-            while idx > 0 && !full_text.is_char_boundary(idx) { idx -= 1; }
+            while idx > 0 && !full_text.is_char_boundary(idx) {
+                idx -= 1;
+            }
             idx
         };
         let prefix = &full_text[prefix_start..start].to_lowercase();
@@ -227,7 +229,9 @@ impl TelephoneDetector {
         }
         let suffix_end = {
             let mut idx = (end + 10).min(full_text.len());
-            while idx < full_text.len() && !full_text.is_char_boundary(idx) { idx += 1; }
+            while idx < full_text.len() && !full_text.is_char_boundary(idx) {
+                idx += 1;
+            }
             idx
         };
         let suffix = &full_text[end..suffix_end];
@@ -238,18 +242,28 @@ impl TelephoneDetector {
         // Regla 2: Descartar si el contexto indica un campo numérico (ID, Timestamp) en estructurados como JSON/YAML
         let json_prefix_start = {
             let mut idx = start.saturating_sub(30);
-            while idx > 0 && !full_text.is_char_boundary(idx) { idx -= 1; }
+            while idx > 0 && !full_text.is_char_boundary(idx) {
+                idx -= 1;
+            }
             idx
         };
         let json_prefix = &full_text[json_prefix_start..start].to_lowercase();
-        if json_prefix.contains("id\"") || json_prefix.contains("id'") || json_prefix.contains("id:") || json_prefix.contains("id=")
-            || json_prefix.contains("timestamp") || json_prefix.contains("date") || json_prefix.contains("time")
-            || json_prefix.contains("created") || json_prefix.contains("updated")
-            || json_prefix.contains("size") || json_prefix.contains("length") || json_prefix.contains("count")
+        if json_prefix.contains("id\"")
+            || json_prefix.contains("id'")
+            || json_prefix.contains("id:")
+            || json_prefix.contains("id=")
+            || json_prefix.contains("timestamp")
+            || json_prefix.contains("date")
+            || json_prefix.contains("time")
+            || json_prefix.contains("created")
+            || json_prefix.contains("updated")
+            || json_prefix.contains("size")
+            || json_prefix.contains("length")
+            || json_prefix.contains("count")
         {
             return true;
         }
-        
+
         // Falso positivo si es una fracción decimal (ej. .944430319)
         if json_prefix.ends_with('.') {
             return true;
