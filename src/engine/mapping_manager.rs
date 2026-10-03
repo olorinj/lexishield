@@ -66,7 +66,10 @@ impl MappingManager {
     }
 
     /// Carga múltiples mapeos a la tabla.
-    pub fn load_mappings(&mut self, mappings: Vec<Mapping>) -> Result<Vec<Mapping>, ObfuscationError> {
+    pub fn load_mappings(
+        &mut self,
+        mappings: Vec<Mapping>,
+    ) -> Result<Vec<Mapping>, ObfuscationError> {
         let mut newly_added = Vec::new();
         for m in mappings {
             if !self.forward.contains_key(&m.original) {

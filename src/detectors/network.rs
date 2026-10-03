@@ -80,32 +80,32 @@ impl IPv4Detector {
 
         let mut result = String::new();
 
-        if let Ok(ip) = clean_original.parse::<Ipv4Addr>() {
-            if Self::is_private(&ip) {
-                let octets = ip.octets();
-                let subnet_key = format!("{}.{}.{}", octets[0], octets[1], octets[2]);
+        if let Ok(ip) = clean_original.parse::<Ipv4Addr>()
+            && Self::is_private(&ip)
+        {
+            let octets = ip.octets();
+            let subnet_key = format!("{}.{}.{}", octets[0], octets[1], octets[2]);
 
-                let mut map = self.subnet_map.borrow_mut();
-                let mut used = self.used_subnets.borrow_mut();
+            let mut map = self.subnet_map.borrow_mut();
+            let mut used = self.used_subnets.borrow_mut();
 
-                // Registrar subred original para que no se pise (si no está ya)
-                used.insert(subnet_key.clone());
+            // Registrar subred original para que no se pise (si no está ya)
+            used.insert(subnet_key.clone());
 
-                let new_subnet = map.entry(subnet_key).or_insert_with(|| {
-                    loop {
-                        // Generar una subred privada aleatoria en 10.x.x.0/24
-                        let b: u8 = rng.gen_range(0..=255);
-                        let c: u8 = rng.gen_range(0..=255);
-                        let cand = format!("10.{}.{}", b, c);
-                        if !used.contains(&cand) {
-                            used.insert(cand.clone());
-                            break cand;
-                        }
+            let new_subnet = map.entry(subnet_key).or_insert_with(|| {
+                loop {
+                    // Generar una subred privada aleatoria en 10.x.x.0/24
+                    let b: u8 = rng.gen_range(0..=255);
+                    let c: u8 = rng.gen_range(0..=255);
+                    let cand = format!("10.{}.{}", b, c);
+                    if !used.contains(&cand) {
+                        used.insert(cand.clone());
+                        break cand;
                     }
-                });
+                }
+            });
 
-                result = format!("{}.{}", new_subnet, octets[3]);
-            }
+            result = format!("{}.{}", new_subnet, octets[3]);
         }
 
         // Para IPs públicas (o fallback), usar el rango TEST-NET-1
