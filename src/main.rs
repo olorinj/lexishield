@@ -585,6 +585,69 @@ fn format_size(bytes: u64) -> String {
     }
 }
 
+fn is_binary_or_compressed(path: &Path, file: &mut std::fs::File) -> bool {
+    // 1. Detección por extensiones comunes binarias/comprimidas
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        let ext_lower = ext.to_lowercase();
+        let binary_extensions = [
+            // Comprimidos y empaquetados
+            "zip", "gz", "tar", "tgz", "bz2", "tbz2", "xz", "txz", "7z", "rar", "zst", "iso", "cab",
+            "deb", "rpm", "apk", "jar", "war", "ear",
+            // Ejecutables y librerías binarias
+            "exe", "dll", "so", "dylib", "bin", "o", "a", "obj", "pyc", "class", "wasm",
+            // Multimedia
+            "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tiff", "psd", "mp3", "mp4", "mkv",
+            "avi", "mov", "wav", "flac", "ogg", "webm",
+            // Documentos compilados y bases de datos
+            "pdf", "docx", "xlsx", "pptx", "db", "sqlite", "sqlite3", "mdb",
+            // Tipografías
+            "woff", "woff2", "ttf", "eot", "otf", // Bóvedas cifradas de LexiShield
+            "lexi",
+        ];
+        if binary_extensions.contains(&ext_lower.as_str()) {
+            return true;
+        }
+    }
+
+    // 2. Inspección rápida de cabecera (primeros 1024 bytes)
+    use std::io::{Read, Seek, SeekFrom};
+    let mut header = [0u8; 1024];
+    if let Ok(n) = file.read(&mut header) {
+        let _ = file.seek(SeekFrom::Start(0));
+        if n > 0 {
+            // Magic bytes de compresión
+            if n >= 2 && header[0..2] == [0x1f, 0x8b] {
+                return true;
+            }
+            if n >= 4 && header[0..4] == [0x50, 0x4b, 0x03, 0x04] {
+                return true;
+            }
+            if n >= 6 && header[0..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c] {
+                return true;
+            }
+            if n >= 3 && header[0..3] == [0x42, 0x5a, 0x68] {
+                return true;
+            }
+            if n >= 6 && header[0..6] == [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00] {
+                return true;
+            }
+            if n >= 4 && header[0..4] == [0x28, 0xb5, 0x2f, 0xfd] {
+                return true;
+            }
+            if n >= 4 && header[0..4] == [0x52, 0x61, 0x72, 0x21] {
+                return true;
+            }
+
+            // Si contiene bytes nulos en la cabecera es binario
+            if header[..n].contains(&0x00) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 /// Escanea un archivo línea por línea con reporte de progreso en tiempo real (bytes leídos / tamaño total).
 fn scan_file_with_progress(
     engine: &mut ObfuscatorEngine,
@@ -595,7 +658,7 @@ fn scan_file_with_progress(
     use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
 
-    let file = match File::open(path) {
+    let mut file = match File::open(path) {
         Ok(f) => f,
         Err(e) => {
             log::warn!("No se pudo abrir el archivo '{}': {}", path.display(), e);
@@ -604,6 +667,17 @@ fn scan_file_with_progress(
     };
 
     let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
+
+    if is_binary_or_compressed(path, &mut file) {
+        println!(
+            "\r  {}[ {} ] Omitido (formato binario o comprimido no admitido): {} \x1b[K",
+            prefix_tag,
+            format_size(total_bytes),
+            display_name
+        );
+        return Ok(Vec::new());
+    }
+
     let mut reader = BufReader::with_capacity(64 * 1024, file);
     let mut newly_added = Vec::new();
     let mut bytes_read = 0u64;
