@@ -734,6 +734,59 @@ fn scan_file_with_progress(
     Ok(newly_added)
 }
 
+/// Parsea una entrada de texto que contiene números o rangos (ej: "1, 3-5 8") a índices (0-based).
+fn parse_omitted_indices(input: &str, total_count: usize) -> Option<Vec<usize>> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let parts: Vec<&str> = trimmed
+        .split(|c: char| c.is_whitespace() || c == ',')
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if parts.is_empty() {
+        return None;
+    }
+
+    let mut indices = Vec::new();
+    let mut any_valid = false;
+
+    for p in parts {
+        if p.contains('-') {
+            if let Some((start_str, end_str)) = p.split_once('-') {
+                if let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>())
+                {
+                    if start > 0 && end >= start && end <= total_count {
+                        for num in start..=end {
+                            indices.push(num - 1);
+                        }
+                        any_valid = true;
+                    } else {
+                        println!(
+                            "⚠️  Aviso: el rango '{}-{}' está fuera de los límites (1-{}).",
+                            start, end, total_count
+                        );
+                    }
+                }
+            }
+        } else if let Ok(num) = p.parse::<usize>() {
+            if num > 0 && num <= total_count {
+                indices.push(num - 1);
+                any_valid = true;
+            } else {
+                println!(
+                    "⚠️  Aviso: el número '{}' está fuera de rango (1-{}).",
+                    num, total_count
+                );
+            }
+        }
+    }
+
+    if any_valid { Some(indices) } else { None }
+}
+
 fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std::error::Error>> {
     let is_default = opts.save_mappings.is_none();
     let map_path = resolve_vault_path(opts.save_mappings)?;
@@ -799,7 +852,9 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
     }
 
     use std::io::{self, Write};
+    let mut omitted_indices: Vec<usize> = Vec::new();
     let chunk_size = 20;
+
     for (i, m) in newly_added.iter().enumerate() {
         println!(
             "{}. [{:?}] '{}' -> '{}'",
@@ -811,97 +866,89 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
 
         if (i + 1) % chunk_size == 0 && i + 1 < count {
             print!(
-                "--- Mostrados {} de {} (Enter para seguir, 'q' para saltar al final) --- ",
+                "--- Mostrados {} de {} [Enter para continuar, 'q' para saltar al final, o números/rangos a omitir (ej: 1, 3-5)]: ",
                 i + 1,
                 count
             );
             io::stdout().flush()?;
             let mut buf = String::new();
             io::stdin().read_line(&mut buf)?;
-            if buf.trim().to_lowercase() == "q" {
+            let trimmed = buf.trim();
+            if trimmed.eq_ignore_ascii_case("q") {
                 break;
+            }
+            if let Some(mut newly_omitted) = parse_omitted_indices(trimmed, count) {
+                let om_display: Vec<String> = newly_omitted
+                    .iter()
+                    .map(|idx| (idx + 1).to_string())
+                    .collect();
+                println!("  -> Marcados para OMITIR: {}", om_display.join(", "));
+                omitted_indices.append(&mut newly_omitted);
             }
         }
     }
 
     let mut save = opts.yes;
-    let mut omitted_indices: Vec<usize> = Vec::new();
 
     if !save {
+        omitted_indices.sort_unstable();
+        omitted_indices.dedup();
+
+        let omitted_msg = if !omitted_indices.is_empty() {
+            format!(
+                " ({} marcados previamente para omitir)",
+                omitted_indices.len()
+            )
+        } else {
+            String::new()
+        };
+
         print!(
-            "¿Desea guardar los {} mapeos en '{}'? [s/N, o números/rangos a omitir (ej: 1, 3-5)]: ",
+            "¿Desea guardar los {} mapeos en '{}'{}? [S/n, o números adicionales a omitir (ej: 1, 3-5)]: ",
             count,
-            map_path.display()
+            map_path.display(),
+            omitted_msg
         );
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
-        let trimmed = input.trim().to_lowercase();
+        let trimmed = input.trim();
 
-        if trimmed == "s" || trimmed == "si" || trimmed == "y" || trimmed == "yes" {
+        if trimmed.is_empty()
+            || trimmed.eq_ignore_ascii_case("s")
+            || trimmed.eq_ignore_ascii_case("si")
+            || trimmed.eq_ignore_ascii_case("y")
+            || trimmed.eq_ignore_ascii_case("yes")
+        {
             save = true;
-        } else if trimmed == "n" || trimmed == "no" || trimmed.is_empty() {
+        } else if trimmed.eq_ignore_ascii_case("n") || trimmed.eq_ignore_ascii_case("no") {
             save = false;
-        } else {
-            let parts: Vec<&str> = trimmed
-                .split(|c: char| c.is_whitespace() || c == ',')
-                .filter(|s| !s.is_empty())
+        } else if let Some(mut newly_omitted) = parse_omitted_indices(trimmed, count) {
+            let om_display: Vec<String> = newly_omitted
+                .iter()
+                .map(|idx| (idx + 1).to_string())
                 .collect();
-
-            if !parts.is_empty() {
-                let mut valid = true;
-                for p in parts {
-                    if p.contains('-') {
-                        let (start_str, end_str) = p.split_once('-').unwrap();
-
-                        if let (Ok(start), Ok(end)) =
-                            (start_str.parse::<usize>(), end_str.parse::<usize>())
-                        {
-                            if start > 0 && end >= start && end <= count {
-                                for num in start..=end {
-                                    omitted_indices.push(num - 1);
-                                }
-                            } else {
-                                println!("Aviso: el rango {}-{} es inválido.", start, end);
-                                valid = false;
-                            }
-                        } else {
-                            valid = false;
-                        }
-                    } else if let Ok(num) = p.parse::<usize>() {
-                        if num > 0 && num <= count {
-                            omitted_indices.push(num - 1);
-                        } else {
-                            println!("Aviso: el número {} está fuera de rango.", num);
-                            valid = false;
-                        }
-                    } else {
-                        valid = false;
-                    }
-                }
-                if valid {
-                    save = true;
-                } else {
-                    println!("Entrada inválida. Cancelando guardado.");
-                    save = false;
-                }
-            } else {
-                save = false;
-            }
+            println!("  -> Marcados para OMITIR: {}", om_display.join(", "));
+            omitted_indices.append(&mut newly_omitted);
+            save = true;
+        } else {
+            println!("Entrada no reconocida. No se guardarán los cambios.");
+            save = false;
         }
     }
 
     if save {
-        for idx in omitted_indices {
+        omitted_indices.sort_unstable();
+        omitted_indices.dedup();
+
+        for &idx in &omitted_indices {
             if let Some(m) = newly_added.get_mut(idx) {
                 m.pseudonym = "=".to_string();
                 m.omitted = true;
-                log::info!("Mapeo {} omitido por elección del usuario.", m.original);
+                let _ = engine.manager.add_mapping(m.clone());
+                log::info!("Mapeo '{}' omitido por elección del usuario.", m.original);
             }
         }
-
-        // Reinyectamos en el engine para que sobreescriba si los marcamos como omitidos
-        let _ = engine.manager.load_mappings(newly_added);
 
         let final_mappings = engine.manager.get_mappings();
 
