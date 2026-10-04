@@ -1,5 +1,6 @@
 //! Registro y orquestador de detectores de patrones de LexiShield.
 
+pub mod custom;
 pub mod guid;
 pub mod identity;
 pub mod network;
@@ -8,6 +9,7 @@ pub mod windows;
 
 use crate::models::{DetectorType, Mapping};
 use crate::stopwords::is_protected_word;
+use custom::{CompiledCustomRule, CustomRule};
 use guid::GuidDetector;
 use identity::{CreditCardDetector, SpanishDniNieDetector, TelephoneDetector};
 use network::{DomainDetector, EmailDetector, HostnameDetector, IPv4Detector, IPv6Detector};
@@ -40,6 +42,7 @@ pub struct DetectorRegistry {
     pub o365_subject: O365SubjectDetector,
     pub o365_server: O365OriginatingServerDetector,
     pub attachment: AttachmentFileNameDetector,
+    pub custom_rules: Vec<CompiledCustomRule>,
 }
 
 impl Default for DetectorRegistry {
@@ -50,6 +53,24 @@ impl Default for DetectorRegistry {
 
 impl DetectorRegistry {
     pub fn new() -> Self {
+        Self::with_custom_rules(&[])
+    }
+
+    pub fn with_custom_rules(custom_rules: &[CustomRule]) -> Self {
+        let mut compiled = Vec::new();
+        for r in custom_rules {
+            match CompiledCustomRule::try_from_rule(r) {
+                Ok(c) => compiled.push(c),
+                Err(e) => {
+                    log::warn!(
+                        "Regla personalizada '{}' descartada por regex inválida: {}",
+                        r.name,
+                        e
+                    );
+                }
+            }
+        }
+
         Self {
             guid: GuidDetector::new(),
             sid: WindowsSidDetector::new(),
@@ -66,11 +87,12 @@ impl DetectorRegistry {
             o365_subject: O365SubjectDetector::new(),
             o365_server: O365OriginatingServerDetector::new(),
             attachment: AttachmentFileNameDetector::new(),
+            custom_rules: compiled,
         }
     }
 
     /// Genera un seudónimo apropiado según el tipo de detector.
-    pub fn generate_pseudonym_for(&self, original: &str, dtype: DetectorType) -> String {
+    pub fn generate_pseudonym_for(&self, original: &str, dtype: &DetectorType) -> String {
         match dtype {
             DetectorType::GuidUuid => self.guid.generate_pseudonym(original),
             DetectorType::WindowsSid => self.sid.generate_pseudonym(original),
@@ -92,12 +114,19 @@ impl DetectorRegistry {
                     rand::Rng::gen_range(&mut rand::thread_rng(), 100_000_000..999_999_999);
                 format!("ANON_{}", id)
             }
+            DetectorType::Custom(name) => {
+                if let Some(rule) = self.custom_rules.iter().find(|r| &r.name == name) {
+                    rule.generate_pseudonym(original)
+                } else {
+                    let id: u64 =
+                        rand::Rng::gen_range(&mut rand::thread_rng(), 100_000_000..999_999_999);
+                    format!("CUSTOM_{}", id)
+                }
+            }
         }
     }
 
-    /// Escanea el texto aplicando los detectores en el orden estricto de prioridad configurado.
-    ///
-    /// Aplica **Mejora 2**: Validación de longitud mínima y exclusión de palabras protegidas.
+    /// Escanea el texto aplicando primero reglas personalizadas y luego los detectores en el orden de prioridad.
     pub fn scan_text(
         &self,
         text: &str,
@@ -111,7 +140,44 @@ impl DetectorRegistry {
             std::collections::HashSet::new();
         let mut claimed_spans: Vec<(usize, usize)> = Vec::new();
 
-        for &dtype in priority_order {
+        // 1. Ejecutar primero las reglas personalizadas del usuario (máxima prioridad)
+        for custom_rule in &self.custom_rules {
+            let matches = custom_rule.find_matches(text);
+            let dtype = custom_rule.detector_type();
+
+            for (start, end, matched_str) in matches {
+                let idx = claimed_spans.partition_point(|&(s, _)| s < end);
+                let overlaps = idx > 0 && claimed_spans[idx - 1].1 > start;
+                if overlaps {
+                    continue;
+                }
+
+                let candidate = matched_str.trim();
+                if candidate.is_empty() {
+                    continue;
+                }
+
+                let ins_idx = claimed_spans.partition_point(|&(s, _)| s < start);
+                claimed_spans.insert(ins_idx, (start, end));
+
+                if !seen_originals.contains(candidate) {
+                    seen_originals.insert(candidate.to_string());
+                    let mut pseudonym = custom_rule.generate_pseudonym(candidate);
+                    if pseudonym != "=" {
+                        let mut attempts = 0;
+                        while seen_pseudonyms.contains(&pseudonym) && attempts < 100 {
+                            pseudonym = custom_rule.generate_pseudonym(candidate);
+                            attempts += 1;
+                        }
+                        seen_pseudonyms.insert(pseudonym.clone());
+                    }
+                    found_mappings.push(Mapping::new(candidate, pseudonym, dtype.clone()));
+                }
+            }
+        }
+
+        // 2. Ejecutar detectores estándar según el orden de prioridad
+        for dtype in priority_order {
             let matches: Vec<(usize, usize, &str)> = match dtype {
                 DetectorType::GuidUuid => self.guid.find_matches(text),
                 DetectorType::WindowsSid => self.sid.find_matches(text),
@@ -129,10 +195,10 @@ impl DetectorRegistry {
                 DetectorType::O365OriginatingServer => self.o365_server.find_matches(text),
                 DetectorType::AttachmentFileName => self.attachment.find_matches(text),
                 DetectorType::GenericToken => Vec::new(),
+                DetectorType::Custom(_) => Vec::new(),
             };
 
             for (start, end, matched_str) in matches {
-                // Verificar si el rango se solapa con un patrón más prioritario ya capturado (búsqueda binaria O(log N))
                 let idx = claimed_spans.partition_point(|&(s, _)| s < end);
                 let overlaps = idx > 0 && claimed_spans[idx - 1].1 > start;
                 if overlaps {
@@ -141,12 +207,9 @@ impl DetectorRegistry {
 
                 let candidate = matched_str.trim();
 
-                // Salvaguardas de la Mejora 2: Longitud mínima y palabras protegidas
-                if candidate.len() < min_token_len {
-                    // Permitir solo si es un tipo estructurado de alta fidelidad
-                    if matches!(dtype, DetectorType::GenericToken) {
-                        continue;
-                    }
+                // Salvaguardas: Longitud mínima y palabras protegidas
+                if candidate.len() < min_token_len && matches!(dtype, DetectorType::GenericToken) {
+                    continue;
                 }
 
                 if is_protected_word(candidate) {
@@ -169,7 +232,7 @@ impl DetectorRegistry {
                         attempts += 1;
                     }
                     seen_pseudonyms.insert(pseudonym.clone());
-                    found_mappings.push(Mapping::new(candidate, pseudonym, dtype));
+                    found_mappings.push(Mapping::new(candidate, pseudonym, dtype.clone()));
                 }
             }
         }

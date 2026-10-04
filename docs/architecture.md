@@ -99,4 +99,28 @@ A diferencia de la versión original en Python (que dependía de SQLite con exte
 
 El motor de LexiShield detecta de forma transparente si un archivo de mapeos es un JSON plano estándar o una bóveda cifrada mediante la cabecera `LEXI\x01`, solicitando la contraseña únicamente cuando es necesario.
 
+---
+
+## 🛠️ Ciclo de Vida de Configuración Universal y Reglas Dinámicas (TOML)
+
+Cumpliendo con los estándares de arquitectura, LexiShield desacopla completamente los valores predeterminados del código de las preferencias del usuario mediante un archivo **TOML** (`~/.lexishield/config.toml`).
+
+```mermaid
+flowchart TD
+    A[Inicio LexiShield] --> B{¿Existe ~/.lexishield/config.toml?}
+    B -- No --> C[Copiar plantilla comentada DEFAULT_CONFIG_TOML]
+    B -- Sí --> D[Cargar y parsear TOML con Serde]
+    C --> D
+    D --> E[Compilar Reglas Personalizadas Custom Rules]
+    E --> F[Inicializar DetectorRegistry con Custom + Detectores Estándar]
+    F --> G[ObfuscatorEngine Listo]
+```
+
+### Características de la Configuración:
+* **Persistencia y Fusión Segura:** Al arrancar, si el archivo no existe en el perfil del usuario, se inicializa automáticamente con ejemplos documentados. Si ya existe, se respetan los valores y las claves nuevas toman valores por defecto sin sobrescribir información del usuario.
+* **Motor de Reglas Personalizadas (Custom Rules):** Los usuarios pueden definir expresiones regulares arbitrarias con estrategias de seudonimización sintética (`random_digits`, `random_hex`, `random_alphanumeric`, `prefix_seq`, `mask`) o marcarlas para omisión (`omitted = true`).
+* **Control de Exclusiones en Directorios (`[ignore]`):** Filtra recursivamente directorios de dependencias (`node_modules`, `target`, `.git`) y extensiones binarias/multimedia para acelerar drásticamente los escaneos de auditoría.
+* **Capacidad de Restablecimiento (`lexishield config reset`):** Permite restaurar de forma controlada la configuración base recomendada.
+
+
 

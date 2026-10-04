@@ -254,3 +254,96 @@ fn test_encrypted_vault_save_load_roundtrip() {
     let _ = std::fs::remove_file(&vault_file);
     let _ = std::fs::remove_file(&json_file);
 }
+
+#[test]
+fn test_toml_config_parsing() {
+    let toml_data = r#"
+[general]
+min_token_length = 6
+strict_word_boundaries = false
+
+[vault]
+default_vault = "empresa.lexi"
+
+[ignore]
+ignored_directories = [".git", "build", "custom_dir"]
+ignored_extensions = ["bin", "iso"]
+
+[[custom_rules]]
+name = "Empleado"
+pattern = '(?i)\bEMP-\d{4}\b'
+prefix = "EMP-"
+strategy = "random_digits"
+"#;
+
+    let config: LexiConfig = toml::from_str(toml_data).unwrap();
+    assert_eq!(config.general.min_token_length, 6);
+    assert_eq!(config.min_token_length(), 6);
+    assert!(!config.strict_word_boundaries());
+    assert_eq!(config.vault.default_vault, "empresa.lexi");
+    assert!(
+        config
+            .ignore
+            .ignored_directories
+            .contains(&"custom_dir".to_string())
+    );
+    assert_eq!(config.custom_rules.len(), 1);
+    assert_eq!(config.custom_rules[0].name, "Empleado");
+}
+
+#[test]
+fn test_custom_rules_in_engine() {
+    use lexishield::detectors::custom::{CustomRule, CustomStrategy};
+
+    let mut config = LexiConfig::default();
+    config.custom_rules = vec![
+        CustomRule {
+            name: "Employee ID".into(),
+            pattern: r"(?i)\bEMP-\d{4}\b".into(),
+            prefix: Some("EMP-".into()),
+            strategy: CustomStrategy::RandomDigits,
+            omitted: false,
+        },
+        CustomRule {
+            name: "Project Tag".into(),
+            pattern: r"\bPRJ-[A-Z0-9]{3}\b".into(),
+            prefix: Some("PRJ-".into()),
+            strategy: CustomStrategy::PrefixSeq,
+            omitted: false,
+        },
+        CustomRule {
+            name: "Whitelisted Token".into(),
+            pattern: r"\bPUBLIC_TOKEN_\w+\b".into(),
+            prefix: None,
+            strategy: CustomStrategy::RandomDigits,
+            omitted: true,
+        },
+    ];
+
+    let mut engine = ObfuscatorEngine::new(config);
+    let sample_text = "El empleado EMP-4821 trabaja en PRJ-X99 con token PUBLIC_TOKEN_12345.";
+
+    let mappings = engine.scan_and_register_mappings(sample_text).unwrap();
+    assert_eq!(mappings.len(), 3);
+
+    let (obfuscated, _report) = engine
+        .obfuscate_text(sample_text, FormatType::Plaintext)
+        .unwrap();
+
+    // EMP-4821 debe haberse transformado en EMP-XXXX (4 dígitos)
+    assert!(!obfuscated.contains("EMP-4821"));
+    assert!(obfuscated.contains("EMP-"));
+
+    // PRJ-X99 debe haberse transformado en PRJ-XXXXXX
+    assert!(!obfuscated.contains("PRJ-X99"));
+    assert!(obfuscated.contains("PRJ-"));
+
+    // PUBLIC_TOKEN_12345 estaba marcado como omitido (omitted = true), debe permanecer intacto
+    assert!(obfuscated.contains("PUBLIC_TOKEN_12345"));
+
+    // Desofuscación debe recuperar exactamente el texto original
+    let (restored, _) = engine
+        .deobfuscate_text(&obfuscated, FormatType::Plaintext)
+        .unwrap();
+    assert_eq!(restored, sample_text);
+}
