@@ -28,6 +28,12 @@ Aria integró LexiShield como su puente local y seguro hacia la Inteligencia Art
 
 El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendimiento y un bajo consumo de memoria gracias a las características intrínsecas de Rust.
 
+### ✨ Características Principales
+* **Paralelización Multihilo Extrema:** Aprovecha todos los núcleos de tu CPU usando `rayon` para escanear directorios enteros en tiempo récord.
+* **Telemetría y Observabilidad Estructurada:** Ejecución silenciosa por defecto y modo de depuración detallada (`-v`) integrado para diagnósticos completos.
+* **Robusto (Fuzz-Tested):** Motor de parsing blindado y tolerante a fallos, verificado bajo escenarios de estrés (Fuzzing).
+* **Motor Híbrido (Formatos y Reglas Custom):** Soporta XML, JSON, texto plano y permite inyectar reglas regex propias vía configuración TOML.
+
 ### Flujo de Operación (Arquitectura)
 
 ```mermaid
@@ -59,7 +65,11 @@ El binario `lexishield` proporciona una interfaz por consola directa y eficiente
 ### Estructura general de comandos
 ```bash
 # Formato general
-lexishield <COMMAND> [OPTIONS]
+lexishield [GLOBAL_OPTIONS] <COMMAND> [OPTIONS]
+
+# Opciones Globales:
+#  -v, --verbose    Activa el modo de depuración estructurada (Telemetría)
+#  --config <PATH>  Ruta a un archivo TOML de configuración personalizado
 ```
 
 ### 1. Comando: `obfuscate`

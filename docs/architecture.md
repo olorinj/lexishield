@@ -124,3 +124,18 @@ flowchart TD
 
 
 
+
+---
+
+## 🚀 Paralelización Multihilo y Observabilidad
+
+LexiShield ha sido diseñado para escalar al procesar grandes volúmenes de datos, cumpliendo estrictamente con los estándares de agentes y fiabilidad:
+
+### ⚡ Paralelización Extrema (`rayon` e `indicatif`)
+Cuando se ejecuta el comando `scan` sobre un directorio completo en modo automático (`-y`), LexiShield reparte de manera balanceada los archivos descubiertos entre **todos los núcleos lógicos de la CPU**. Esto se logra iterando los archivos mediante `par_iter()` de la librería `rayon`. Cada hilo instancia localmente el motor de reglas y ofusca su bloque, reuniendo las detecciones al finalizar de forma segura para resolver las posibles colisiones mediante el `MappingManager` sin bloquear la concurrencia. Todo el progreso se visualiza en tiempo real mediante barras concurrentes profesionales de `indicatif`.
+
+### 📊 Telemetría y Logs Estructurados
+Cumpliendo con la regla 5 de arquitectura (*Universal Logging & Observability*), LexiShield prohíbe el uso de comandos de impresión puros (`println!`) para la lógica o depuración interna. En su lugar, el sistema entero está instrumentado con `log` y `env_logger`. Por defecto, se ejecutan en modo silencioso. Al utilizar el flag global `-v` (o `--verbose`), el entorno inicia el nivel en `Debug`, mostrando tiempos de parseo en milisegundos, colisiones inyectivas detectadas en tiempo real y detalles sobre la derivación criptográfica de las bóvedas de contraseñas.
+
+### 🛡️ Robustez y Fuzz Testing (`cargo fuzz`)
+Para asegurar la estabilidad absoluta ante cualquier entrada (basura, archivos binarios corrompidos disfrazados de texto, payloads de inyección regex), el motor central y todos sus parsers han sido instrumentados para pruebas de penetración (Fuzz Testing) utilizando `cargo fuzz` y LLVM libFuzzer. Esto garantiza matemáticamente que el motor de ofuscación de LexiShield no crasheará (panic) y operará dentro de límites controlados de memoria, proporcionando un nivel de software resiliente apto para análisis de logs forenses.
