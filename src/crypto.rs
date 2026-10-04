@@ -26,7 +26,7 @@ fn derive_key(password: &str, salt: &[u8]) -> Result<[u8; 32], ObfuscationError>
     argon2
         .hash_password_into(password.as_bytes(), salt, &mut key)
         .map_err(|e| {
-            ObfuscationError::CryptoError(format!("Error en derivación de clave Argon2: {}", e))
+            ObfuscationError::CryptoError(format!("Error en derivación de clave Argon2: {e}"))
         })?;
     Ok(key)
 }
@@ -53,13 +53,12 @@ pub fn encrypt_mappings(mappings: &[Mapping], password: &str) -> Result<Vec<u8>,
     rng.fill_bytes(&mut nonce_bytes);
 
     let key = derive_key(password, &salt)?;
-    let cipher = ChaCha20Poly1305::new_from_slice(&key).map_err(|e| {
-        ObfuscationError::CryptoError(format!("Error inicializando cifrador: {}", e))
-    })?;
+    let cipher = ChaCha20Poly1305::new_from_slice(&key)
+        .map_err(|e| ObfuscationError::CryptoError(format!("Error inicializando cifrador: {e}")))?;
     let nonce = Nonce::<ChaCha20Poly1305>::from_slice(&nonce_bytes);
 
     let ciphertext = cipher.encrypt(nonce, json_bytes.as_ref()).map_err(|e| {
-        ObfuscationError::CryptoError(format!("Error durante el cifrado AEAD: {}", e))
+        ObfuscationError::CryptoError(format!("Error durante el cifrado AEAD: {e}"))
     })?;
 
     let mut vault_data =
@@ -96,7 +95,7 @@ pub fn decrypt_mappings(data: &[u8], password: &str) -> Result<Vec<Mapping>, Obf
 
     let key = derive_key(password, salt)?;
     let cipher = ChaCha20Poly1305::new_from_slice(&key).map_err(|e| {
-        ObfuscationError::CryptoError(format!("Error inicializando descifrador: {}", e))
+        ObfuscationError::CryptoError(format!("Error inicializando descifrador: {e}"))
     })?;
     let nonce = Nonce::<ChaCha20Poly1305>::from_slice(nonce_bytes);
 

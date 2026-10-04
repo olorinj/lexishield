@@ -1,11 +1,11 @@
 //! Detector y generador de identificadores GUID / UUID.
 
 use crate::models::DetectorType;
-use once_cell::sync::Lazy;
 use regex::Regex;
+use std::sync::LazyLock;
 use uuid::Uuid;
 
-static GUID_REGEX: Lazy<Regex> = Lazy::new(|| {
+static GUID_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b")
         .expect("Regex de GUID inválida")
 });

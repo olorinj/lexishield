@@ -1,22 +1,22 @@
 //! Detectores de identidad personal: DNI/NIE con letra de control real, Tarjetas con Luhn y Teléfonos.
 
 use crate::models::DetectorType;
-use once_cell::sync::Lazy;
 use rand::Rng;
 use regex::Regex;
+use std::sync::LazyLock;
 
 const DNI_LETTERS: &[u8] = b"TRWAGMYFPDXBNJZSQVHLCKE";
 
-static DNI_NIE_REGEX: Lazy<Regex> = Lazy::new(|| {
+static DNI_NIE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b(?:([XYZxyz])\s*(\d{7})|(\d{8}))\s*([A-Za-z])\b")
         .expect("Regex DNI/NIE inválida")
 });
 
-static CREDIT_CARD_REGEX: Lazy<Regex> = Lazy::new(|| {
+static CREDIT_CARD_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:\d{4}[-\s]?){3}\d{4}\b|\b\d{13,19}\b").expect("Regex Credit Card inválida")
 });
 
-static PHONE_REGEX: Lazy<Regex> = Lazy::new(|| {
+static PHONE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:\+34[\s.-]?)?[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b")
         .expect("Regex Phone inválida")
 });
@@ -41,7 +41,7 @@ impl SpanishDniNieDetector {
 
     /// Valida si un DNI/NIE tiene un checksum matemáticamente correcto.
     pub fn is_valid_dni_nie(raw: &str) -> bool {
-        let cleaned: String = raw.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let cleaned: String = raw.chars().filter(char::is_ascii_alphanumeric).collect();
         if cleaned.len() != 9 {
             return false;
         }
@@ -80,14 +80,13 @@ impl SpanishDniNieDetector {
         let is_upper = original
             .chars()
             .last()
-            .map(|c| c.is_ascii_uppercase())
-            .unwrap_or(true);
+            .is_none_or(|c| c.is_ascii_uppercase());
         let out_letter = if is_upper {
             letter
         } else {
             letter.to_ascii_lowercase()
         };
-        format!("{:08}{}", num, out_letter)
+        format!("{num:08}{out_letter}")
     }
 }
 
@@ -269,8 +268,7 @@ impl CreditCardDetector {
                     ]
                     .contains(&c)
             })
-            .map(|idx| idx + 1)
-            .unwrap_or(0);
+            .map_or(0, |idx| idx + 1);
         let token_end = text[end..]
             .find(|c: char| {
                 c.is_whitespace()
@@ -279,8 +277,7 @@ impl CreditCardDetector {
                     ]
                     .contains(&c)
             })
-            .map(|idx| end + idx)
-            .unwrap_or(text.len());
+            .map_or(text.len(), |idx| end + idx);
 
         let surrounding = &text[token_start..token_end];
         // Si el token circundante contiene letras alfabéticas o de hash, no es una tarjeta real
@@ -386,7 +383,10 @@ impl CreditCardDetector {
                 digits[15]
             )
         } else {
-            digits.iter().map(|d| d.to_string()).collect()
+            digits
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect()
         }
     }
 }
@@ -482,7 +482,7 @@ impl TelephoneDetector {
         };
 
         // 2. Determinar primer dígito del cuerpo (mantener tipo móvil/fijo)
-        let first_digit_orig = body.chars().find(|c| c.is_ascii_digit()).unwrap_or('6');
+        let first_digit_orig = body.chars().find(char::is_ascii_digit).unwrap_or('6');
         let first_digit = match first_digit_orig {
             '6' | '7' => {
                 if rng.gen_bool(0.5) {

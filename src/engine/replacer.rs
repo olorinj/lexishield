@@ -24,7 +24,7 @@ pub fn apply_single_pass_replacements(
     for t in &targets {
         let escaped = regex::escape(t);
         if strict_word_boundaries && t.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            pattern_parts.push(format!(r"\b{}\b", escaped));
+            pattern_parts.push(format!(r"\b{escaped}\b"));
         } else {
             pattern_parts.push(escaped);
         }
@@ -34,7 +34,7 @@ pub fn apply_single_pass_replacements(
     let regex = match Regex::new(&pattern_str) {
         Ok(r) => r,
         Err(e) => {
-            log::error!("Error construyendo regex para reemplazos: {}", e);
+            log::error!("Error construyendo regex para reemplazos: {e}");
             return (text.to_string(), 0);
         }
     };

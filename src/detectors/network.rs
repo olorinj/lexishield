@@ -1,31 +1,32 @@
 //! Detectores de redes, direcciones IP, dominios, hostnames y correos electrónicos.
 
 use crate::models::DetectorType;
-use once_cell::sync::Lazy;
 use rand::Rng;
 use regex::Regex;
 use std::net::Ipv4Addr;
+use std::sync::LazyLock;
 
-static IPV4_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b(?:[0-9]{1,3}\\?\.){3}[0-9]{1,3}\b").expect("Regex IPv4 inválida"));
+static IPV4_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\b(?:[0-9]{1,3}\\?\.){3}[0-9]{1,3}\b").expect("Regex IPv4 inválida")
+});
 
-static IPV6_REGEX: Lazy<Regex> = Lazy::new(|| {
+static IPV6_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?i)\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b|\b(?:[0-9a-f]{1,4}:){1,7}:[0-9a-f]{1,4}\b",
     )
     .expect("Regex IPv6 inválida")
 });
 
-static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b").expect("Regex Email inválida")
 });
 
-static DOMAIN_REGEX: Lazy<Regex> = Lazy::new(|| {
+static DOMAIN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|org|net|edu|gov|io|es|eu|local|internal|corp)\b")
         .expect("Regex Domain inválida")
 });
 
-static HOSTNAME_REGEX: Lazy<Regex> = Lazy::new(|| {
+static HOSTNAME_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b(?:host|srv|server|dc|ws|node|app)-?[a-z0-9]{2,10}\b")
         .expect("Regex Hostname inválida")
 });
@@ -65,10 +66,10 @@ impl IPv4Detector {
             .collect()
     }
 
-    fn is_private(ip: &Ipv4Addr) -> bool {
+    fn is_private(ip: Ipv4Addr) -> bool {
         let octets = ip.octets();
         octets[0] == 10
-            || (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
+            || (octets[0] == 172 && (16..=31).contains(&octets[1]))
             || (octets[0] == 192 && octets[1] == 168)
     }
 
@@ -80,7 +81,7 @@ impl IPv4Detector {
 
         let result = if let Ok(ip) = clean_original.parse::<Ipv4Addr>() {
             let octets = ip.octets();
-            let is_priv = Self::is_private(&ip);
+            let is_priv = Self::is_private(ip);
             let subnet_key = format!("{}.{}.{}", octets[0], octets[1], octets[2]);
 
             let mut map = self.subnet_map.borrow_mut();
@@ -95,7 +96,7 @@ impl IPv4Detector {
                         // Subredes privadas en 10.x.y.0/24 (65.536 subredes disponibles)
                         let b: u8 = rng.gen_range(0..=255);
                         let c: u8 = rng.gen_range(0..=255);
-                        format!("10.{}.{}", b, c)
+                        format!("10.{b}.{c}")
                     } else {
                         // Subredes públicas seguras en espacios no reservados (millones de subredes disponibles)
                         let a: u8 = rng.gen_range(11..=220);
@@ -104,7 +105,7 @@ impl IPv4Detector {
                         }
                         let b: u8 = rng.gen_range(1..=254);
                         let c: u8 = rng.gen_range(1..=254);
-                        format!("{}.{}.{}", a, b, c)
+                        format!("{a}.{b}.{c}")
                     };
 
                     if !used.contains(&cand) {
@@ -120,7 +121,7 @@ impl IPv4Detector {
             let b: u8 = rng.gen_range(1..=254);
             let c: u8 = rng.gen_range(1..=254);
             let d: u8 = rng.gen_range(1..=254);
-            format!("{}.{}.{}.{}", a, b, c, d)
+            format!("{a}.{b}.{c}.{d}")
         };
 
         if has_escapes {
@@ -155,7 +156,7 @@ impl IPv6Detector {
         let mut rng = rand::thread_rng();
         let a: u16 = rng.gen_range(0x1000..0xFFFF);
         let b: u16 = rng.gen_range(0x1000..0xFFFF);
-        format!("2001:db8:85a3::{:x}:{:x}", a, b)
+        format!("2001:db8:85a3::{a:x}:{b:x}")
     }
 }
 
@@ -182,7 +183,7 @@ impl EmailDetector {
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
         let id: u64 = rng.gen_range(100_000..999_999_999);
-        format!("user_{}@example.com", id)
+        format!("user_{id}@example.com")
     }
 }
 
@@ -209,7 +210,7 @@ impl DomainDetector {
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
         let id: u64 = rng.gen_range(100_000..999_999_999);
-        format!("service{}.example.com", id)
+        format!("service{id}.example.com")
     }
 }
 
@@ -240,7 +241,7 @@ impl HostnameDetector {
         } else {
             "host"
         };
-        format!("{}-anon-{}", prefix, id)
+        format!("{prefix}-anon-{id}")
     }
 }
 

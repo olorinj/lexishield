@@ -35,6 +35,12 @@ linting:
     - rustup component add clippy
     - cargo clippy -- -D warnings
 
+security_audit:
+  stage: lint
+  script:
+    - cargo install cargo-audit --locked || true
+    - cargo audit
+
 # -------------------------------------------------------------
 # 2. Fase de Pruebas Automatizadas
 # -------------------------------------------------------------

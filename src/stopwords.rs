@@ -1,10 +1,10 @@
 //! Lista de palabras reservadas, stopwords y términos protegidos para evitar falsos positivos y colisiones.
 
-use once_cell::sync::Lazy;
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
 /// Conjunto estático e inmutable de palabras reservadas y stopwords en español e inglés.
-pub static PROTECTED_WORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+pub static PROTECTED_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
     let words = [
         // Stopwords comunes en español
         "de",

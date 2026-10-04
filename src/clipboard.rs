@@ -14,19 +14,19 @@ use std::time::Duration;
 /// Obtiene el texto actual del portapapeles del sistema.
 pub fn get_clipboard_text() -> Result<String, String> {
     let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {}", e))?;
+        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {e}"))?;
     clipboard
         .get_text()
-        .map_err(|e| format!("Error al leer texto del portapapeles: {}", e))
+        .map_err(|e| format!("Error al leer texto del portapapeles: {e}"))
 }
 
 /// Escribe texto en el portapapeles del sistema.
 pub fn set_clipboard_text(text: &str) -> Result<(), String> {
     let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {}", e))?;
+        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {e}"))?;
     clipboard
         .set_text(text.to_string())
-        .map_err(|e| format!("Error al escribir texto en el portapapeles: {}", e))
+        .map_err(|e| format!("Error al escribir texto en el portapapeles: {e}"))
 }
 
 /// Dirección de monitorización para el comando watch.
@@ -52,9 +52,9 @@ pub fn watch_clipboard_loop(
         let mappings = load_mappings_auto(map_path, password)?;
         engine.manager.load_mappings(mappings)?;
         log::info!(
-            "Se cargaron {} mapeos previos desde: {:?}",
+            "Se cargaron {} mapeos previos desde: {}",
             engine.manager.count(),
-            map_path
+            map_path.display()
         );
     }
 
@@ -66,14 +66,13 @@ pub fn watch_clipboard_loop(
     });
 
     log::info!(
-        "Iniciando monitorización de portapapeles [Modo: {:?}]. Presiona Ctrl+C para detener.",
-        direction
+        "Iniciando monitorización de portapapeles [Modo: {direction:?}]. Presiona Ctrl+C para detener."
     );
 
     let mut last_seen = get_clipboard_text().unwrap_or_default();
 
-    let mut clipboard = Clipboard::new()
-        .map_err(|e| format!("Error al inicializar acceso a portapapeles: {}", e))?;
+    let mut clipboard =
+        Clipboard::new().map_err(|e| format!("Error al inicializar acceso a portapapeles: {e}"))?;
 
     while running.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_millis(250));
@@ -87,12 +86,14 @@ pub fn watch_clipboard_loop(
                         if let Ok((obfuscated, report)) =
                             engine.obfuscate_text(&current_text, format)
                         {
-                            if obfuscated != current_text {
+                            if obfuscated == current_text {
+                                last_seen = current_text;
+                            } else {
                                 log::info!(
                                     "Portapapeles ofuscado automáticamente ({} reemplazos aplicados).",
                                     report.replacements_applied
                                 );
-                                last_seen = obfuscated.clone();
+                                last_seen.clone_from(&obfuscated);
                                 let _ = clipboard.set_text(obfuscated);
 
                                 if let Some(map_path) = mappings_file {
@@ -100,11 +101,9 @@ pub fn watch_clipboard_loop(
                                     if let Err(e) =
                                         save_mappings_auto(map_path, &current_maps, password)
                                     {
-                                        log::error!("Error al guardar mapeos: {}", e);
+                                        log::error!("Error al guardar mapeos: {e}");
                                     }
                                 }
-                            } else {
-                                last_seen = current_text;
                             }
                         }
                     }
@@ -112,15 +111,15 @@ pub fn watch_clipboard_loop(
                         if let Ok((deobfuscated, report)) =
                             engine.deobfuscate_text(&current_text, format)
                         {
-                            if deobfuscated != current_text {
+                            if deobfuscated == current_text {
+                                last_seen = current_text;
+                            } else {
                                 log::info!(
                                     "Portapapeles desofuscado automáticamente ({} reemplazos restaurados).",
                                     report.replacements_applied
                                 );
-                                last_seen = deobfuscated.clone();
+                                last_seen.clone_from(&deobfuscated);
                                 let _ = clipboard.set_text(deobfuscated);
-                            } else {
-                                last_seen = current_text;
                             }
                         }
                     }

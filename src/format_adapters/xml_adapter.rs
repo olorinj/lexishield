@@ -56,7 +56,11 @@ impl XmlAdapter {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Eof) => break,
                 Ok(Event::Text(t)) => {
-                    let raw_str = match t.unescape() {
+                    let decoded = match std::str::from_utf8(&t) {
+                        Ok(s) => s,
+                        Err(e) => return Err(ObfuscationError::XmlError(e.to_string())),
+                    };
+                    let raw_str = match quick_xml::escape::unescape(decoded) {
                         Ok(s) => s.into_owned(),
                         Err(e) => return Err(ObfuscationError::XmlError(e.to_string())),
                     };

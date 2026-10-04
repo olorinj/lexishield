@@ -112,7 +112,7 @@ impl DetectorRegistry {
             DetectorType::GenericToken => {
                 let id: u64 =
                     rand::Rng::gen_range(&mut rand::thread_rng(), 100_000_000..999_999_999);
-                format!("ANON_{}", id)
+                format!("ANON_{id}")
             }
             DetectorType::Custom(name) => {
                 if let Some(rule) = self.custom_rules.iter().find(|r| &r.name == name) {
@@ -120,7 +120,7 @@ impl DetectorRegistry {
                 } else {
                     let id: u64 =
                         rand::Rng::gen_range(&mut rand::thread_rng(), 100_000_000..999_999_999);
-                    format!("CUSTOM_{}", id)
+                    format!("CUSTOM_{id}")
                 }
             }
         }
@@ -194,8 +194,7 @@ impl DetectorRegistry {
                 DetectorType::O365Subject => self.o365_subject.find_matches(text),
                 DetectorType::O365OriginatingServer => self.o365_server.find_matches(text),
                 DetectorType::AttachmentFileName => self.attachment.find_matches(text),
-                DetectorType::GenericToken => Vec::new(),
-                DetectorType::Custom(_) => Vec::new(),
+                DetectorType::GenericToken | DetectorType::Custom(_) => Vec::new(),
             };
 
             for (start, end, matched_str) in matches {
@@ -214,8 +213,7 @@ impl DetectorRegistry {
 
                 if is_protected_word(candidate) {
                     log::debug!(
-                        "Token descartado por coincidir con palabra protegida: {}",
-                        candidate
+                        "Token descartado por coincidir con palabra protegida: {candidate}"
                     );
                     continue;
                 }
