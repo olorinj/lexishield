@@ -1,6 +1,6 @@
 [package]
 name = "lexishield"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 authors = ["Julio C. Semper"]
 description = "Motor de anonimización y ofuscación semántica de alto rendimiento para consultas de IA y sanitización de datos"
