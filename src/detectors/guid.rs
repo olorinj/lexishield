@@ -52,7 +52,7 @@ mod tests {
         let lower = "c9a646d3-9c61-4cb7-897d-4b958c218a56";
         let upper = "C9A646D3-9C61-4CB7-897D-4B958C218A56";
 
-        let text = format!("Lower: {} Upper: {}", lower, upper);
+        let text = format!("Lower: {lower} Upper: {upper}");
         let matches = detector.find_matches(&text);
         assert_eq!(matches.len(), 2);
 

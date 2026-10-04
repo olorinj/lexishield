@@ -197,8 +197,8 @@ mod tests {
 
     #[test]
     fn test_validate_valid_xml() {
-        let orig = r#"<config><admin>root</admin></config>"#;
-        let obf = r#"<config><admin>user01</admin></config>"#;
+        let orig = r"<config><admin>root</admin></config>";
+        let obf = r"<config><admin>user01</admin></config>";
         let report = SyntaxValidator::validate(orig, obf, FormatType::Xml).unwrap();
         assert!(report.syntax_valid);
         assert!(report.schema_keys_intact);

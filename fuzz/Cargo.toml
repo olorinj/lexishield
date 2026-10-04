@@ -16,3 +16,21 @@ name = "lexi_engine"
 path = "fuzz_targets/lexi_engine.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_json"
+path = "fuzz_targets/fuzz_json.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_xml"
+path = "fuzz_targets/fuzz_xml.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_log"
+path = "fuzz_targets/fuzz_log.rs"
+test = false
+doc = false

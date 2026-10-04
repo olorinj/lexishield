@@ -162,27 +162,66 @@ Gestiona diccionarios de mapeos (soporta tanto JSON plano como bóvedas cifradas
 * **`lexishield dict clear -m mapeos.lexi -p "pwd"`**: Vacía el diccionario cifrado.
 
 ### 6. Comando: `config` (Configuración y Reglas TOML)
-Permite inspeccionar, ubicar y restablecer la configuración global del usuario (`~/.lexishield/config.toml`), donde se pueden definir parámetros de escaneo, exclusiones y **reglas de detección personalizadas** (Custom Regex):
+Permite inspeccionar, ubicar y restablecer la configuración global del usuario (`~/.lexishield/config.toml`) y el archivo modular de reglas (`~/.lexishield/rules.toml`), donde se pueden definir parámetros de escaneo, exclusiones y **reglas de detección personalizadas** (Custom Regex):
 
 * **`lexishield config show`**: Muestra en consola el contenido del archivo de configuración activo.
 * **`lexishield config path`**: Muestra la ruta física del archivo `config.toml`.
-* **`lexishield config reset`**: Restablece el archivo a la plantilla por defecto con ejemplos explicados.
-* **`lexishield --config /ruta/personalizada.toml <COMMAND>`**: Permite usar un archivo de configuración alternativo en cualquier comando.
+* **`lexishield config reset`**: Restablece los archivos a las plantillas por defecto con ejemplos explicados.
+* **`lexishield --config /ruta/personalizada.toml --rules /ruta/mis_reglas.toml <COMMAND>`**: Permite usar archivos de configuración y reglas alternativos en cualquier comando.
 
-*Ejemplo de Reglas Personalizadas en `~/.lexishield/config.toml`:*
+*Ejemplo de Reglas Personalizadas en `~/.lexishield/rules.toml`:*
 ```toml
-# Definición de reglas personalizadas por el usuario
-[[custom_rules]]
+# Reglas dinámicas personalizadas sin recompilar
+[[rules]]
 name = "Identificador de Empleado"
 pattern = '(?i)\bEMP-\d{4,6}\b'
 prefix = "EMP-"
 strategy = "random_digits"
 
-[[custom_rules]]
+[[rules]]
 name = "Código de Proyecto Interno"
 pattern = '(?i)\bPRJ-[A-Z0-9]{3,6}\b'
 prefix = "PRJ-"
 strategy = "random_alphanumeric"
+
+[[rules]]
+name = "Token de Acceso a Servicios"
+pattern = '(?i)\b(ghp|glpat|npm)_[a-zA-Z0-9]{20,}\b'
+strategy = "mask"
+```
+
+### 7. Soporte para Tuberías Unix (Pipes & `stdin`)
+LexiShield garantiza pureza estricta de CLI (la telemetría se emite exclusivamente por `stderr`), lo que permite encadenar comandos en pipelines de Unix sin corromper la salida:
+
+```bash
+# Procesar archivo por tubería a stdout
+cat access.log | lexishield obfuscate > access_safe.log
+
+# Monitorizar en tiempo real un archivo de log continuo (streaming)
+tail -f /var/log/nginx/access.log | lexishield obfuscate -i -
+
+# Escanear datos enviados por echo
+echo "Contacto: soporte@empresa.com" | lexishield scan --stdin
+```
+
+### 8. Filtrado de Archivos y Soporte `.lexiignore`
+Durante escaneos recursivos de directorios (`lexishield scan -i /ruta/`), LexiShield ignora automáticamente archivos binarios (`.pdf`, `.exe`, `.jpg`, `.zip`), metadirectorios (`.git`, `node_modules`, `target`, `dist`) y respeta archivos `.gitignore` y **`.lexiignore`** personalizados dentro de tus carpetas.
+
+### 9. Comando: `completions` (Autocompletado Nativo)
+Genera scripts de autocompletado nativo para la terminal:
+
+```bash
+# Bash
+source <(lexishield completions bash)
+
+# Zsh
+lexishield completions zsh > ~/.zfunc/_lexishield
+
+# PowerShell
+lexishield completions powershell | Out-String | Invoke-Expression
+
+# Fish
+lexishield completions fish > ~/.config/fish/completions/lexishield.fish
 ```
 
 ---

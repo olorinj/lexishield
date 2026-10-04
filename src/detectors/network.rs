@@ -273,6 +273,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
     fn test_email_detection_and_generation() {
         let detector = EmailDetector::new();
         let matches = detector.find_matches("Escribir a admin.soporte@dominio.com o user@test.org");

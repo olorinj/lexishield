@@ -20,3 +20,46 @@ Para compilar el proyecto en todos los sistemas operativos simultáneamente de f
 .\compilar.ps1 -All
 ```
 
+## 🧪 Flujo de Calidad Obligatorio (Quality Gate)
+
+Antes de enviar cualquier contribución o abrir una *Pull Request*, debes pasar el control de calidad en cuatro pasos:
+
+1. **Formato:**
+   ```bash
+   cargo fmt --all -- --check
+   ```
+2. **Linting Pedante:**
+   ```bash
+   cargo clippy --all-targets --all-features -- -D warnings
+   ```
+3. **Pruebas Automatizadas:**
+   ```bash
+   cargo test --all-targets
+   ```
+4. **Auditoría de Seguridad de Dependencias:**
+   ```bash
+   cargo audit
+   ```
+
+## 🛡️ Pruebas de Fuzzing (`cargo-fuzz`)
+
+Para verificar que los adaptadores y motores no producen pánicos ante datos corruptos:
+
+```bash
+# Ejecutar fuzzing del motor general
+cargo +nightly fuzz run lexi_engine
+
+# Fuzzing de adaptadores estructurados
+cargo +nightly fuzz run fuzz_json
+cargo +nightly fuzz run fuzz_xml
+cargo +nightly fuzz run fuzz_log
+```
+
+## ⏱️ Ejecución de Benchmarks (`criterion`)
+
+Para validar el rendimiento y *throughput* de escaneo y ofuscación:
+
+```bash
+cargo bench
+```
+

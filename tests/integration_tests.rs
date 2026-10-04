@@ -295,30 +295,32 @@ strategy = "random_digits"
 fn test_custom_rules_in_engine() {
     use lexishield::detectors::custom::{CustomRule, CustomStrategy};
 
-    let mut config = LexiConfig::default();
-    config.custom_rules = vec![
-        CustomRule {
-            name: "Employee ID".into(),
-            pattern: r"(?i)\bEMP-\d{4}\b".into(),
-            prefix: Some("EMP-".into()),
-            strategy: CustomStrategy::RandomDigits,
-            omitted: false,
-        },
-        CustomRule {
-            name: "Project Tag".into(),
-            pattern: r"\bPRJ-[A-Z0-9]{3}\b".into(),
-            prefix: Some("PRJ-".into()),
-            strategy: CustomStrategy::PrefixSeq,
-            omitted: false,
-        },
-        CustomRule {
-            name: "Whitelisted Token".into(),
-            pattern: r"\bPUBLIC_TOKEN_\w+\b".into(),
-            prefix: None,
-            strategy: CustomStrategy::RandomDigits,
-            omitted: true,
-        },
-    ];
+    let config = LexiConfig {
+        custom_rules: vec![
+            CustomRule {
+                name: "Employee ID".into(),
+                pattern: r"(?i)\bEMP-\d{4}\b".into(),
+                prefix: Some("EMP-".into()),
+                strategy: CustomStrategy::RandomDigits,
+                omitted: false,
+            },
+            CustomRule {
+                name: "Project Tag".into(),
+                pattern: r"\bPRJ-[A-Z0-9]{3}\b".into(),
+                prefix: Some("PRJ-".into()),
+                strategy: CustomStrategy::PrefixSeq,
+                omitted: false,
+            },
+            CustomRule {
+                name: "Whitelisted Token".into(),
+                pattern: r"\bPUBLIC_TOKEN_\w+\b".into(),
+                prefix: None,
+                strategy: CustomStrategy::RandomDigits,
+                omitted: true,
+            },
+        ],
+        ..Default::default()
+    };
 
     let mut engine = ObfuscatorEngine::new(config);
     let sample_text = "El empleado EMP-4821 trabaja en PRJ-X99 con token PUBLIC_TOKEN_12345.";
@@ -346,4 +348,35 @@ fn test_custom_rules_in_engine() {
         .deobfuscate_text(&obfuscated, FormatType::Plaintext)
         .unwrap();
     assert_eq!(restored, sample_text);
+}
+
+#[test]
+fn test_load_external_rules_toml() {
+    let temp_dir = std::env::temp_dir().join(format!("lexi_test_rules_{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let rules_path = temp_dir.join("rules.toml");
+
+    let rules_content = r#"
+[[rules]]
+name = "Ticket ID"
+pattern = '(?i)\bTCK-\d{5}\b'
+prefix = "TCK-"
+strategy = "random_digits"
+
+[[rules]]
+name = "Internal Secret"
+pattern = '(?i)\bSEC_[A-Z0-9]{8}\b'
+strategy = "mask"
+"#;
+    std::fs::write(&rules_path, rules_content).unwrap();
+
+    let loaded_rules = lexishield::config::load_rules_from_file(&rules_path);
+    assert_eq!(loaded_rules.len(), 2);
+    assert_eq!(loaded_rules[0].name, "Ticket ID");
+    assert_eq!(loaded_rules[1].name, "Internal Secret");
+
+    let config = lexishield::config::load_config_with_rules(None, Some(&rules_path));
+    assert!(config.custom_rules.iter().any(|r| r.name == "Ticket ID"));
+
+    let _ = std::fs::remove_dir_all(&temp_dir);
 }

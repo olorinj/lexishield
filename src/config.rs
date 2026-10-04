@@ -9,6 +9,41 @@ use std::path::{Path, PathBuf};
 /// Nombre del directorio de configuración del usuario en su perfil.
 pub const USER_CONFIG_DIR_NAME: &str = ".lexishield";
 pub const CONFIG_FILE_NAME: &str = "config.toml";
+pub const RULES_FILE_NAME: &str = "rules.toml";
+
+/// Plantilla predeterminada y comentada para reglas personalizadas de usuario (~/.lexishield/rules.toml).
+pub const DEFAULT_RULES_TOML: &str = r#"# ==============================================================================
+# Reglas Personalizadas de Detección para LexiShield (~/.lexishield/rules.toml)
+# ==============================================================================
+# Aquí puedes añadir tus propios patrones de expresiones regulares para detectar
+# datos sensibles específicos de tu organización sin tener que recompilar el binario.
+#
+# Estrategias disponibles:
+#   - "random_digits": Genera dígitos aleatorios preservando longitud y formato.
+#   - "random_hex": Genera caracteres hexadecimales aleatorios.
+#   - "random_alphanumeric": Genera caracteres alfanuméricos aleatorios.
+#   - "prefix_seq": Prefijo seguido de un identificador numérico aleatorio.
+#   - "mask": Enmascara la coincidencia con asteriscos o marcador fijo.
+#
+# Ejemplos:
+
+[[rules]]
+name = "Identificador de Empleado"
+pattern = '(?i)\bEMP-\d{4,6}\b'
+prefix = "EMP-"
+strategy = "random_digits"
+
+[[rules]]
+name = "Código de Proyecto Interno"
+pattern = '(?i)\bPRJ-[A-Z0-9]{3,6}\b'
+prefix = "PRJ-"
+strategy = "random_alphanumeric"
+
+[[rules]]
+name = "Token de Acceso a Servicios"
+pattern = '(?i)\b(ghp|glpat|npm)_[a-zA-Z0-9]{20,}\b'
+strategy = "mask"
+"#;
 
 /// Plantilla predeterminada y comentada de configuración en formato TOML.
 pub const DEFAULT_CONFIG_TOML: &str = r#"# ==============================================================================
@@ -361,6 +396,46 @@ pub fn get_user_config_path() -> Result<PathBuf, ObfuscationError> {
     Ok(dir.join(CONFIG_FILE_NAME))
 }
 
+/// Obtiene la ruta del archivo de reglas personalizadas del usuario (~/.lexishield/rules.toml).
+pub fn get_user_rules_path() -> Result<PathBuf, ObfuscationError> {
+    let dir = get_user_config_dir()?;
+    Ok(dir.join(RULES_FILE_NAME))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct RulesContainer {
+    #[serde(default, alias = "rules")]
+    pub custom_rules: Vec<CustomRule>,
+}
+
+/// Carga reglas personalizadas desde un archivo TOML arbitrario.
+pub fn load_rules_from_file(path: &Path) -> Vec<CustomRule> {
+    if !path.exists() {
+        return Vec::new();
+    }
+    match fs::read_to_string(path) {
+        Ok(content) => {
+            if let Ok(container) = toml::from_str::<RulesContainer>(&content)
+                && !container.custom_rules.is_empty()
+            {
+                return container.custom_rules;
+            }
+            if let Ok(direct_list) = toml::from_str::<Vec<CustomRule>>(&content) {
+                return direct_list;
+            }
+            log::warn!(
+                "No se pudieron interpretar las reglas personalizadas de {}",
+                path.display()
+            );
+            Vec::new()
+        }
+        Err(e) => {
+            log::warn!("Error al leer archivo de reglas {}: {}", path.display(), e);
+            Vec::new()
+        }
+    }
+}
+
 /// Restablece la configuración predeterminada creando o sobreescribiendo ~/.lexishield/config.toml.
 pub fn reset_config() -> Result<PathBuf, ObfuscationError> {
     let config_dir = get_user_config_dir()?;
@@ -383,17 +458,20 @@ pub fn reset_config() -> Result<PathBuf, ObfuscationError> {
         ))
     })?;
 
+    let rules_path = config_dir.join(RULES_FILE_NAME);
+    let _ = fs::write(&rules_path, DEFAULT_RULES_TOML);
+
     log::info!(
-        "Configuración restaurada a valores por defecto en: {}",
+        "Configuración y reglas restauradas a valores por defecto en: {}",
         config_path.display()
     );
     Ok(config_path)
 }
 
-/// Inicializa el directorio y archivo de configuración en el perfil del usuario.
+/// Inicializa el directorio y archivos de configuración en el perfil del usuario.
 ///
-/// Cumple la regla universal: Si el archivo no existe, lo crea con la plantilla
-/// predeterminada. Si ya existe, NO lo sobrescribe para respetar los datos del usuario.
+/// Cumple la regla universal: Si los archivos no existen, los crea con las plantillas
+/// predeterminadas. Si ya existen, NO los sobrescribe para respetar los datos del usuario.
 pub fn ensure_user_config_initialized() -> Result<PathBuf, ObfuscationError> {
     let config_dir = get_user_config_dir()?;
     if !config_dir.exists() {
@@ -422,12 +500,24 @@ pub fn ensure_user_config_initialized() -> Result<PathBuf, ObfuscationError> {
         );
     }
 
+    let rules_path = config_dir.join(RULES_FILE_NAME);
+    if !rules_path.exists() {
+        let _ = fs::write(&rules_path, DEFAULT_RULES_TOML);
+        log::info!(
+            "Plantilla de reglas personalizadas creada en {}",
+            rules_path.display()
+        );
+    }
+
     Ok(config_path)
 }
 
-/// Carga la configuración del usuario desde disco o devuelve la predeterminada en caso de fallo.
-pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
-    let path_to_load = match custom_path {
+/// Carga la configuración del usuario y combina reglas dinámicas adicionales.
+pub fn load_config_with_rules(
+    custom_config: Option<&Path>,
+    custom_rules: Option<&Path>,
+) -> LexiConfig {
+    let path_to_load = match custom_config {
         Some(p) => p.to_path_buf(),
         None => match ensure_user_config_initialized() {
             Ok(p) => p,
@@ -440,9 +530,9 @@ pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
         },
     };
 
-    match fs::read_to_string(&path_to_load) {
+    let mut cfg = match fs::read_to_string(&path_to_load) {
         Ok(data) => match toml::from_str::<LexiConfig>(&data) {
-            Ok(cfg) => cfg,
+            Ok(c) => c,
             Err(e) => {
                 log::warn!(
                     "Error al parsear archivo TOML {} ({}); usando valores por defecto",
@@ -460,5 +550,40 @@ pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
             );
             LexiConfig::default()
         }
+    };
+
+    // Cargar reglas dinámicas adicionales desde rules.toml o ruta indicada
+    let rules_to_load = match custom_rules {
+        Some(p) => Some(p.to_path_buf()),
+        None => get_user_rules_path().ok(),
+    };
+
+    if let Some(r_path) = rules_to_load
+        && r_path.exists()
+    {
+        let external_rules = load_rules_from_file(&r_path);
+        if !external_rules.is_empty() {
+            log::info!(
+                "Cargadas {} reglas personalizadas desde {}",
+                external_rules.len(),
+                r_path.display()
+            );
+            for r in external_rules {
+                if !cfg
+                    .custom_rules
+                    .iter()
+                    .any(|existing| existing.name == r.name)
+                {
+                    cfg.custom_rules.push(r);
+                }
+            }
+        }
     }
+
+    cfg
+}
+
+/// Carga la configuración del usuario desde disco o devuelve la predeterminada en caso de fallo.
+pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
+    load_config_with_rules(custom_path, None)
 }

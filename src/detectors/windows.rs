@@ -131,7 +131,7 @@ mod tests {
     fn test_windows_sid_detector() {
         let detector = WindowsSidDetector::new();
         let sid = "S-1-5-21-123456789-987654321-112233445-1001";
-        let text = format!("Usuario con SID: {}", sid);
+        let text = format!("Usuario con SID: {sid}");
         let matches = detector.find_matches(&text);
         assert_eq!(matches.len(), 1);
         let pseudo = detector.generate_pseudonym(sid);

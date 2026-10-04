@@ -33,6 +33,7 @@ rpassword = "7.3"
 toml = "0.8"
 mimalloc = { version = "0.1", default-features = false }
 clap_complete = "4.5"
+ignore = "0.4"
 
 [build-dependencies]
 winres = "0.1"

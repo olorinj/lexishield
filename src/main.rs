@@ -4,7 +4,7 @@ use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use lexishield::clipboard::{
     WatchDirection, get_clipboard_text, set_clipboard_text, watch_clipboard_loop,
 };
-use lexishield::config::{LexiConfig, load_config};
+use lexishield::config::{LexiConfig, load_config_with_rules};
 use lexishield::engine::ObfuscatorEngine;
 use lexishield::logger::init_logger;
 use lexishield::models::{DetectorType, FormatType, Mapping};
@@ -21,13 +21,17 @@ static GLOBAL: MiMalloc = MiMalloc;
 #[command(about = "Motor de anonimización y ofuscación semántica de alto rendimiento", long_about = None)]
 #[command(version = "0.1.0")]
 struct Cli {
-    /// Activa el nivel de log Debug para más detalles (Telemetría).
+    /// Activa el nivel de log Debug para más detalles (Telemetría en stderr).
     #[arg(short, long, global = true)]
     verbose: bool,
 
     /// Ruta a un archivo de configuración TOML personalizado.
     #[arg(long, global = true)]
     config: Option<PathBuf>,
+
+    /// Ruta a un archivo de reglas TOML personalizado (~/.lexishield/rules.toml).
+    #[arg(long, global = true)]
+    rules: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -169,11 +173,15 @@ enum DictCommands {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Ofusca un archivo, texto directo o portapapeles.
+    /// Ofusca un archivo, texto directo, entrada estándar (stdin) o portapapeles.
     Obfuscate {
-        /// Archivo de entrada a procesar.
+        /// Archivo de entrada a procesar (use '-' para leer desde stdin).
         #[arg(short, long)]
         input: Option<PathBuf>,
+
+        /// Leer datos directamente desde la entrada estándar (stdin).
+        #[arg(long)]
+        stdin: bool,
 
         /// Archivo de salida donde guardar el resultado.
         #[arg(short, long)]
@@ -210,9 +218,13 @@ enum Commands {
 
     /// Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada.
     Deobfuscate {
-        /// Archivo de entrada a desofuscar.
+        /// Archivo de entrada a desofuscar (use '-' para leer desde stdin).
         #[arg(short, long)]
         input: Option<PathBuf>,
+
+        /// Leer datos directamente desde la entrada estándar (stdin).
+        #[arg(long)]
+        stdin: bool,
 
         /// Archivo de salida.
         #[arg(short, long)]
@@ -243,11 +255,15 @@ enum Commands {
         format: CliFormat,
     },
 
-    /// Escanea un archivo, texto o portapapeles y muestra los datos sensibles detectados sin modificarlos.
+    /// Escanea un archivo, texto, stdin o portapapeles y muestra los datos sensibles detectados sin modificarlos.
     Scan {
-        /// Archivo a escanear.
+        /// Archivo o directorio a escanear (use '-' para leer desde stdin).
         #[arg(short, long)]
         input: Option<PathBuf>,
+
+        /// Leer datos directamente desde la entrada estándar (stdin).
+        #[arg(long)]
+        stdin: bool,
 
         /// Texto a escanear.
         #[arg(short, long)]
@@ -359,20 +375,32 @@ fn resolve_input_content(
     input: Option<&Path>,
     text: Option<&str>,
     clipboard: bool,
+    stdin: bool,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    use std::io::{IsTerminal, Read};
     if clipboard {
         return Ok(get_clipboard_text()?);
     }
-    match (input, text) {
-        (Some(p), _) => Ok(fs::read_to_string(p)?),
-        (_, Some(t)) => Ok(t.to_string()),
-        (None, None) => {
-            log::error!(
-                "Debe proporcionar un archivo con --input, texto con --text o activar --clipboard"
-            );
-            Err("No se especificó ninguna fuente de entrada válida".into())
-        }
+    if let Some(t) = text {
+        return Ok(t.to_string());
     }
+    if let Some(p) = input {
+        if p.as_os_str() == "-" {
+            let mut buffer = String::new();
+            std::io::stdin().read_to_string(&mut buffer)?;
+            return Ok(buffer);
+        }
+        return Ok(fs::read_to_string(p)?);
+    }
+    if stdin || !std::io::stdin().is_terminal() {
+        let mut buffer = String::new();
+        std::io::stdin().read_to_string(&mut buffer)?;
+        return Ok(buffer);
+    }
+    log::error!(
+        "Debe proporcionar un archivo con --input, pasar datos por tubería (stdin), texto con --text o activar --clipboard"
+    );
+    Err("No se especificó ninguna fuente de entrada válida".into())
 }
 
 /// Resuelve la contraseña ya sea desde CLI, de forma interactiva o detectando si el archivo está cifrado.
@@ -442,6 +470,7 @@ fn resolve_password(
 
 struct ObfuscateOptions {
     input: Option<PathBuf>,
+    stdin: bool,
     output: Option<PathBuf>,
     text: Option<String>,
     clipboard: bool,
@@ -457,8 +486,12 @@ fn handle_obfuscate(
     config: LexiConfig,
     opts: ObfuscateOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let content =
-        resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+    let content = resolve_input_content(
+        opts.input.as_deref(),
+        opts.text.as_deref(),
+        opts.clipboard,
+        opts.stdin,
+    )?;
 
     let is_default = opts.save_mappings.is_none();
     let map_path = if !opts.no_save {
@@ -524,6 +557,7 @@ fn handle_obfuscate(
 
 struct DeobfuscateOptions {
     input: Option<PathBuf>,
+    stdin: bool,
     output: Option<PathBuf>,
     text: Option<String>,
     clipboard: bool,
@@ -538,8 +572,12 @@ fn handle_deobfuscate(
     config: LexiConfig,
     opts: DeobfuscateOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let content =
-        resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+    let content = resolve_input_content(
+        opts.input.as_deref(),
+        opts.text.as_deref(),
+        opts.clipboard,
+        opts.stdin,
+    )?;
 
     let is_default = opts.mappings.is_none();
     let map_path = opts
@@ -581,6 +619,7 @@ fn handle_deobfuscate(
 
 struct ScanOptions {
     input: Option<PathBuf>,
+    stdin: bool,
     text: Option<String>,
     clipboard: bool,
     save_mappings: Option<PathBuf>,
@@ -589,41 +628,60 @@ struct ScanOptions {
     yes: bool,
 }
 
-/// Manejador de la acción de escaneo.
-fn collect_files(
+/// Recopila archivos a procesar usando el motor de ignorados estilo ripgrep (.gitignore, .lexiignore y extensiones configuradas).
+fn collect_files_with_ignore(
     dir: &Path,
-    ignore: &lexishield::config::IgnoreConfig,
+    ignore_cfg: &lexishield::config::IgnoreConfig,
 ) -> std::io::Result<Vec<PathBuf>> {
+    if !dir.is_dir() {
+        return Ok(vec![dir.to_path_buf()]);
+    }
+
+    use ignore::WalkBuilder;
+    let mut builder = WalkBuilder::new(dir);
+    builder.add_custom_ignore_filename(".lexiignore");
+    builder.hidden(true);
+    builder.git_ignore(true);
+    builder.git_global(true);
+    builder.git_exclude(true);
+
     let mut files = Vec::new();
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                && (name.starts_with('.')
-                    || ignore
-                        .ignored_directories
-                        .iter()
-                        .any(|d| d.eq_ignore_ascii_case(name)))
-            {
-                continue; // Saltar archivos ocultos (.git, etc) o directorios ignorados
-            }
-            if path.is_dir() {
-                files.extend(collect_files(&path, ignore)?);
-            } else if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str())
-                    && ignore
-                        .ignored_extensions
-                        .iter()
-                        .any(|e| e.eq_ignore_ascii_case(ext))
-                {
-                    continue; // Saltar extensiones ignoradas
+    for result in builder.build() {
+        match result {
+            Ok(entry) => {
+                let path = entry.path();
+                if path.is_file() {
+                    let in_ignored_dir = path.components().any(|c| {
+                        if let std::path::Component::Normal(os_name) = c
+                            && let Some(s) = os_name.to_str()
+                        {
+                            return ignore_cfg
+                                .ignored_directories
+                                .iter()
+                                .any(|d| d.eq_ignore_ascii_case(s));
+                        }
+                        false
+                    });
+                    if in_ignored_dir {
+                        continue;
+                    }
+
+                    if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                        && ignore_cfg
+                            .ignored_extensions
+                            .iter()
+                            .any(|e| e.eq_ignore_ascii_case(ext))
+                    {
+                        continue;
+                    }
+
+                    files.push(path.to_path_buf());
                 }
-                files.push(path);
+            }
+            Err(err) => {
+                log::warn!("Error al explorar ruta: {err}");
             }
         }
-    } else {
-        files.push(dir.to_path_buf());
     }
     Ok(files)
 }
@@ -978,9 +1036,27 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
 
     let mut total_discovered = 0usize;
 
-    if let Some(ref path) = opts.input {
+    if opts.stdin || opts.input.as_ref().is_some_and(|p| p.as_os_str() == "-") {
+        let content = resolve_input_content(
+            opts.input.as_deref(),
+            opts.text.as_deref(),
+            opts.clipboard,
+            opts.stdin,
+        )?;
+        println!(
+            "🔍 Analizando flujo de entrada estándar stdin ({})...",
+            format_size(content.len() as u64)
+        );
+        let mut text_new = engine.scan_and_register_mappings(&content)?;
+        if !text_new.is_empty() {
+            total_discovered += text_new.len();
+            if !opts.yes {
+                prompt_file_mappings("stdin", &mut text_new, &mut engine)?;
+            }
+        }
+    } else if let Some(ref path) = opts.input {
         if path.is_dir() {
-            let files = collect_files(path, &engine.config.ignore)?;
+            let files = collect_files_with_ignore(path, &engine.config.ignore)?;
             let total = files.len();
             println!(
                 "🔍 Escaneando directorio '{}' ({} archivos)...",
@@ -1052,8 +1128,12 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
             }
         }
     } else {
-        let content =
-            resolve_input_content(opts.input.as_deref(), opts.text.as_deref(), opts.clipboard)?;
+        let content = resolve_input_content(
+            opts.input.as_deref(),
+            opts.text.as_deref(),
+            opts.clipboard,
+            opts.stdin,
+        )?;
         println!(
             "🔍 Analizando texto en memoria ({})...",
             format_size(content.len() as u64)
@@ -1300,12 +1380,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         init_logger();
     }
-    let config = load_config(cli.config.as_deref());
+    let config = load_config_with_rules(cli.config.as_deref(), cli.rules.as_deref());
 
     match cli.command {
         Commands::Config { subcommand } => handle_config(cli.config.as_deref(), subcommand),
         Commands::Obfuscate {
             input,
+            stdin,
             output,
             text,
             clipboard,
@@ -1318,6 +1399,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             config,
             ObfuscateOptions {
                 input,
+                stdin,
                 output,
                 text,
                 clipboard,
@@ -1331,6 +1413,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         Commands::Deobfuscate {
             input,
+            stdin,
             output,
             text,
             clipboard,
@@ -1342,6 +1425,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             config,
             DeobfuscateOptions {
                 input,
+                stdin,
                 output,
                 text,
                 clipboard,
@@ -1354,6 +1438,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         Commands::Scan {
             input,
+            stdin,
             text,
             clipboard,
             save_mappings,
@@ -1364,6 +1449,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             config,
             ScanOptions {
                 input,
+                stdin,
                 text,
                 clipboard,
                 save_mappings,

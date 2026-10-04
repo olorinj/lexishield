@@ -177,3 +177,20 @@ La CLI incluye el comando `lexishield completions <SHELL>` capaz de generar scri
 
 ### 🛡️ DevSecOps y Auditoría de Vulnerabilidades (`cargo-audit`)
 La seguridad de la cadena de suministro (*Supply Chain Security*) se audita automáticamente en el pipeline de CI/CD mediante `cargo audit` contra la base de datos de avisos de seguridad de RustSec, bloqueando cualquier commit o despliegue si se introduce una dependencia con CVEs conocidos.
+
+### 📁 Motor de Exploración y Filtrado Inteligente (`ignore` & `.lexiignore`)
+Para escanear estructuras masivas de directorios sin procesar archivos irrelevantes o binarios:
+* **Integración del crate `ignore`**: Utiliza el mismo motor multihilo de *ripgrep* (`WalkBuilder`) para respetar las reglas de `.gitignore`, `.git/info/exclude` y archivos `.lexiignore` locales.
+* **Inspección de Cabeceras (*Magic Bytes*)**: Los archivos binarios y comprimidos (`.zip`, `.gz`, `.pdf`, `.exe`, `.tar`, etc.) se identifican mediante listas de extensiones y lectura de los primeros 1024 bytes (detección de `0x00` y firmas conocidas), omitiéndolos limpiamente sin arrojar errores de UTF-8.
+
+### 🔄 Pureza CLI y Procesamiento en Tuberías Unix (`stdin` / `stdout`)
+Siguiendo la norma de higiene estricta de CLI:
+* **Separación de Canales**: Todo log de telemetría y barra de progreso escribe en `stderr`.
+* **Modo Tubería (*Pipes*)**: Al pasar `-i -` o activar `--stdin` (o canalizar datos vía `|`), LexiShield lee de la entrada estándar y escribe el resultado transformado directamente en `stdout`, permitiendo composabilidad total con `grep`, `jq`, `tail -f`, y redirecciones de shell.
+
+### 🧩 Infraestructura de Fuzzing Dedicada (`fuzz/`)
+La estabilidad del motor está blindada contra entradas arbitrarias mediante cuatro *fuzz targets* especializados compilados con LLVM `libFuzzer`:
+* **`lexi_engine`**: Fuzzing del orquestador global de mapeos y escaneo.
+* **`fuzz_json`**: Fuzzing de mutación sobre el analizador de JSON.
+* **`fuzz_xml`**: Fuzzing de fragmentos XML malformados sobre `quick-xml`.
+* **`fuzz_log`**: Fuzzing de formatos de log delimitaods (Syslog, CEF, Logfmt, KVP).
