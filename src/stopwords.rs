@@ -277,6 +277,8 @@ pub static PROTECTED_WORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
         "check",
         "index",
         // Métodos y cabeceras HTTP comunes
+        "http",
+        "https",
         "get",
         "post",
         "put",
@@ -312,4 +314,21 @@ pub static PROTECTED_WORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 pub fn is_protected_word(word: &str) -> bool {
     let lower = word.to_lowercase();
     PROTECTED_WORDS.contains(lower.as_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_protected_word() {
+        assert!(is_protected_word("SELECT"));
+        assert!(is_protected_word("select"));
+        assert!(is_protected_word("authorization"));
+        assert!(is_protected_word("para"));
+        assert!(is_protected_word("HTTP"));
+        assert!(is_protected_word("https"));
+        assert!(!is_protected_word("juan_perez_99"));
+        assert!(!is_protected_word("supersecretpassword"));
+    }
 }

@@ -174,3 +174,35 @@ impl SyntaxValidator {
         Ok(tags)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_valid_json() {
+        let orig = r#"{"usuario": "admin", "servidor": "10.0.0.1"}"#;
+        let obf = r#"{"usuario": "user_01", "servidor": "192.0.2.1"}"#;
+        let report = SyntaxValidator::validate(orig, obf, FormatType::Json).unwrap();
+        assert!(report.syntax_valid);
+        assert!(report.schema_keys_intact);
+        assert_eq!(report.original_keys_count, 2);
+    }
+
+    #[test]
+    fn test_validate_corrupted_json_fails() {
+        let orig = r#"{"usuario": "admin"}"#;
+        let obf = r#"{"usuario": "user_01""#; // Falta cierre
+        let result = SyntaxValidator::validate(orig, obf, FormatType::Json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_valid_xml() {
+        let orig = r#"<config><admin>root</admin></config>"#;
+        let obf = r#"<config><admin>user01</admin></config>"#;
+        let report = SyntaxValidator::validate(orig, obf, FormatType::Xml).unwrap();
+        assert!(report.syntax_valid);
+        assert!(report.schema_keys_intact);
+    }
+}

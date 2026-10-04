@@ -527,3 +527,48 @@ impl TelephoneDetector {
         result
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spanish_dni_nie_detection_and_validation() {
+        let detector = SpanishDniNieDetector::new();
+        // 12345678Z (8 % 23 = 14 => Z)
+        let matches =
+            detector.find_matches("El DNI 12345678Z y NIE X1234567L son válidos pero 00000000A no");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].2, "12345678Z");
+        assert_eq!(matches[1].2, "X1234567L");
+
+        let pseudo = detector.generate_pseudonym("12345678Z");
+        let matches_pseudo = detector.find_matches(&pseudo);
+        assert_eq!(
+            matches_pseudo.len(),
+            1,
+            "El seudónimo generado debe ser un DNI válido"
+        );
+    }
+
+    #[test]
+    fn test_credit_card_luhn_and_heuristic() {
+        let detector = CreditCardDetector::new();
+        // Visa de prueba válida de 16 dígitos con Luhn válido
+        let matches = detector.find_matches("Tarjeta Visa 4532-1234-5678-9014 activa");
+        assert_eq!(matches.len(), 1);
+        let pseudo = detector.generate_pseudonym("4532-1234-5678-9014");
+        assert_eq!(pseudo.len(), 19); // Mantiene espaciado y guiones
+    }
+
+    #[test]
+    fn test_telephone_detector_format_preservation() {
+        let detector = TelephoneDetector::new();
+        let matches = detector.find_matches("Llamar al +34 694 185 579 o al 912345678");
+        assert_eq!(matches.len(), 2);
+
+        let pseudo_intl = detector.generate_pseudonym("+34 694 185 579");
+        assert!(pseudo_intl.starts_with("+34 "));
+        assert_eq!(pseudo_intl.len(), "+34 694 185 579".len());
+    }
+}

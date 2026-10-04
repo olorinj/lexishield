@@ -118,3 +118,35 @@ impl WindowsHexIdDetector {
         format!("0x{}", hex_str)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_windows_sid_detector() {
+        let detector = WindowsSidDetector::new();
+        let sid = "S-1-5-21-123456789-987654321-112233445-1001";
+        let text = format!("Usuario con SID: {}", sid);
+        let matches = detector.find_matches(&text);
+        assert_eq!(matches.len(), 1);
+        let pseudo = detector.generate_pseudonym(sid);
+        assert!(pseudo.starts_with("S-1-5-21-"));
+    }
+
+    #[test]
+    fn test_windows_logon_id_detector() {
+        let detector = WindowsLogonIdDetector::new();
+        let matches = detector.find_matches("Logon ID: 0x03e7 y sesión 0x1A2B3C");
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn test_windows_hex_id_detector() {
+        let detector = WindowsHexIdDetector::new();
+        let matches = detector.find_matches("Handle 0x00000000A1B2C3D4 detectado");
+        assert_eq!(matches.len(), 1);
+        let pseudo = detector.generate_pseudonym("0x00000000A1B2C3D4");
+        assert!(pseudo.starts_with("0x"));
+    }
+}

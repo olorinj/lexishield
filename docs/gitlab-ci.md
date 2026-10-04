@@ -77,3 +77,4 @@ Cuando no estés compilando o ejecutando pipelines, puedes liberar los recursos 
   ```bash
   VAGRANT_VAGRANTFILE=build/Vagrantfile.gitlab vagrant destroy
   ```
+
