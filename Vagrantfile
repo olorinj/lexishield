@@ -31,9 +31,14 @@ Vagrant.configure("2") do |config|
     echo "=== Actualizando repositorios ==="
     apt-get update
 
-    echo "=== Instalando dependencias de compilacion (Linux, MinGW para Windows y Docker) ==="
+    echo "=== Instalando dependencias de compilacion (Linux, MinGW para Windows, Docker y GUI Tauri) ==="
     apt-get install -y --no-install-recommends \
-      curl build-essential pkg-config libssl-dev git dos2unix docker.io ca-certificates mingw-w64
+      curl build-essential pkg-config libssl-dev git dos2unix docker.io ca-certificates mingw-w64 \
+      libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+    echo "=== Instalando Node.js (v20 LTS) y npm ==="
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
 
     echo "=== Configurando servicio y permisos de Docker ==="
     usermod -aG docker vagrant

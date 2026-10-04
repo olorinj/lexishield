@@ -8,6 +8,9 @@ param (
     [Alias("m", "macos")]
     [switch]$Mac,
 
+    [Alias("g", "gui")]
+    [switch]$Gui,
+
     [Alias("a")]
     [switch]$All,
 
@@ -88,6 +91,7 @@ try {
         if ($Windows) { $argsBash += "-w" }
         if ($Linux)   { $argsBash += "-l" }
         if ($Mac)     { $argsBash += "-m" }
+        if ($Gui)     { $argsBash += "-g" }
     }
     if ($Clean)  { $argsBash += "-c" }
     if ($Update) { $argsBash += "-u" }

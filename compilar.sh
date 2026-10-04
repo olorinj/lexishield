@@ -99,10 +99,16 @@ while [[ $# -gt 0 ]]; do
             especifico=true
             shift
             ;;
+        -g|--gui)
+            compilar_gui=true
+            especifico=true
+            shift
+            ;;
         -a|--all)
             compilar_win=true
             compilar_linux=true
             compilar_mac=true
+            compilar_gui=true
             especifico=true
             shift
             ;;
@@ -123,7 +129,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Argumento no reconocido: $1"
-            echo "Uso: ./compilar.sh [-w|--windows] [-l|--linux] [-m|--mac] [-a|--all] [-c|--clean] [-u|--update] [-k|--keep-vm] [--native]"
+            echo "Uso: ./compilar.sh [-w|--windows] [-l|--linux] [-m|--mac] [-g|--gui] [-a|--all] [-c|--clean] [-u|--update] [-k|--keep-vm] [--native]"
             exit 1
             ;;
     esac
@@ -229,6 +235,27 @@ if [ "$compilar_mac" = true ]; then
             cp -f "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/lexishield" "./dist/lexishield-darwin-arm64"
             archivos_compilados+=("./dist/lexishield-darwin-arm64")
         fi
+    fi
+fi
+
+# 4. Compilacion de Interfaz Grafica (Tauri GUI)
+if [ "$compilar_gui" = true ]; then
+    echo -e "\n\e[36m[4/4] Compilando Interfaz Grafica de Usuario (LexiShield Tauri GUI)...\e[0m"
+    if command -v npm &> /dev/null; then
+        echo -e "\e[90mInstalando dependencias de UI y construyendo bundle frontend...\e[0m"
+        (cd ui && npm install && npm run build)
+        echo -e "\e[90mConstruyendo paquetes nativos (AppImage, .deb, etc.) con Tauri...\e[0m"
+        ui/node_modules/.bin/tauri build
+        
+        mkdir -p dist
+        if [ -d "src-tauri/target/release/bundle" ]; then
+            cp -r src-tauri/target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || true
+            cp -r src-tauri/target/release/bundle/deb/*.deb dist/ 2>/dev/null || true
+            cp -f src-tauri/target/release/lexishield-gui "./dist/lexishield-gui-linux-amd64" 2>/dev/null || true
+            archivos_compilados+=("./dist/*.AppImage" "./dist/*.deb")
+        fi
+    else
+        echo -e "\e[33m[AVISO] 'npm' no encontrado en el PATH. Omitiendo compilacion de la GUI.\e[0m"
     fi
 fi
 
