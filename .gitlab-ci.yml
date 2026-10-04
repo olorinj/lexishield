@@ -77,3 +77,4 @@ gitlab_release:
       links:
         - name: "lexishield-linux-amd64"
           url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/dist/lexishield-linux-amd64"
+

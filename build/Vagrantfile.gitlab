@@ -1,0 +1,117 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  # Misma imagen minima y optimizada de Bento Debian 12 (Bookworm)
+  config.vm.box = "bento/debian-12"
+
+  # Sincronizacion de la carpeta del proyecto en /vagrant
+  config.vm.synced_folder "..", "/vagrant", mount_options: ["dmode=775", "fmode=775"]
+
+  # Reenvio de puertos para acceder a servicios locales de GitLab (Web UI y HTTPS)
+  config.vm.network "forwarded_port", guest: 80, host: 8080, auto_correct: true
+  config.vm.network "forwarded_port", guest: 443, host: 8443, auto_correct: true
+
+  # Optimizacion de hardware y virtualizacion para ejecucion de pipelines
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "lexishield-gitlab-ci"
+    vb.memory = "4096"
+    vb.cpus = 4
+
+    # Ajustes avanzados de VirtualBox para aceleracion de contenedores y KVM
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["modifyvm", :id, "--paravirtprovider", "kvm"]
+    vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--audio", "none"]
+    vb.customize ["modifyvm", :id, "--vram", "16"]
+    vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
+  end
+
+  # Aprovisionamiento automatizado de Docker, GitLab Runner y utilidades CI/CD
+  config.vm.provision "shell", inline: <<-SHELL
+    export DEBIAN_FRONTEND=noninteractive
+
+    echo "=== [1/5] Configurando SWAP (2GB) para estabilidad en compilaciones pesadas ==="
+    if [ ! -f /swapfile ]; then
+      fallocate -l 2G /swapfile
+      chmod 600 /swapfile
+      mkswap /swapfile
+      swapon /swapfile
+      echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+
+    echo "=== [2/5] Actualizando repositorios e instalando paquetes base ==="
+    apt-get update
+    apt-get install -y --no-install-recommends \
+      curl ca-certificates gnupg lsb-release git docker.io build-essential pkg-config libssl-dev
+
+    echo "=== [3/5] Configurando Docker y permisos ==="
+    systemctl enable --now docker
+    usermod -aG docker vagrant
+
+    echo "=== [4/5] Instalando GitLab Runner oficial ==="
+    curl -L --retry 3 --retry-delay 2 "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | bash
+    apt-get install -y gitlab-runner
+    usermod -aG docker gitlab-runner
+    systemctl enable --now gitlab-runner
+
+    echo "=== [5/5] Pre-descargando imagen Docker de Rust para ejecucion instantanea ==="
+    docker pull rust:1.85-slim || docker pull rust:latest
+
+    # Creacion de script interactivo de ayuda para registrar el Runner facilmente
+    cat << 'EOF_REG' > /usr/local/bin/register-runner
+#!/bin/bash
+if [ -z "$1" ]; then
+  echo "Uso: register-runner <TOKEN_DE_GITLAB> [URL_GITLAB (por defecto: https://gitlab.com)]"
+  echo "Ejemplo: register-runner glrt-xxxxxxxxxxxx https://gitlab.com"
+  exit 1
+fi
+
+TOKEN="$1"
+URL="${2:-https://gitlab.com}"
+
+echo "Registrando GitLab Runner con Docker Executor..."
+sudo gitlab-runner register \
+  --non-interactive \
+  --url "$URL" \
+  --token "$TOKEN" \
+  --executor "docker" \
+  --docker-image "rust:1.85-slim" \
+  --docker-volumes "/var/run/docker.sock:/var/run/docker.sock" \
+  --description "vagrant-bento-debian12-runner" \
+  --tag-list "rust,docker,linux"
+
+echo "¡Runner registrado y listo para procesar pipelines!"
+EOF_REG
+    chmod +x /usr/local/bin/register-runner
+
+    # Creacion de script opcional para lanzar GitLab Community Edition local mediante Docker
+    cat << 'EOF_GL' > /usr/local/bin/start-gitlab-server
+#!/bin/bash
+echo "Iniciando contenedor de GitLab Community Edition (Servidor local)..."
+docker run --detach \
+  --hostname localhost \
+  --publish 80:80 --publish 443:443 --publish 2222:22 \
+  --name gitlab \
+  --restart always \
+  --volume /srv/gitlab/config:/etc/gitlab \
+  --volume /srv/gitlab/logs:/var/log/gitlab \
+  --volume /srv/gitlab/data:/var/opt/gitlab \
+  --shm-size 256m \
+  gitlab/gitlab-ce:latest
+
+echo "GitLab Server iniciando en segundo plano. Accede desde tu anfitrion a: http://localhost:8080"
+echo "Para ver la contrasena inicial de root: docker exec -it gitlab grep 'Password:' /etc/gitlab/initial_root_password"
+EOF_GL
+    chmod +x /usr/local/bin/start-gitlab-server
+
+    echo ""
+    echo "========================================================================="
+    echo " ¡Entorno Vagrant GitLab CI/CD listo con Bento Debian 12!"
+    echo " * Docker + GitLab Runner configurados."
+    echo " * Registra tu runner con: sudo register-runner <TU_TOKEN>"
+    echo " * Lanza un servidor GitLab local con: sudo start-gitlab-server"
+    echo "========================================================================="
+  SHELL
+end
