@@ -151,6 +151,30 @@ Gestiona diccionarios de mapeos (soporta tanto JSON plano como bóvedas cifradas
 * **`lexishield dict add -o "usuario.real" -p "user0001" -m mapeos.lexi -p "pwd"`**: Inyecta un par en la bóveda.
 * **`lexishield dict clear -m mapeos.lexi -p "pwd"`**: Vacía el diccionario cifrado.
 
+### 6. Comando: `config` (Configuración y Reglas TOML)
+Permite inspeccionar, ubicar y restablecer la configuración global del usuario (`~/.lexishield/config.toml`), donde se pueden definir parámetros de escaneo, exclusiones y **reglas de detección personalizadas** (Custom Regex):
+
+* **`lexishield config show`**: Muestra en consola el contenido del archivo de configuración activo.
+* **`lexishield config path`**: Muestra la ruta física del archivo `config.toml`.
+* **`lexishield config reset`**: Restablece el archivo a la plantilla por defecto con ejemplos explicados.
+* **`lexishield --config /ruta/personalizada.toml <COMMAND>`**: Permite usar un archivo de configuración alternativo en cualquier comando.
+
+*Ejemplo de Reglas Personalizadas en `~/.lexishield/config.toml`:*
+```toml
+# Definición de reglas personalizadas por el usuario
+[[custom_rules]]
+name = "Identificador de Empleado"
+pattern = '(?i)\bEMP-\d{4,6}\b'
+prefix = "EMP-"
+strategy = "random_digits"
+
+[[custom_rules]]
+name = "Código de Proyecto Interno"
+pattern = '(?i)\bPRJ-[A-Z0-9]{3,6}\b'
+prefix = "PRJ-"
+strategy = "random_alphanumeric"
+```
+
 ---
 
 ## 📚 Documentación Técnica para Desarrolladores

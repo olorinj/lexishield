@@ -16,6 +16,10 @@ use std::path::{Path, PathBuf};
 #[command(about = "Motor de anonimización y ofuscación semántica de alto rendimiento", long_about = None)]
 #[command(version = "0.1.0")]
 struct Cli {
+    /// Ruta a un archivo de configuración TOML personalizado.
+    #[arg(long, global = true)]
+    config: Option<PathBuf>,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -289,6 +293,26 @@ enum Commands {
         #[command(subcommand)]
         subcommand: DictCommands,
     },
+
+    /// Gestiona la configuración del sistema (~/.lexishield/config.toml).
+    Config {
+        #[command(subcommand)]
+        subcommand: ConfigCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigCommands {
+    /// Muestra el contenido del archivo de configuración activo.
+    Show,
+    /// Muestra la ruta absoluta del archivo de configuración.
+    Path,
+    /// Restablece la configuración a los valores por defecto (~/.lexishield/config.toml).
+    Reset {
+        /// Confirma el restablecimiento sin preguntar.
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
 }
 
 /// Resuelve el contenido de entrada desde un archivo, texto o portapapeles.
@@ -550,20 +574,35 @@ struct ScanOptions {
 }
 
 /// Manejador de la acción de escaneo.
-fn collect_files(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+fn collect_files(
+    dir: &Path,
+    ignore: &lexishield::config::IgnoreConfig,
+) -> std::io::Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                && name.starts_with('.')
+                && (name.starts_with('.')
+                    || ignore
+                        .ignored_directories
+                        .iter()
+                        .any(|d| d.eq_ignore_ascii_case(name)))
             {
-                continue; // Saltar archivos ocultos (.git, etc)
+                continue; // Saltar archivos ocultos (.git, etc) o directorios ignorados
             }
             if path.is_dir() {
-                files.extend(collect_files(&path)?);
+                files.extend(collect_files(&path, ignore)?);
             } else if path.is_file() {
+                if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                    && ignore
+                        .ignored_extensions
+                        .iter()
+                        .any(|e| e.eq_ignore_ascii_case(ext))
+                {
+                    continue; // Saltar extensiones ignoradas
+                }
                 files.push(path);
             }
         }
@@ -917,7 +956,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
 
     if let Some(ref path) = opts.input {
         if path.is_dir() {
-            let files = collect_files(path)?;
+            let files = collect_files(path, &engine.config.ignore)?;
             let total = files.len();
             println!(
                 "🔍 Escaneando directorio '{}' ({} archivos)...",
@@ -1151,12 +1190,58 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
+fn handle_config(
+    config_path_override: Option<&Path>,
+    subcommand: ConfigCommands,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let cfg_path = match config_path_override {
+        Some(p) => p.to_path_buf(),
+        None => lexishield::config::ensure_user_config_initialized()?,
+    };
+
+    match subcommand {
+        ConfigCommands::Path => {
+            println!("{}", cfg_path.display());
+        }
+        ConfigCommands::Show => {
+            println!("⚙️  Archivo de configuración: {}", cfg_path.display());
+            println!("--------------------------------------------------");
+            let content = fs::read_to_string(&cfg_path)?;
+            println!("{}", content);
+        }
+        ConfigCommands::Reset { yes } => {
+            if !yes {
+                use std::io::{self, Write};
+                print!(
+                    "⚠️  ¿Restablecer la configuración en '{}' a los valores por defecto? [s/N]: ",
+                    cfg_path.display()
+                );
+                io::stdout().flush()?;
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                let trimmed = input.trim().to_lowercase();
+                if trimmed != "s" && trimmed != "si" && trimmed != "y" && trimmed != "yes" {
+                    log::info!("Operación cancelada.");
+                    return Ok(());
+                }
+            }
+            let restored = lexishield::config::reset_config()?;
+            println!(
+                "✅ Configuración restablecida con éxito en: {}",
+                restored.display()
+            );
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger();
     let cli = Cli::parse();
-    let config = load_config(None);
+    let config = load_config(cli.config.as_deref());
 
     match cli.command {
+        Commands::Config { subcommand } => handle_config(cli.config.as_deref(), subcommand),
         Commands::Obfuscate {
             input,
             output,

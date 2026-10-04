@@ -23,10 +23,11 @@ pub struct ObfuscatorEngine {
 
 impl ObfuscatorEngine {
     pub fn new(config: LexiConfig) -> Self {
+        let detectors = DetectorRegistry::with_custom_rules(&config.custom_rules);
         Self {
             config,
             manager: MappingManager::new(),
-            detectors: DetectorRegistry::new(),
+            detectors,
             format_orchestrator: FormatOrchestrator::new(),
         }
     }
@@ -39,7 +40,7 @@ impl ObfuscatorEngine {
         let mut detected = self.detectors.scan_text(
             content,
             &self.config.detector_priority_order,
-            self.config.min_token_length,
+            self.config.min_token_length(),
         );
 
         // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
@@ -51,7 +52,7 @@ impl ObfuscatorEngine {
             while self.manager.has_pseudonym(&m.pseudonym) && attempts < 1000 {
                 m.pseudonym = self
                     .detectors
-                    .generate_pseudonym_for(&m.original, m.detector_type);
+                    .generate_pseudonym_for(&m.original, &m.detector_type);
                 attempts += 1;
             }
         }
@@ -99,14 +100,14 @@ impl ObfuscatorEngine {
                 text,
                 format,
                 &replacement_map,
-                self.config.strict_word_boundaries,
+                self.config.strict_word_boundaries(),
             )?;
 
         let mut warnings = Vec::new();
         let mut syntax_valid = true;
         let mut schema_intact = true;
 
-        if self.config.validate_syntax_post_process {
+        if self.config.validate_syntax_post_process() {
             match SyntaxValidator::validate(text, &result_text, detected_format) {
                 Ok(vreport) => {
                     syntax_valid = vreport.syntax_valid;

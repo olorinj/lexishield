@@ -1,41 +1,155 @@
-//! Gestión de configuración y persistencia según estándares universales.
+//! Gestión de configuración y persistencia según estándares universales en formato TOML.
 
+use crate::detectors::custom::CustomRule;
 use crate::models::{DetectorType, ObfuscationError};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Nombre del directorio de configuración del usuario.
+/// Nombre del directorio de configuración del usuario en su perfil.
 pub const USER_CONFIG_DIR_NAME: &str = ".lexishield";
-pub const CONFIG_FILE_NAME: &str = "config.json";
+pub const CONFIG_FILE_NAME: &str = "config.toml";
 
-/// Configuración global del motor LexiShield.
+/// Plantilla predeterminada y comentada de configuración en formato TOML.
+pub const DEFAULT_CONFIG_TOML: &str = r#"# ==============================================================================
+# Configuración Global de LexiShield (~/.lexishield/config.toml)
+# ==============================================================================
+
+[general]
+# Longitud mínima requerida para tokens genéricos no estructurados.
+min_token_length = 4
+
+# Exigir límites de palabra (\b) para evitar sustituciones accidentales en subcadenas.
+strict_word_boundaries = true
+
+# Preservar claves de JSON sin alterar.
+preserve_json_keys = true
+
+# Preservar nombres de etiquetas y atributos XML.
+preserve_xml_tags = true
+
+# Preservar cabeceras y nombres de campo en logs estructurados.
+preserve_log_headers = true
+
+# Realizar validación sintáctica post-ofuscación (Syntax Linting).
+validate_syntax_post_process = true
+
+# Garantizar biyección e inyectividad estricta 1:1 en mapeos.
+enforce_injective_mappings = true
+
+# Generar seudónimos sintácticamente válidos con checksums reales (DNI, Tarjetas).
+generate_valid_checksums = true
+
+[vault]
+# Nombre o ruta del archivo de bóveda por defecto dentro de ~/.lexishield/
+default_vault = "default.lexi"
+
+[ignore]
+# Directorios ignorados automáticamente durante el escaneo recursivo
+ignored_directories = [
+    ".git",
+    "node_modules",
+    "target",
+    ".vagrant",
+    ".vagrant.d",
+    ".vscode",
+    ".idea",
+    "vendor",
+    "dist",
+    "build",
+]
+
+# Extensiones de archivos binarios/multimedia ignoradas durante el escaneo
+ignored_extensions = [
+    "png", "jpg", "jpeg", "gif", "ico", "svg", "webp",
+    "pdf", "zip", "tar", "gz", "tgz", "bz2", "7z", "rar",
+    "exe", "bin", "dll", "so", "dylib", "lock",
+    "woff", "woff2", "ttf", "eot", "mp4", "mp3", "avi", "mkv",
+]
+
+# Orden de prioridad de los detectores estándar incorporados
+detector_priority_order = [
+    "GuidUuid",
+    "WindowsSid",
+    "WindowsLogonId",
+    "WindowsHexId",
+    "SpanishDniNie",
+    "CreditCard",
+    "Email",
+    "IPv4",
+    "IPv6",
+    "DomainFqdn",
+    "O365Subject",
+    "O365OriginatingServer",
+    "AttachmentFileName",
+    "Hostname",
+    "Telephone",
+    "GenericToken",
+]
+
+# ==============================================================================
+# Reglas personalizadas de detección definidas por el usuario (Custom Rules)
+# ==============================================================================
+# Estrategias disponibles:
+#   - "random_digits": Genera dígitos aleatorios preservando longitud y formato.
+#   - "random_hex": Genera caracteres hexadecimales aleatorios.
+#   - "random_alphanumeric": Genera caracteres alfanuméricos aleatorios.
+#   - "prefix_seq": Prefijo seguido de un identificador numérico aleatorio.
+#   - "mask": Enmascara la coincidencia con asteriscos o marcador fijo.
+#
+# Ejemplos (descomentar y adaptar para activar):
+#
+# [[custom_rules]]
+# name = "Identificador de Empleado"
+# pattern = '(?i)\bEMP-\d{4,6}\b'
+# prefix = "EMP-"
+# strategy = "random_digits"
+#
+# [[custom_rules]]
+# name = "Código de Proyecto Interno"
+# pattern = '(?i)\bPRJ-[A-Z0-9]{3,6}\b'
+# prefix = "PRJ-"
+# strategy = "random_alphanumeric"
+#
+# [[custom_rules]]
+# name = "Token de Acceso de Servicio"
+# pattern = '(?i)\b(ghp|glpat|npm)_[a-zA-Z0-9]{20,}\b'
+# strategy = "mask"
+"#;
+
+/// Configuración general de opciones de procesamiento.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LexiConfig {
-    /// Longitud mínima requerida para tokens genéricos no estructurados.
+pub struct GeneralConfig {
+    #[serde(default = "default_min_token_length")]
     pub min_token_length: usize,
-    /// Exigir límites de palabra (\b) para evitar sustituciones en subcadenas.
+    #[serde(default = "default_true")]
     pub strict_word_boundaries: bool,
-    /// Preservar claves de JSON sin alterar.
+    #[serde(default = "default_true")]
     pub preserve_json_keys: bool,
-    /// Preservar nombres de etiquetas y atributos XML.
+    #[serde(default = "default_true")]
     pub preserve_xml_tags: bool,
-    /// Preservar cabeceras y nombres de campo en logs estructurados.
+    #[serde(default = "default_true")]
     pub preserve_log_headers: bool,
-    /// Realizar validación sintáctica post-ofuscación (Syntax Linting).
+    #[serde(default = "default_true")]
     pub validate_syntax_post_process: bool,
-    /// Garantizar biyección e inyectividad estricta 1:1 en mapeos.
+    #[serde(default = "default_true")]
     pub enforce_injective_mappings: bool,
-    /// Generar seudónimos sintácticamente válidos con checksums reales (DNI, Tarjetas).
+    #[serde(default = "default_true")]
     pub generate_valid_checksums: bool,
-    /// Orden de prioridad de los detectores (del más específico al más genérico).
-    pub detector_priority_order: Vec<DetectorType>,
 }
 
-impl Default for LexiConfig {
+fn default_min_token_length() -> usize {
+    4
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
-            min_token_length: 4,
+            min_token_length: default_min_token_length(),
             strict_word_boundaries: true,
             preserve_json_keys: true,
             preserve_xml_tags: true,
@@ -43,29 +157,177 @@ impl Default for LexiConfig {
             validate_syntax_post_process: true,
             enforce_injective_mappings: true,
             generate_valid_checksums: true,
-            detector_priority_order: vec![
-                // 1. Identificadores rígidos y específicos (máxima especificidad)
-                DetectorType::GuidUuid,
-                DetectorType::WindowsSid,
-                DetectorType::WindowsLogonId,
-                DetectorType::WindowsHexId,
-                DetectorType::SpanishDniNie,
-                DetectorType::CreditCard,
-                // 2. Red y comunicaciones
-                DetectorType::Email,
-                DetectorType::IPv4,
-                DetectorType::IPv6,
-                DetectorType::DomainFqdn,
-                // 3. Específicos de registros y servicios
-                DetectorType::O365Subject,
-                DetectorType::O365OriginatingServer,
-                DetectorType::AttachmentFileName,
-                DetectorType::Hostname,
-                // 4. Genéricos y numéricos (última prioridad para evitar falsos positivos)
-                DetectorType::Telephone,
-                DetectorType::GenericToken,
-            ],
         }
+    }
+}
+
+/// Configuración de bóvedas y persistencia.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultConfig {
+    #[serde(default = "default_vault_name")]
+    pub default_vault: String,
+}
+
+fn default_vault_name() -> String {
+    "default.lexi".to_string()
+}
+
+impl Default for VaultConfig {
+    fn default() -> Self {
+        Self {
+            default_vault: default_vault_name(),
+        }
+    }
+}
+
+/// Configuración de exclusiones e ignorados durante escaneos.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IgnoreConfig {
+    #[serde(default = "default_ignored_directories")]
+    pub ignored_directories: Vec<String>,
+    #[serde(default = "default_ignored_extensions")]
+    pub ignored_extensions: Vec<String>,
+}
+
+fn default_ignored_directories() -> Vec<String> {
+    vec![
+        ".git".into(),
+        "node_modules".into(),
+        "target".into(),
+        ".vagrant".into(),
+        ".vagrant.d".into(),
+        ".vscode".into(),
+        ".idea".into(),
+        "vendor".into(),
+        "dist".into(),
+        "build".into(),
+    ]
+}
+
+fn default_ignored_extensions() -> Vec<String> {
+    vec![
+        "png".into(),
+        "jpg".into(),
+        "jpeg".into(),
+        "gif".into(),
+        "ico".into(),
+        "svg".into(),
+        "webp".into(),
+        "pdf".into(),
+        "zip".into(),
+        "tar".into(),
+        "gz".into(),
+        "tgz".into(),
+        "bz2".into(),
+        "7z".into(),
+        "rar".into(),
+        "exe".into(),
+        "bin".into(),
+        "dll".into(),
+        "so".into(),
+        "dylib".into(),
+        "lock".into(),
+        "woff".into(),
+        "woff2".into(),
+        "ttf".into(),
+        "eot".into(),
+        "mp4".into(),
+        "mp3".into(),
+        "avi".into(),
+        "mkv".into(),
+    ]
+}
+
+impl Default for IgnoreConfig {
+    fn default() -> Self {
+        Self {
+            ignored_directories: default_ignored_directories(),
+            ignored_extensions: default_ignored_extensions(),
+        }
+    }
+}
+
+fn default_priority_order() -> Vec<DetectorType> {
+    vec![
+        // 1. Identificadores rígidos y específicos (máxima especificidad)
+        DetectorType::GuidUuid,
+        DetectorType::WindowsSid,
+        DetectorType::WindowsLogonId,
+        DetectorType::WindowsHexId,
+        DetectorType::SpanishDniNie,
+        DetectorType::CreditCard,
+        // 2. Red y comunicaciones
+        DetectorType::Email,
+        DetectorType::IPv4,
+        DetectorType::IPv6,
+        DetectorType::DomainFqdn,
+        // 3. Específicos de registros y servicios
+        DetectorType::O365Subject,
+        DetectorType::O365OriginatingServer,
+        DetectorType::AttachmentFileName,
+        DetectorType::Hostname,
+        // 4. Genéricos y numéricos
+        DetectorType::Telephone,
+        DetectorType::GenericToken,
+    ]
+}
+
+/// Configuración global del motor LexiShield.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LexiConfig {
+    #[serde(default)]
+    pub general: GeneralConfig,
+
+    #[serde(default)]
+    pub vault: VaultConfig,
+
+    #[serde(default)]
+    pub ignore: IgnoreConfig,
+
+    #[serde(default = "default_priority_order")]
+    pub detector_priority_order: Vec<DetectorType>,
+
+    #[serde(default)]
+    pub custom_rules: Vec<CustomRule>,
+}
+
+impl Default for LexiConfig {
+    fn default() -> Self {
+        Self {
+            general: GeneralConfig::default(),
+            vault: VaultConfig::default(),
+            ignore: IgnoreConfig::default(),
+            detector_priority_order: default_priority_order(),
+            custom_rules: Vec::new(),
+        }
+    }
+}
+
+impl LexiConfig {
+    // Métodos de conveniencia para mantener compatibilidad con accesos directos
+    pub fn min_token_length(&self) -> usize {
+        self.general.min_token_length
+    }
+    pub fn strict_word_boundaries(&self) -> bool {
+        self.general.strict_word_boundaries
+    }
+    pub fn preserve_json_keys(&self) -> bool {
+        self.general.preserve_json_keys
+    }
+    pub fn preserve_xml_tags(&self) -> bool {
+        self.general.preserve_xml_tags
+    }
+    pub fn preserve_log_headers(&self) -> bool {
+        self.general.preserve_log_headers
+    }
+    pub fn validate_syntax_post_process(&self) -> bool {
+        self.general.validate_syntax_post_process
+    }
+    pub fn enforce_injective_mappings(&self) -> bool {
+        self.general.enforce_injective_mappings
+    }
+    pub fn generate_valid_checksums(&self) -> bool {
+        self.general.generate_valid_checksums
     }
 }
 
@@ -77,7 +339,7 @@ pub fn get_user_config_dir() -> Result<PathBuf, ObfuscationError> {
     Ok(home.join(USER_CONFIG_DIR_NAME))
 }
 
-/// Obtiene la ruta del fichero cifrado de mapeos por defecto.
+/// Obtiene la ruta del fichero de bóveda por defecto a partir de la configuración.
 pub fn get_default_vault_path() -> Result<PathBuf, ObfuscationError> {
     let config_dir = get_user_config_dir()?;
     if !config_dir.exists() {
@@ -92,10 +354,45 @@ pub fn get_default_vault_path() -> Result<PathBuf, ObfuscationError> {
     Ok(config_dir.join("default.lexi"))
 }
 
+/// Obtiene la ruta del archivo de configuración del usuario (~/.lexishield/config.toml).
+pub fn get_user_config_path() -> Result<PathBuf, ObfuscationError> {
+    let dir = get_user_config_dir()?;
+    Ok(dir.join(CONFIG_FILE_NAME))
+}
+
+/// Restablece la configuración predeterminada creando o sobreescribiendo ~/.lexishield/config.toml.
+pub fn reset_config() -> Result<PathBuf, ObfuscationError> {
+    let config_dir = get_user_config_dir()?;
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir).map_err(|e| {
+            ObfuscationError::ConfigError(format!(
+                "Error al crear directorio de configuración {}: {}",
+                config_dir.display(),
+                e
+            ))
+        })?;
+    }
+
+    let config_path = config_dir.join(CONFIG_FILE_NAME);
+    fs::write(&config_path, DEFAULT_CONFIG_TOML).map_err(|e| {
+        ObfuscationError::ConfigError(format!(
+            "Error al restaurar archivo {}: {}",
+            config_path.display(),
+            e
+        ))
+    })?;
+
+    log::info!(
+        "Configuración restaurada a valores por defecto en: {}",
+        config_path.display()
+    );
+    Ok(config_path)
+}
+
 /// Inicializa el directorio y archivo de configuración en el perfil del usuario.
 ///
-/// Cumple la regla universal: Si el archivo no existe, lo crea con la configuración
-/// por defecto. Si ya existe, NO lo sobrescribe ni elimina información previa.
+/// Cumple la regla universal: Si el archivo no existe, lo crea con la plantilla
+/// predeterminada. Si ya existe, NO lo sobrescribe para respetar los datos del usuario.
 pub fn ensure_user_config_initialized() -> Result<PathBuf, ObfuscationError> {
     let config_dir = get_user_config_dir()?;
     if !config_dir.exists() {
@@ -111,18 +408,17 @@ pub fn ensure_user_config_initialized() -> Result<PathBuf, ObfuscationError> {
 
     let config_path = config_dir.join(CONFIG_FILE_NAME);
     if !config_path.exists() {
-        let default_config = LexiConfig::default();
-        let content = serde_json::to_string_pretty(&default_config).map_err(|e| {
-            ObfuscationError::ConfigError(format!("Error serializando config: {}", e))
-        })?;
-        fs::write(&config_path, content).map_err(|e| {
+        fs::write(&config_path, DEFAULT_CONFIG_TOML).map_err(|e| {
             ObfuscationError::ConfigError(format!(
                 "Error escribiendo {}: {}",
                 config_path.display(),
                 e
             ))
         })?;
-        log::info!("Configuración base copiada a {}", config_path.display());
+        log::info!(
+            "Plantilla de configuración TOML creada en {}",
+            config_path.display()
+        );
     }
 
     Ok(config_path)
@@ -145,11 +441,11 @@ pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
     };
 
     match fs::read_to_string(&path_to_load) {
-        Ok(data) => match serde_json::from_str::<LexiConfig>(&data) {
+        Ok(data) => match toml::from_str::<LexiConfig>(&data) {
             Ok(cfg) => cfg,
             Err(e) => {
                 log::warn!(
-                    "Error al parsear {} ({}); usando valores por defecto",
+                    "Error al parsear archivo TOML {} ({}); usando valores por defecto",
                     path_to_load.display(),
                     e
                 );

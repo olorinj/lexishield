@@ -14,7 +14,7 @@ pub enum FormatType {
 }
 
 /// Tipos de detectores semánticos soportados por LexiShield.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DetectorType {
     GuidUuid,
     WindowsSid,
@@ -32,6 +32,7 @@ pub enum DetectorType {
     O365OriginatingServer,
     AttachmentFileName,
     GenericToken,
+    Custom(String),
 }
 
 impl fmt::Display for DetectorType {
@@ -53,6 +54,7 @@ impl fmt::Display for DetectorType {
             Self::O365OriginatingServer => write!(f, "O365 Server Hostname"),
             Self::AttachmentFileName => write!(f, "Attachment File Name"),
             Self::GenericToken => write!(f, "Generic Token"),
+            Self::Custom(name) => write!(f, "Custom ({})", name),
         }
     }
 }
