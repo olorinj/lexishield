@@ -74,3 +74,41 @@ Para validar el rendimiento y *throughput* de escaneo y ofuscación:
 cargo bench
 ```
 
+## 🚀 Publicación y Generación de Instaladores (GitHub Actions)
+
+El proyecto está configurado para compilar y empaquetar automáticamente las interfaces gráficas nativas (.msi, .dmg, .deb, .AppImage) en la nube utilizando **GitHub Actions**, dado que compilar la interfaz de Mac y Windows desde Linux local no es posible.
+
+### 1. Vincular tu Repositorio a GitHub
+
+Si tienes tu código local y todavía no lo has subido a GitHub (no tienes configurado el `remote`), debes seguir estos pasos primero:
+
+1. Crea un repositorio vacío en la página web de [GitHub](https://github.com/new).
+2. Abre tu terminal en la carpeta local de `lexishield`.
+3. Ejecuta los siguientes comandos (cambiando la URL por la tuya):
+
+```bash
+# Vincular tu repositorio local con el de GitHub
+git remote add origin https://github.com/TU_USUARIO/TU_REPOSITORIO.git
+
+# Renombrar tu rama principal a 'main' (si no lo está ya)
+git branch -M main
+
+# Subir todo tu código inicial por primera vez
+git push -u origin main
+```
+
+### 2. Generar una Nueva Versión (Release) Automática
+
+Una vez tu código esté en GitHub, generar instaladores para tus usuarios es tan fácil como etiquetar una versión. Tienes unos scripts automáticos en la raíz del proyecto para hacer esto en un solo paso:
+
+**En Linux / macOS:**
+```bash
+./publicar_version.sh v1.0.0
+```
+
+**En Windows (PowerShell):**
+```powershell
+.\publicar_version.ps1 v1.0.0
+```
+
+Estos scripts se asegurarán de que tu código esté limpio, crearán una etiqueta git (`v1.0.0`) y la subirán. Inmediatamente después, los servidores de GitHub Actions arrancarán y compilarán los instaladores gráficos para todos los sistemas operativos, depositándolos en la pestaña "Releases" (Lanzamientos) de tu repositorio.
