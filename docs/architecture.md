@@ -139,3 +139,13 @@ Cumpliendo con la regla 5 de arquitectura (*Universal Logging & Observability*),
 
 ### 🛡️ Robustez y Fuzz Testing (`cargo fuzz`)
 Para asegurar la estabilidad absoluta ante cualquier entrada (basura, archivos binarios corrompidos disfrazados de texto, payloads de inyección regex), el motor central y todos sus parsers han sido instrumentados para pruebas de penetración (Fuzz Testing) utilizando `cargo fuzz` y LLVM libFuzzer. Esto garantiza matemáticamente que el motor de ofuscación de LexiShield no crasheará (panic) y operará dentro de límites controlados de memoria, proporcionando un nivel de software resiliente apto para análisis de logs forenses.
+
+### 🧪 Suite de Pruebas y Cobertura de Código (`cargo-tarpaulin`)
+La base de código incluye una suite integral de 31 pruebas automatizadas (22 pruebas unitarias por componente y 9 pruebas de integración de extremo a extremo) que cubren:
+* Validación de algoritmos de suma de comprobación (Luhn para tarjetas de crédito, módulo 23 para DNI/NIE español).
+* Preservación de sintaxis y claves en JSON y etiquetas XML.
+* Inyectividad estricta y detección de colisiones de mapeos.
+* Cifrado y descifrado de bóvedas (`.lexi`) con autenticación de integridad.
+* Detección y filtrado de más de 150 stopwords en español e inglés.
+
+La cobertura de código se mide automáticamente en el pipeline de CI/CD mediante `cargo-tarpaulin`, generando informes Cobertura XML y reportes visuales HTML en `dist/coverage/`.

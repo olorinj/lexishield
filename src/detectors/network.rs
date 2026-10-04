@@ -243,3 +243,59 @@ impl HostnameDetector {
         format!("{}-anon-{}", prefix, id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ipv4_detection_and_generation() {
+        let detector = IPv4Detector::new();
+        let matches = detector
+            .find_matches("Servidor en 192.168.1.50 y router en 10.0.0.1 y falso 999.999.999.999");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].2, "192.168.1.50");
+        assert_eq!(matches[1].2, "10.0.0.1");
+
+        let pseudo = detector.generate_pseudonym("192.168.1.50");
+        assert!(pseudo.parse::<Ipv4Addr>().is_ok());
+    }
+
+    #[test]
+    fn test_ipv6_detection_and_generation() {
+        let detector = IPv6Detector::new();
+        let matches =
+            detector.find_matches("Direccion 2001:0db8:85a3:0000:0000:8a2e:0370:7334 activa");
+        assert_eq!(matches.len(), 1);
+        let pseudo = detector.generate_pseudonym(matches[0].2);
+        assert!(pseudo.contains(':'));
+    }
+
+    #[test]
+    fn test_email_detection_and_generation() {
+        let detector = EmailDetector::new();
+        let matches = detector.find_matches("Escribir a admin.soporte@dominio.com o user@test.org");
+        assert_eq!(matches.len(), 2);
+        let pseudo = detector.generate_pseudonym("admin.soporte@dominio.com");
+        assert!(pseudo.contains('@'));
+        assert!(pseudo.ends_with(".com") || pseudo.ends_with(".org") || pseudo.ends_with(".net"));
+    }
+
+    #[test]
+    fn test_domain_detection_and_generation() {
+        let detector = DomainDetector::new();
+        let matches = detector.find_matches("Visita portal.interno.corp o web.empresa.es");
+        assert_eq!(matches.len(), 2);
+        let pseudo = detector.generate_pseudonym("portal.interno.corp");
+        assert!(pseudo.contains("example.com"));
+    }
+
+    #[test]
+    fn test_hostname_detection_and_generation() {
+        let detector = HostnameDetector::new();
+        let matches = detector.find_matches("Servidores srv-prod01 y host-db02");
+        assert_eq!(matches.len(), 2);
+        let pseudo = detector.generate_pseudonym("srv-prod01");
+        assert!(pseudo.starts_with("srv-anon-"));
+    }
+}

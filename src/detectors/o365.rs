@@ -108,3 +108,40 @@ impl AttachmentFileNameDetector {
         format!("attachment_{}.{}", id, ext)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_o365_subject_detector() {
+        let detector = O365SubjectDetector::new();
+        let text = r#"Log: "Subject": "Planilla de sueldos Q3" del usuario"#;
+        let matches = detector.find_matches(text);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].2, "Planilla de sueldos Q3");
+    }
+
+    #[test]
+    fn test_o365_originating_server_detector() {
+        let detector = O365OriginatingServerDetector::new();
+        let text = r#"Servidor: "OriginatingServer": "AM6EUR05FT022.eop-eur05.prod.protection.outlook.com""#;
+        let matches = detector.find_matches(text);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(
+            matches[0].2,
+            "AM6EUR05FT022.eop-eur05.prod.protection.outlook.com"
+        );
+    }
+
+    #[test]
+    fn test_attachment_filename_detector() {
+        let detector = AttachmentFileNameDetector::new();
+        let text = "Descargar reporte_anual_2024.pdf y nominas.xlsx";
+        let matches = detector.find_matches(text);
+        assert_eq!(matches.len(), 2);
+        let pseudo = detector.generate_pseudonym(matches[0].2);
+        assert!(pseudo.starts_with("attachment_"));
+        assert!(pseudo.ends_with(".pdf"));
+    }
+}

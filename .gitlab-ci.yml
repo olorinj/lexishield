@@ -2,6 +2,7 @@
 stages:
   - lint
   - test
+  - coverage
   - build
   - release
 
@@ -41,6 +42,26 @@ unit_and_integration_tests:
   stage: test
   script:
     - cargo test --verbose
+
+# -------------------------------------------------------------
+# 3. Fase de Cobertura de Código (Code Coverage)
+# -------------------------------------------------------------
+coverage_report:
+  stage: coverage
+  allow_failure: true
+  script:
+    - cargo install cargo-tarpaulin || true
+    - cargo tarpaulin --out Xml --out Html --output-dir dist/coverage --ignore-tests
+  coverage: '/^\d+.\d+% coverage/'
+  artifacts:
+    name: "coverage-$CI_COMMIT_REF_NAME"
+    paths:
+      - dist/coverage/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: dist/coverage/cobertura.xml
+    expire_in: 30 days
 
 # -------------------------------------------------------------
 # 3. Fase de Compilación y Generación de Binarios

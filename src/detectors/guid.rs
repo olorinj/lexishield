@@ -41,3 +41,25 @@ impl GuidDetector {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_guid_detection_and_case_preservation() {
+        let detector = GuidDetector::new();
+        let lower = "c9a646d3-9c61-4cb7-897d-4b958c218a56";
+        let upper = "C9A646D3-9C61-4CB7-897D-4B958C218A56";
+
+        let text = format!("Lower: {} Upper: {}", lower, upper);
+        let matches = detector.find_matches(&text);
+        assert_eq!(matches.len(), 2);
+
+        let pseudo_lower = detector.generate_pseudonym(lower);
+        assert_eq!(pseudo_lower, pseudo_lower.to_ascii_lowercase());
+
+        let pseudo_upper = detector.generate_pseudonym(upper);
+        assert_eq!(pseudo_upper, pseudo_upper.to_ascii_uppercase());
+    }
+}
