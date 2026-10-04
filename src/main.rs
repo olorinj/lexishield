@@ -8,6 +8,7 @@ use lexishield::config::{LexiConfig, load_config};
 use lexishield::engine::ObfuscatorEngine;
 use lexishield::logger::init_logger;
 use lexishield::models::{DetectorType, FormatType, Mapping};
+use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -16,6 +17,10 @@ use std::path::{Path, PathBuf};
 #[command(about = "Motor de anonimización y ofuscación semántica de alto rendimiento", long_about = None)]
 #[command(version = "0.1.0")]
 struct Cli {
+    /// Activa el nivel de log Debug para más detalles (Telemetría).
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
     /// Ruta a un archivo de configuración TOML personalizado.
     #[arg(long, global = true)]
     config: Option<PathBuf>,
@@ -691,8 +696,8 @@ fn is_binary_or_compressed(path: &Path, file: &mut std::fs::File) -> bool {
 fn scan_file_with_progress(
     engine: &mut ObfuscatorEngine,
     path: &Path,
-    prefix_tag: &str,
-    display_name: &str,
+    prefix_tag: Option<&str>,
+    display_name: Option<&str>,
 ) -> Result<Vec<Mapping>, Box<dyn std::error::Error>> {
     use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
@@ -708,12 +713,14 @@ fn scan_file_with_progress(
     let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
 
     if is_binary_or_compressed(path, &mut file) {
-        println!(
-            "\r  {}[ {} ] Omitido (formato binario o comprimido no admitido): {} \x1b[K",
-            prefix_tag,
-            format_size(total_bytes),
-            display_name
-        );
+        if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
+            println!(
+                "\r  {}[ {} ] Omitido (formato binario o comprimido no admitido): {} \x1b[K",
+                tag,
+                format_size(total_bytes),
+                name
+            );
+        }
         return Ok(Vec::new());
     }
 
@@ -723,13 +730,15 @@ fn scan_file_with_progress(
     let mut last_update = std::time::Instant::now();
     let mut byte_buf = Vec::new();
 
-    print!(
-        "\r  {}[ 0 B / {} ] (0.0%) Analizando: {} \x1b[K",
-        prefix_tag,
-        format_size(total_bytes),
-        display_name
-    );
-    let _ = std::io::stdout().flush();
+    if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
+        print!(
+            "\r  {}[ 0 B / {} ] (0.0%) Analizando: {} \x1b[K",
+            tag,
+            format_size(total_bytes),
+            name
+        );
+        let _ = std::io::stdout().flush();
+    }
 
     loop {
         byte_buf.clear();
@@ -749,26 +758,30 @@ fn scan_file_with_progress(
             } else {
                 100.0
             };
-            print!(
-                "\r  {}[ {} / {} ] ({:.1}%) Analizando: {} \x1b[K",
-                prefix_tag,
-                format_size(bytes_read),
-                format_size(total_bytes),
-                pct,
-                display_name
-            );
-            let _ = std::io::stdout().flush();
+            if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
+                print!(
+                    "\r  {}[ {} / {} ] ({:.1}%) Analizando: {} \x1b[K",
+                    tag,
+                    format_size(bytes_read),
+                    format_size(total_bytes),
+                    pct,
+                    name
+                );
+                let _ = std::io::stdout().flush();
+            }
             last_update = std::time::Instant::now();
         }
     }
 
-    println!(
-        "\r  {}[ {} / {} ] (100.0%) Analizado: {} \x1b[K",
-        prefix_tag,
-        format_size(total_bytes),
-        format_size(total_bytes),
-        display_name
-    );
+    if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
+        println!(
+            "\r  {}[ {} / {} ] (100.0%) Analizado: {} \x1b[K",
+            tag,
+            format_size(total_bytes),
+            format_size(total_bytes),
+            name
+        );
+    }
 
     Ok(newly_added)
 }
@@ -963,29 +976,63 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
                 path.display(),
                 total
             );
-            for (idx, f) in files.iter().enumerate() {
-                let current = idx + 1;
-                let rel_path = f.strip_prefix(path).unwrap_or(f);
-                let prefix_tag = format!("[{}/{}] ", current, total);
-                let mut file_new = scan_file_with_progress(
-                    &mut engine,
-                    f,
-                    &prefix_tag,
-                    &rel_path.display().to_string(),
-                )?;
+            if opts.yes {
+                use indicatif::{ProgressBar, ProgressStyle};
+                let pb = ProgressBar::new(total as u64);
+                pb.set_style(ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})").unwrap()
+                    .progress_chars("#>-"));
 
-                if !file_new.is_empty() {
-                    total_discovered += file_new.len();
-                    if !opts.yes {
-                        let disp = format!("[{}/{}] {}", current, total, rel_path.display());
-                        prompt_file_mappings(&disp, &mut file_new, &mut engine)?;
+                let cfg_arc = engine.config.clone();
+                let all_results: Vec<Vec<Mapping>> = files
+                    .par_iter()
+                    .map(|f| {
+                        let mut local_engine = ObfuscatorEngine::new(cfg_arc.clone());
+                        let res = scan_file_with_progress(&mut local_engine, f, None, None)
+                            .unwrap_or_default();
+                        pb.inc(1);
+                        res
+                    })
+                    .collect();
+                pb.finish_with_message("Escaneo multihilo completado.");
+
+                let mut all_mappings = Vec::new();
+                for mut batch in all_results {
+                    all_mappings.append(&mut batch);
+                }
+                if !all_mappings.is_empty() {
+                    let added = engine.manager.load_mappings(all_mappings)?;
+                    total_discovered += added.len();
+                }
+            } else {
+                for (idx, f) in files.iter().enumerate() {
+                    let current = idx + 1;
+                    let rel_path = f.strip_prefix(path).unwrap_or(f);
+                    let prefix_tag = format!("[{}/{}] ", current, total);
+                    let mut file_new = scan_file_with_progress(
+                        &mut engine,
+                        f,
+                        Some(&prefix_tag),
+                        Some(&rel_path.display().to_string()),
+                    )?;
+
+                    if !file_new.is_empty() {
+                        total_discovered += file_new.len();
+                        if !opts.yes {
+                            let disp = format!("[{}/{}] {}", current, total, rel_path.display());
+                            prompt_file_mappings(&disp, &mut file_new, &mut engine)?;
+                        }
                     }
                 }
             }
         } else {
             println!("🔍 Escaneando archivo '{}'...", path.display());
-            let mut file_new =
-                scan_file_with_progress(&mut engine, path, "", &path.display().to_string())?;
+            let mut file_new = scan_file_with_progress(
+                &mut engine,
+                path,
+                Some(""),
+                Some(&path.display().to_string()),
+            )?;
             if !file_new.is_empty() {
                 total_discovered += file_new.len();
                 if !opts.yes {
@@ -1236,8 +1283,12 @@ fn handle_config(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_logger();
     let cli = Cli::parse();
+    if cli.verbose {
+        lexishield::logger::init_logger_with_level(log::LevelFilter::Debug);
+    } else {
+        init_logger();
+    }
     let config = load_config(cli.config.as_deref());
 
     match cli.command {
