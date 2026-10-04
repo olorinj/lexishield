@@ -517,39 +517,57 @@ pub fn load_config_with_rules(
     custom_config: Option<&Path>,
     custom_rules: Option<&Path>,
 ) -> LexiConfig {
-    let path_to_load = match custom_config {
-        Some(p) => p.to_path_buf(),
-        None => match ensure_user_config_initialized() {
-            Ok(p) => p,
-            Err(err) => {
-                log::warn!(
-                    "No se pudo inicializar config de usuario ({err}); usando valores por defecto"
-                );
-                return LexiConfig::default();
-            }
-        },
-    };
-
-    let mut cfg = match fs::read_to_string(&path_to_load) {
-        Ok(data) => match toml::from_str::<LexiConfig>(&data) {
-            Ok(c) => c,
+    let mut cfg = match custom_config {
+        Some(p) => match fs::read_to_string(p) {
+            Ok(data) => match toml::from_str::<LexiConfig>(&data) {
+                Ok(c) => c,
+                Err(e) => {
+                    log::warn!(
+                        "Error al parsear archivo TOML {} ({}); usando valores por defecto",
+                        p.display(),
+                        e
+                    );
+                    LexiConfig::default()
+                }
+            },
             Err(e) => {
                 log::warn!(
-                    "Error al parsear archivo TOML {} ({}); usando valores por defecto",
-                    path_to_load.display(),
+                    "Error al leer {} ({}); usando valores por defecto",
+                    p.display(),
                     e
                 );
                 LexiConfig::default()
             }
         },
-        Err(e) => {
-            log::warn!(
-                "Error al leer {} ({}); usando valores por defecto",
-                path_to_load.display(),
-                e
-            );
-            LexiConfig::default()
-        }
+        None => match ensure_user_config_initialized() {
+            Ok(p) => match fs::read_to_string(&p) {
+                Ok(data) => match toml::from_str::<LexiConfig>(&data) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::warn!(
+                            "Error al parsear archivo TOML {} ({}); usando valores por defecto",
+                            p.display(),
+                            e
+                        );
+                        LexiConfig::default()
+                    }
+                },
+                Err(e) => {
+                    log::warn!(
+                        "Error al leer {} ({}); usando valores por defecto",
+                        p.display(),
+                        e
+                    );
+                    LexiConfig::default()
+                }
+            },
+            Err(err) => {
+                log::warn!(
+                    "No se pudo inicializar config de usuario ({err}); usando valores por defecto"
+                );
+                LexiConfig::default()
+            }
+        },
     };
 
     // Cargar reglas dinámicas adicionales desde rules.toml o ruta indicada

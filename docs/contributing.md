@@ -20,6 +20,17 @@ Para compilar el proyecto en todos los sistemas operativos simultáneamente de f
 .\compilar.ps1 -All
 ```
 
+### Opciones de los Scripts de Compilación
+
+Los scripts (`compilar.sh` y `compilar.ps1`) aceptan los siguientes argumentos para personalizar qué y cómo se compila en Vagrant:
+
+| Opción Linux | Opción Windows | Descripción |
+| :--- | :--- | :--- |
+| `-g`, `--gui` | `-Gui` | Compila la interfaz gráfica (GUI) con Tauri y el frontend web. |
+| `-a`, `--all` | `-All` | Realiza una compilación cruzada completa (todas las plataformas). |
+| `-u`, `--provision` | `-Update` | **Fuerza la actualización de dependencias en Vagrant.** Útil si el `Vagrantfile` ha cambiado (ej. Node.js) y la VM ya estaba creada. |
+| `-c`, `--clean` | `-Clean` | Destruye la máquina virtual (`vagrant destroy -f`) antes de empezar. |
+
 ## 🧪 Flujo de Calidad Obligatorio (Quality Gate)
 
 Antes de enviar cualquier contribución o abrir una *Pull Request*, debes pasar el control de calidad en cuatro pasos:
