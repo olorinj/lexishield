@@ -16,3 +16,4 @@ fuzz_target!(|data: &[u8]| {
         let _ = adapter.process(s, &replacements, true);
     }
 });
+
