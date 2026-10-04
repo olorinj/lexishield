@@ -149,3 +149,17 @@ La base de código incluye una suite integral de 31 pruebas automatizadas (22 pr
 * Detección y filtrado de más de 150 stopwords en español e inglés.
 
 La cobertura de código se mide automáticamente en el pipeline de CI/CD mediante `cargo-tarpaulin`, generando informes Cobertura XML y reportes visuales HTML en `dist/coverage/`.
+
+### ⏱️ Benchmarking de Rendimiento y Throughput (`criterion`)
+Para auditar la velocidad de procesamiento y prevenir regresiones de rendimiento, LexiShield implementa una suite estadística de benchmarks con `criterion`:
+* **`Engine_Scanning`**: Mide el *throughput* (MB/s) escaneando y extrayendo entidades sensibles en cargas de 100 y 1.000 líneas de logs.
+* **`Engine_Obfuscation`**: Mide los nanosegundos por operación al reemplazar tokens sobre texto plano, JSON estructurado y XML.
+* Ejecución: `cargo bench` genera análisis estadísticos y curvas de densidad en `target/criterion/`.
+
+### 📦 Optimización de Tamaño del Binario (`profile.release`)
+El perfil de producción (`[profile.release]`) aplica técnicas avanzadas de compilación para generar un ejecutable ultra-ligero de apenas **~3.2 MB** (frente a los >15 MB habituales en Rust sin optimizar):
+* **`opt-level = 3`**: Máxima vectorización y optimización de bucles.
+* **`lto = true`** *(Link-Time Optimization)*: Análisis inter-módulo de código muerto a nivel global.
+* **`codegen-units = 1`**: Permite al compilador optimizar el grafo completo del binario como una única unidad.
+* **`panic = "abort"`**: Elimina la tabla de *unwinding* de excepciones.
+* **`strip = true`**: Remueve automáticamente todos los símbolos de depuración y metadatos ELF/PE redundantes.
