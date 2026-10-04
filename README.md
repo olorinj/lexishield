@@ -193,3 +193,4 @@ Si te interesa conocer las entrañas de LexiShield, cómo funciona el motor, o q
 
 * **[Arquitectura y Motor de Mapeo (docs/architecture.md)](docs/architecture.md)**: Explicación detallada de los detectores, la inyectividad de los diccionarios, y el tratamiento de JSON/XML.
 * **[Guía de Compilación Multiplataforma (docs/contributing.md)](docs/contributing.md)**: Instrucciones para usar el entorno aislado con Vagrant y compilar los binarios de Windows, Linux y macOS de forma segura evadiendo EDRs.
+* **[Entorno de Integración Continua (docs/gitlab-ci.md)](docs/gitlab-ci.md)**: Documentación sobre cómo usar la VM preconfigurada para ejecutar pipelines automatizados de GitLab CI/CD.
