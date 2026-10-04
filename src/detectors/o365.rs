@@ -136,6 +136,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
     fn test_attachment_filename_detector() {
         let detector = AttachmentFileNameDetector::new();
         let text = "Descargar reporte_anual_2024.pdf y nominas.xlsx";
