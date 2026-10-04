@@ -2,6 +2,15 @@
 name = "lexishield"
 version = "0.1.0"
 edition = "2024"
+authors = ["LexiShield Contributors"]
+description = "Motor de anonimización y ofuscación semántica de alto rendimiento para consultas de IA y sanitización de datos"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+repository = "https://gitlab.com/tu-usuario/lexishield"
+homepage = "https://gitlab.com/tu-usuario/lexishield"
+documentation = "https://docs.rs/lexishield"
+keywords = ["anonymization", "obfuscation", "privacy", "security", "cli"]
+categories = ["command-line-utilities", "cryptography", "development-tools"]
 
 [dependencies]
 rayon = "1.10"
