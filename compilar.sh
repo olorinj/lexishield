@@ -171,8 +171,9 @@ if [ "$compilar_linux" = true ]; then
     fi
     
     if [ -f "$bin_src" ]; then
-        cp -f "$bin_src" "./lexishield-linux-amd64"
-        archivos_compilados+=("./lexishield-linux-amd64")
+        mkdir -p dist
+        cp -f "$bin_src" "./dist/lexishield-linux-amd64"
+        archivos_compilados+=("./dist/lexishield-linux-amd64")
     fi
 fi
 
@@ -191,8 +192,9 @@ if [ "$compilar_win" = true ]; then
     
     bin_win="$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/lexishield.exe"
     if [ -f "$bin_win" ]; then
-        cp -f "$bin_win" "./lexishield-windows-amd64.exe"
-        archivos_compilados+=("./lexishield-windows-amd64.exe")
+        mkdir -p dist
+        cp -f "$bin_win" "./dist/lexishield-windows-amd64.exe"
+        archivos_compilados+=("./dist/lexishield-windows-amd64.exe")
     fi
 fi
 
@@ -210,7 +212,7 @@ if [ "$compilar_mac" = true ]; then
         echo -e "\e[31m[ERROR] Docker no esta disponible para la compilacion de macOS.\e[0m"
     else
         echo -e "\e[90mConstruyendo contenedor de compilacion macOS (crazymax/osxcross)...\e[0m"
-        docker build -t lexishield-osxcross -f Dockerfile.osxcross .
+        docker build -t lexishield-osxcross -f build/Dockerfile.osxcross .
         
         echo -e "\e[36m -> Compilando macOS Intel (x86_64-apple-darwin)...\e[0m"
         docker run --rm -v "$(pwd):/src" -v "$CARGO_TARGET_DIR:/src/target" lexishield-osxcross cargo build --target x86_64-apple-darwin --release
@@ -218,13 +220,14 @@ if [ "$compilar_mac" = true ]; then
         echo -e "\e[36m -> Compilando macOS Apple Silicon (aarch64-apple-darwin)...\e[0m"
         docker run --rm -v "$(pwd):/src" -v "$CARGO_TARGET_DIR:/src/target" lexishield-osxcross cargo build --target aarch64-apple-darwin --release
 
+        mkdir -p dist
         if [ -f "$CARGO_TARGET_DIR/x86_64-apple-darwin/release/lexishield" ]; then
-            cp -f "$CARGO_TARGET_DIR/x86_64-apple-darwin/release/lexishield" "./lexishield-darwin-amd64"
-            archivos_compilados+=("./lexishield-darwin-amd64")
+            cp -f "$CARGO_TARGET_DIR/x86_64-apple-darwin/release/lexishield" "./dist/lexishield-darwin-amd64"
+            archivos_compilados+=("./dist/lexishield-darwin-amd64")
         fi
         if [ -f "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/lexishield" ]; then
-            cp -f "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/lexishield" "./lexishield-darwin-arm64"
-            archivos_compilados+=("./lexishield-darwin-arm64")
+            cp -f "$CARGO_TARGET_DIR/aarch64-apple-darwin/release/lexishield" "./dist/lexishield-darwin-arm64"
+            archivos_compilados+=("./dist/lexishield-darwin-arm64")
         fi
     fi
 fi

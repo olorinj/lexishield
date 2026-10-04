@@ -66,8 +66,9 @@ try {
         cargo build --release
 
         if (Test-Path ".\target\release\lexishield.exe") {
-            Copy-Item -Path .\target\release\lexishield.exe -Destination .\lexishield-windows-amd64.exe -Force
-            Write-Host "Binario generado: .\lexishield-windows-amd64.exe" -ForegroundColor Green
+            if (-not (Test-Path ".\dist")) { New-Item -ItemType Directory -Force -Path ".\dist" | Out-Null }
+            Copy-Item -Path .\target\release\lexishield.exe -Destination .\dist\lexishield-windows-amd64.exe -Force
+            Write-Host "Binario generado: .\dist\lexishield-windows-amd64.exe" -ForegroundColor Green
         }
         return
     }
