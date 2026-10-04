@@ -101,22 +101,25 @@ lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi 
 ```
 
 ### 3. Comando: `scan`
-Escanea un archivo, texto o portapapeles y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos. Permite revisar qué se va a cambiar y guardarlo para uso futuro.
+Escanea un archivo, texto, directorio o portapapeles y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos. Permite revisar de manera interactiva (fichero a fichero) qué se va a cambiar y guardarlo para uso futuro.
 
-* **`-i, --input <FILE>`**: Archivo a escanear.
+* **`-i, --input <PATH>`**: Archivo o directorio a escanear. Si es directorio, lo recorrerá mostrando progreso en tiempo real y preguntando por cada archivo.
 * **`-t, --text <STRING>`**: Texto a escanear.
 * **`-c, --clipboard`**: Escanea directamente el contenido del portapapeles.
-* **`-s, --save-mappings <FILE>`**: Guarda los mapeos detectados tras la confirmación interactiva del usuario (ideal para auditoría manual).
+* **`-s, --save-mappings <FILE>`**: Guarda los mapeos detectados tras la confirmación interactiva del usuario.
 * **`-p, --password <PASSWORD>`**: Contraseña para proteger la bóveda de mapeos si decides guardarla (`.lexi`).
 * **`--ask-password`**: Solicita la contraseña por consola de forma segura.
-* **`-y, --yes`**: Guarda los mapeos detectados automáticamente omitiendo la pregunta de confirmación interactiva `[s/N]`.
+* **`-y, --yes`**: Guarda los mapeos detectados automáticamente omitiendo la revisión interactiva.
 
-*Ejemplo (Auditoría interactiva):*
+*Ejemplo (Auditoría interactiva de un directorio):*
 ```bash
-# Detectará los datos sensibles, los mostrará por pantalla y luego preguntará:
-# "¿Desea guardar los X mapeos detectados en 'mapeos.lexi'? [s/N]: "
-lexishield scan -i documento.txt -s mapeos.lexi --ask-password
+# Escanea todos los archivos de la carpeta, indicando progreso de lectura en la misma línea (ej. [ 3.1 KB / 10 MB ]).
+# Por cada archivo con descubrimientos nuevos, pausará la ejecución para mostrar los pares y preguntará qué índices deseas omitir.
+lexishield scan -i /var/log/app/ -s mapeos.lexi --ask-password
 ```
+*Durante el escaneo interactivo de un fichero, podrás:*
+1. **Ver resultados paginados:** Si hay más de 20 detecciones, la lista se pausa. Pulsa `Enter` para ver más o `q` para saltar al final.
+2. **Omitir detecciones falsas:** Al finalizar la lista del fichero, el programa te preguntará qué índices deseas omitir. Puedes introducir listas o rangos separados por comas (ej. `1, 3-5`). Estos elementos se guardarán con el valor especial `=` en el diccionario, asegurando que no se ofusquen.
 
 *Ejemplo (Auditoría automatizada):*
 ```bash

@@ -32,6 +32,36 @@ El motor realiza una identificación precisa de la información sensible mediant
 ### 🛡️ Generación Inteligente de Pseudónimos (Mapeo Coherente de Tipos)
 LexiShield garantiza que el valor ofuscado generado sea de la misma naturaleza e igual de válido que el original para mantener la coherencia en el análisis de logs. Un UUID será sustituido por un UUID estructuralmente válido diferente; un identificador fiscal español mantendrá su letra de control validada, y una IP conservará el aspecto de una IPv4 o IPv6 según corresponda.
 
+### 🧠 Heurísticas Avanzadas de Detección
+Para reducir drásticamente los falsos positivos, los detectores aplican inteligencia contextual:
+* **Aislamiento de Tarjetas de Crédito:** No solo se valida la longitud y el algoritmo de Luhn, sino que se verifican los caracteres contiguos. Si el número candidato es un fragmento de un hash MD5, un timestamp largo o un nombre de archivo (ej. `attachment_1234.png`), se rechaza. Además, comprueba que el prefijo IIN sea de una franquicia válida.
+* **Preservación Estricta de Formato:** Ciertos datos, como los números de teléfono, pueden tener múltiples espaciados o guiones (`+34 600.11-22`). Al ofuscarlos, el motor regenera los dígitos conservando intacta la estructura visual y los prefijos del número original.
+
+### ⚙️ Inyectividad Estricta y Manejo de Omisiones
+El sistema gestiona de forma robusta la consistencia de los diccionarios en memoria y en disco:
+
+* **Control de Colisiones (`CollisionError`):** Para asegurar una restauración perfecta, dos valores originales distintos **nunca** pueden apuntar al mismo pseudónimo. El `MappingManager` emplea un índice inverso para rechazar o abortar la inyección si detecta un choque de pseudónimos.
+* **Omisión Controlada (`=`):** A través del CLI interactivo, los usuarios pueden excluir detecciones erróneas. Estos elementos se mapean con el pseudónimo literal `=`. LexiShield respeta este marcador de omisión: jamás ofusca esos valores y se encarga de limpiar cualquier índice inverso previo para evitar colisiones fantasma.
+
+```mermaid
+sequenceDiagram
+    participant D as Detector
+    participant M as MappingManager
+    
+    D->>M: add_mapping(original="192.168.1.5", pseudo="10.0.0.1")
+    alt "10.0.0.1" ya existe en reverse map
+        M->>M: Comprueba si el valor original es diferente
+        alt Valor original difiere
+            M-->>D: Error: CollisionError
+        else Valor original coincide
+            M-->>D: Ignora (Ya mapeado previamente)
+        end
+    else No existe o el pseudo es "="
+        M->>M: Guarda mapeo (Si pseudo="=", limpia reverse previo)
+        M-->>D: OK
+    end
+```
+
 ### 📖 Tratamiento de Caracteres Especiales y Formatos Estructurados (XML/JSON)
 
 Para que LexiShield funcione correctamente sin importar cómo estén escritos los archivos, la versión de Rust implementa adaptadores de formato (`json_adapter`, `xml_adapter`, `log_adapter`). 
