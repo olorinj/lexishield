@@ -54,7 +54,7 @@ impl fmt::Display for DetectorType {
             Self::O365OriginatingServer => write!(f, "O365 Server Hostname"),
             Self::AttachmentFileName => write!(f, "Attachment File Name"),
             Self::GenericToken => write!(f, "Generic Token"),
-            Self::Custom(name) => write!(f, "Custom ({})", name),
+            Self::Custom(name) => write!(f, "Custom ({name})"),
         }
     }
 }
@@ -115,14 +115,14 @@ pub enum ObfuscationError {
 impl fmt::Display for ObfuscationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::IoError(e) => write!(f, "Error de E/S: {}", e),
-            Self::JsonError(e) => write!(f, "Error de sintaxis JSON: {}", e),
-            Self::XmlError(msg) => write!(f, "Error de estructura XML: {}", msg),
-            Self::CollisionError(msg) => write!(f, "Colisión en tabla de mapeos: {}", msg),
-            Self::ValidationError(msg) => write!(f, "Error de validación post-ofuscación: {}", msg),
-            Self::InvalidFormat(msg) => write!(f, "Formato no válido: {}", msg),
-            Self::ConfigError(msg) => write!(f, "Error en configuración: {}", msg),
-            Self::CryptoError(msg) => write!(f, "Error criptográfico/bóveda segura: {}", msg),
+            Self::IoError(e) => write!(f, "Error de E/S: {e}"),
+            Self::JsonError(e) => write!(f, "Error de sintaxis JSON: {e}"),
+            Self::XmlError(msg) => write!(f, "Error de estructura XML: {msg}"),
+            Self::CollisionError(msg) => write!(f, "Colisión en tabla de mapeos: {msg}"),
+            Self::ValidationError(msg) => write!(f, "Error de validación post-ofuscación: {msg}"),
+            Self::InvalidFormat(msg) => write!(f, "Formato no válido: {msg}"),
+            Self::ConfigError(msg) => write!(f, "Error en configuración: {msg}"),
+            Self::CryptoError(msg) => write!(f, "Error criptográfico/bóveda segura: {msg}"),
         }
     }
 }

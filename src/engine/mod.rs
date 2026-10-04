@@ -115,7 +115,7 @@ impl ObfuscatorEngine {
                     warnings.extend(vreport.issues);
                 }
                 Err(e) => {
-                    warnings.push(format!("Aviso de validación: {}", e));
+                    warnings.push(format!("Aviso de validación: {e}"));
                     schema_intact = false;
                 }
             }
@@ -134,10 +134,7 @@ impl ObfuscatorEngine {
         };
 
         log::info!(
-            "Transformación completada en {:.2}ms [Formato: {:?}, Reemplazos: {}]",
-            elapsed_ms,
-            detected_format,
-            replacements_count
+            "Transformación completada en {elapsed_ms:.2}ms [Formato: {detected_format:?}, Reemplazos: {replacements_count}]"
         );
 
         Ok((result_text, report))

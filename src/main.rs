@@ -1,6 +1,6 @@
 //! Interfaz de Línea de Comandos (CLI) de LexiShield en Rust.
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use lexishield::clipboard::{
     WatchDirection, get_clipboard_text, set_clipboard_text, watch_clipboard_loop,
 };
@@ -8,9 +8,13 @@ use lexishield::config::{LexiConfig, load_config};
 use lexishield::engine::ObfuscatorEngine;
 use lexishield::logger::init_logger;
 use lexishield::models::{DetectorType, FormatType, Mapping};
+use mimalloc::MiMalloc;
 use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 #[derive(Parser)]
 #[command(name = "lexishield")]
@@ -102,7 +106,7 @@ enum DictCommands {
         original: String,
 
         /// Seudónimo ofuscado.
-        #[arg(short, long)]
+        #[arg(short = 's', long)]
         pseudonym: String,
 
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
@@ -303,6 +307,13 @@ enum Commands {
     Config {
         #[command(subcommand)]
         subcommand: ConfigCommands,
+    },
+
+    /// Genera scripts de autocompletado para terminales (bash, zsh, fish, powershell, elvish).
+    Completions {
+        /// Shell objetivo para generar el autocompletado.
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
     },
 }
 
@@ -1384,5 +1395,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         Commands::Dict { subcommand } => handle_dict(subcommand),
+        Commands::Completions { shell } => {
+            let mut cmd = Cli::command();
+            clap_complete::generate(shell, &mut cmd, "lexishield", &mut std::io::stdout());
+            Ok(())
+        }
     }
 }

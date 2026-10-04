@@ -62,10 +62,7 @@ impl FormatOrchestrator {
             other => other,
         };
 
-        log::debug!(
-            "Procesando contenido con adaptador de formato: {:?}",
-            actual_format
-        );
+        log::debug!("Procesando contenido con adaptador de formato: {actual_format:?}");
 
         let (result_text, count) = match actual_format {
             FormatType::Json => {

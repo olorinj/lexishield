@@ -132,11 +132,11 @@ impl CompiledCustomRule {
             CustomStrategy::PrefixSeq => {
                 let p = self.prefix.as_deref().unwrap_or("CUSTOM_");
                 let num: u32 = rng.gen_range(100_000..999_999);
-                format!("{}{:06}", p, num)
+                format!("{p}{num:06}")
             }
             CustomStrategy::Mask => {
                 if let Some(p) = &self.prefix {
-                    format!("{}***", p)
+                    format!("{p}***")
                 } else {
                     "***REDACTED***".to_string()
                 }

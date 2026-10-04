@@ -5,11 +5,11 @@
 
 use crate::engine::replacer::apply_single_pass_replacements;
 use crate::models::ObfuscationError;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
-static KVP_REGEX: Lazy<Regex> = Lazy::new(|| {
+static KVP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"([a-zA-Z0-9_\-\.]+)=("?[^"\s]+"?[^"\s]*)"#).expect("Regex KVP inválida")
 });
 
@@ -48,7 +48,7 @@ impl LogAdapter {
 
         for line in text.lines() {
             if line.trim().is_empty() {
-                output_lines.push("".to_string());
+                output_lines.push(String::new());
                 continue;
             }
 
@@ -73,9 +73,9 @@ impl LogAdapter {
                     total_replacements += count;
 
                     if is_quoted {
-                        format!("{}=\"{}\"", key, new_val)
+                        format!("{key}=\"{new_val}\"")
                     } else {
-                        format!("{}={}", key, new_val)
+                        format!("{key}={new_val}")
                     }
                 });
                 output_lines.push(replaced_line.into_owned());

@@ -1,21 +1,22 @@
 //! Detectores para escenarios específicos de Office 365 y nombres de archivos adjuntos.
 
 use crate::models::DetectorType;
-use once_cell::sync::Lazy;
 use rand::Rng;
 use regex::Regex;
+use std::sync::LazyLock;
 
-static SUBJECT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i)"Subject"\s*:\s*"([^"]+)""#).expect("Regex Subject inválida"));
+static SUBJECT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)"Subject"\s*:\s*"([^"]+)""#).expect("Regex Subject inválida")
+});
 
-static ORIGINATING_SERVER_REGEX: Lazy<Regex> = Lazy::new(|| {
+static ORIGINATING_SERVER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)"OriginatingServer"\s*:\s*"([a-zA-Z0-9.-]+)""#)
         .expect("Regex OriginatingServer inválida")
 });
 
-static ATTACHMENT_REGEX: Lazy<Regex> = Lazy::new(|| {
+static ATTACHMENT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r#"(?i)\b([a-zA-Z0-9_\-\s]{3,}\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv))\b"#,
+        r"(?i)\b([a-zA-Z0-9_\-\s]{3,}\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv))\b",
     )
     .expect("Regex Attachment inválida")
 });
@@ -52,7 +53,7 @@ impl O365SubjectDetector {
         ];
         let id: u64 = rng.gen_range(100_000..999_999_999);
         let topic = topics[rng.gen_range(0..topics.len())];
-        format!("{} #{}", topic, id)
+        format!("{topic} #{id}")
     }
 }
 
@@ -78,7 +79,7 @@ impl O365OriginatingServerDetector {
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
         let id: u64 = rng.gen_range(100_000..999_999);
-        format!("EURPRD{:06}PROD.outlook.example.com", id)
+        format!("EURPRD{id:06}PROD.outlook.example.com")
     }
 }
 
@@ -105,7 +106,7 @@ impl AttachmentFileNameDetector {
         let mut rng = rand::thread_rng();
         let id: u64 = rng.gen_range(100_000_000..999_999_999);
         let ext = original.rsplit('.').next().unwrap_or("dat");
-        format!("attachment_{}.{}", id, ext)
+        format!("attachment_{id}.{ext}")
     }
 }
 

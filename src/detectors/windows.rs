@@ -1,18 +1,18 @@
 //! Detectores específicos para identificadores de Windows (SIDs, Logon IDs, Hex IDs).
 
 use crate::models::DetectorType;
-use once_cell::sync::Lazy;
 use rand::Rng;
 use regex::Regex;
+use std::sync::LazyLock;
 
-static SID_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\bS-1-(?:[0-59]|16)(?:-\d+)+\b").expect("Regex de SID inválida"));
+static SID_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bS-1-(?:[0-59]|16)(?:-\d+)+\b").expect("Regex de SID inválida"));
 
-static LOGON_ID_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)\b0x[0-9a-f]{4,8}\b").expect("Regex de Logon ID inválida"));
+static LOGON_ID_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b0x[0-9a-f]{4,8}\b").expect("Regex de Logon ID inválida"));
 
-static HEX_ID_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)\b0x[0-9a-f]{9,}\b").expect("Regex de Hex ID inválida"));
+static HEX_ID_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b0x[0-9a-f]{9,}\b").expect("Regex de Hex ID inválida"));
 
 #[derive(Default)]
 pub struct WindowsSidDetector;
@@ -40,7 +40,7 @@ impl WindowsSidDetector {
         let sub2: u32 = rng.gen_range(100_000_000..999_999_999);
         let sub3: u32 = rng.gen_range(100_000_000..999_999_999);
         let rid: u32 = rng.gen_range(1000..9999);
-        format!("S-1-5-21-{}-{}-{}-{}", sub1, sub2, sub3, rid)
+        format!("S-1-5-21-{sub1}-{sub2}-{sub3}-{rid}")
     }
 }
 
@@ -73,9 +73,9 @@ impl WindowsLogonIdDetector {
         let val: u32 = rng.gen_range(0x1000..0xFFFF_FFFF);
         let is_upper = original.chars().skip(2).any(|c| c.is_ascii_uppercase());
         if is_upper {
-            format!("0x{:0len$X}", val, len = len)
+            format!("0x{val:0len$X}")
         } else {
-            format!("0x{:0len$x}", val, len = len)
+            format!("0x{val:0len$x}")
         }
     }
 }
@@ -110,12 +110,16 @@ impl WindowsHexIdDetector {
         for _ in 0..hex_len {
             let nibble: u8 = rng.gen_range(0..16);
             if is_upper {
-                hex_str.push_str(&format!("{:X}", nibble));
+                hex_str.push(
+                    char::from_digit(u32::from(nibble), 16)
+                        .unwrap_or('0')
+                        .to_ascii_uppercase(),
+                );
             } else {
-                hex_str.push_str(&format!("{:x}", nibble));
+                hex_str.push(char::from_digit(u32::from(nibble), 16).unwrap_or('0'));
             }
         }
-        format!("0x{}", hex_str)
+        format!("0x{hex_str}")
     }
 }
 

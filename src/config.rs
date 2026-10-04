@@ -119,6 +119,7 @@ detector_priority_order = [
 
 /// Configuración general de opciones de procesamiento.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct GeneralConfig {
     #[serde(default = "default_min_token_length")]
     pub min_token_length: usize,
@@ -432,8 +433,7 @@ pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
             Ok(p) => p,
             Err(err) => {
                 log::warn!(
-                    "No se pudo inicializar config de usuario ({}); usando valores por defecto",
-                    err
+                    "No se pudo inicializar config de usuario ({err}); usando valores por defecto"
                 );
                 return LexiConfig::default();
             }

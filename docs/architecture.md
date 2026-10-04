@@ -163,3 +163,17 @@ El perfil de producción (`[profile.release]`) aplica técnicas avanzadas de com
 * **`codegen-units = 1`**: Permite al compilador optimizar el grafo completo del binario como una única unidad.
 * **`panic = "abort"`**: Elimina la tabla de *unwinding* de excepciones.
 * **`strip = true`**: Remueve automáticamente todos los símbolos de depuración y metadatos ELF/PE redundantes.
+
+### ⚡ Asignador de Memoria de Alto Rendimiento (`mimalloc`)
+Para maximizar el rendimiento concurrente con `rayon` y evitar cuellos de botella por contención de bloqueos (*lock contention*) durante la ofuscación masiva de cadenas de texto, LexiShield utiliza **`mimalloc`** como asignador global de memoria (`#[global_allocator]`), reduciendo la fragmentación y acelerando la asignación dinámica.
+
+### ⌨️ Autocompletado de Shell Integrado (`clap_complete`)
+La CLI incluye el comando `lexishield completions <SHELL>` capaz de generar scripts nativos de autocompletado en caliente para:
+* `bash`: `eval "$(lexishield completions bash)"`
+* `zsh`: `source <(lexishield completions zsh)`
+* `fish`: `lexishield completions fish | source`
+* `powershell`: `Invoke-Expression (& lexishield completions powershell | Out-String)`
+* `elvish`: `eval (lexishield completions elvish | slurp)`
+
+### 🛡️ DevSecOps y Auditoría de Vulnerabilidades (`cargo-audit`)
+La seguridad de la cadena de suministro (*Supply Chain Security*) se audita automáticamente en el pipeline de CI/CD mediante `cargo audit` contra la base de datos de avisos de seguridad de RustSec, bloqueando cualquier commit o despliegue si se introduce una dependencia con CVEs conocidos.

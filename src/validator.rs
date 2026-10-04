@@ -58,8 +58,7 @@ impl SyntaxValidator {
 
         let obf_val: Value = serde_json::from_str(obfuscated).map_err(|e| {
             ObfuscationError::ValidationError(format!(
-                "El JSON ofuscado quedó sintácticamente inválido: {}",
-                e
+                "El JSON ofuscado quedó sintácticamente inválido: {e}"
             ))
         })?;
 
@@ -76,10 +75,10 @@ impl SyntaxValidator {
             let missing: Vec<_> = orig_keys.difference(&obf_keys).collect();
             let added: Vec<_> = obf_keys.difference(&orig_keys).collect();
             if !missing.is_empty() {
-                issues.push(format!("Claves JSON alteradas o perdidas: {:?}", missing));
+                issues.push(format!("Claves JSON alteradas o perdidas: {missing:?}"));
             }
             if !added.is_empty() {
-                issues.push(format!("Claves JSON inesperadas introducidas: {:?}", added));
+                issues.push(format!("Claves JSON inesperadas introducidas: {added:?}"));
             }
         }
 
@@ -99,7 +98,7 @@ impl SyntaxValidator {
                     let full_key = if prefix.is_empty() {
                         k.clone()
                     } else {
-                        format!("{}.{}", prefix, k)
+                        format!("{prefix}.{k}")
                     };
                     keys.insert(full_key.clone());
                     Self::collect_json_keys(v, &full_key, keys);
@@ -107,7 +106,7 @@ impl SyntaxValidator {
             }
             Value::Array(arr) => {
                 for (i, v) in arr.iter().enumerate() {
-                    let full_key = format!("{}[{}]", prefix, i);
+                    let full_key = format!("{prefix}[{i}]");
                     Self::collect_json_keys(v, &full_key, keys);
                 }
             }
@@ -125,20 +124,19 @@ impl SyntaxValidator {
         let mut issues = Vec::new();
         let schema_intact = match (&orig_tags, &obf_tags) {
             (Ok(o), Ok(b)) => {
-                if o != b {
+                if o == b {
+                    true
+                } else {
                     issues.push(
                         "Las etiquetas XML entre el original y el ofuscado difieren".to_string(),
                     );
                     false
-                } else {
-                    true
                 }
             }
             (Err(_), _) => true, // Si el original no era XML, omitir
             (_, Err(e)) => {
                 return Err(ObfuscationError::ValidationError(format!(
-                    "El XML ofuscado contiene errores de parseo: {}",
-                    e
+                    "El XML ofuscado contiene errores de parseo: {e}"
                 )));
             }
         };
@@ -146,8 +144,8 @@ impl SyntaxValidator {
         Ok(ValidationReport {
             syntax_valid: obf_tags.is_ok(),
             schema_keys_intact: schema_intact,
-            original_keys_count: orig_tags.as_ref().map(|v| v.len()).unwrap_or(0),
-            obfuscated_keys_count: obf_tags.as_ref().map(|v| v.len()).unwrap_or(0),
+            original_keys_count: orig_tags.as_ref().map_or(0, std::vec::Vec::len),
+            obfuscated_keys_count: obf_tags.as_ref().map_or(0, std::vec::Vec::len),
             issues,
         })
     }
@@ -161,7 +159,7 @@ impl SyntaxValidator {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Eof) => break,
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e) | Event::Empty(e)) => {
                     let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
                     tags.push(tag_name);
                 }
