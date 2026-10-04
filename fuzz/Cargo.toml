@@ -1,0 +1,18 @@
+[package]
+name = "lexishield-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+lexishield = { path = ".." }
+
+[[bin]]
+name = "lexi_engine"
+path = "fuzz_targets/lexi_engine.rs"
+test = false
+doc = false

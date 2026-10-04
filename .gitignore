@@ -5,3 +5,9 @@ dist/
 
 # Ignorar el enlace simbólico global de agentes
 .agents
+
+# Fuzzing
+fuzz/target/
+fuzz/corpus/
+fuzz/artifacts/
+fuzz/coverage/
