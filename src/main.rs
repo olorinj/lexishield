@@ -19,7 +19,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 #[derive(Parser)]
 #[command(name = "lexishield")]
 #[command(about = "Motor de anonimización y ofuscación semántica de alto rendimiento", long_about = None)]
-#[command(version = "0.1.0")]
+#[command(version = "1.0.0")]
 struct Cli {
     /// Activa el nivel de log Debug para más detalles (Telemetría en stderr).
     #[arg(short, long, global = true)]
