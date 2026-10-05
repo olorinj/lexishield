@@ -2,12 +2,14 @@
 
 pub mod json_adapter;
 pub mod log_adapter;
+pub mod office_adapter;
 pub mod text_adapter;
 pub mod xml_adapter;
 
 use crate::models::{FormatType, ObfuscationError};
 use json_adapter::JsonAdapter;
 use log_adapter::LogAdapter;
+use office_adapter::OfficeAdapter;
 use std::collections::HashMap;
 use text_adapter::TextAdapter;
 use xml_adapter::XmlAdapter;
@@ -18,6 +20,7 @@ pub struct FormatOrchestrator {
     pub xml: XmlAdapter,
     pub log: LogAdapter,
     pub text: TextAdapter,
+    pub office: OfficeAdapter,
 }
 
 impl Default for FormatOrchestrator {
@@ -33,6 +36,7 @@ impl FormatOrchestrator {
             xml: XmlAdapter::new(),
             log: LogAdapter::new(),
             text: TextAdapter::new(),
+            office: OfficeAdapter::new(),
         }
     }
 

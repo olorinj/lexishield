@@ -140,7 +140,25 @@ impl ObfuscatorEngine {
         Ok((result_text, report))
     }
 
-    /// Procesa un archivo en disco de forma segura.
+    /// Escanea un archivo en disco (de texto u Office OpenXML) y registra automáticamente sus entidades.
+    pub fn scan_file(&mut self, path: &Path) -> Result<Vec<Mapping>, ObfuscationError> {
+        let bytes = fs::read(path)?;
+        let office_type =
+            crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes);
+        if office_type == crate::format_adapters::office_adapter::OfficeType::Unknown {
+            let content = String::from_utf8(bytes).map_err(|e| {
+                ObfuscationError::InvalidFormat(format!(
+                    "El archivo no contiene texto UTF-8 válido: {e}"
+                ))
+            })?;
+            self.scan_and_register_mappings(&content)
+        } else {
+            let extracted_text = self.format_orchestrator.office.extract_text(&bytes)?;
+            self.scan_and_register_mappings(&extracted_text)
+        }
+    }
+
+    /// Procesa un archivo en disco de forma segura (detectando automáticamente texto plano vs Office OpenXML).
     pub fn process_file(
         &self,
         input_path: &Path,
@@ -148,9 +166,43 @@ impl ObfuscatorEngine {
         format: FormatType,
         reverse: bool,
     ) -> Result<ObfuscationReport, ObfuscationError> {
-        let content = fs::read_to_string(input_path)?;
-        let (transformed, report) = self.transform_text(&content, format, reverse)?;
-        fs::write(output_path, transformed)?;
-        Ok(report)
+        let bytes = fs::read(input_path)?;
+        let office_type =
+            crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes);
+
+        if office_type == crate::format_adapters::office_adapter::OfficeType::Unknown {
+            let content = String::from_utf8(bytes).map_err(|e| {
+                ObfuscationError::InvalidFormat(format!(
+                    "El archivo no contiene texto UTF-8 válido: {e}"
+                ))
+            })?;
+            let (transformed, report) = self.transform_text(&content, format, reverse)?;
+            fs::write(output_path, transformed)?;
+            Ok(report)
+        } else {
+            let start_time = Instant::now();
+            let original_len = bytes.len();
+            let replacement_map = self.manager.get_replacement_map(reverse);
+
+            let (output_bytes, count, _) = self.format_orchestrator.office.process_office(
+                &bytes,
+                &replacement_map,
+                self.config.strict_word_boundaries(),
+            )?;
+
+            fs::write(output_path, &output_bytes)?;
+            let elapsed_ms = start_time.elapsed().as_secs_f64() * 1000.0;
+
+            Ok(ObfuscationReport {
+                format_detected: FormatType::Xml,
+                original_length: original_len,
+                result_length: output_bytes.len(),
+                replacements_applied: count,
+                elapsed_ms,
+                schema_intact: true,
+                syntax_valid: true,
+                warnings: Vec::new(),
+            })
+        }
     }
 }
