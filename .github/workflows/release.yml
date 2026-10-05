@@ -45,7 +45,7 @@ jobs:
 
       - name: Instalar dependencias web y compilar frontend
         run: |
-          npm install
+          npm install --no-package-lock
           npm run build
         working-directory: ui
 
