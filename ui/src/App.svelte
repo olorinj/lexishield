@@ -1,6 +1,76 @@
 <script>
   import { onMount } from "svelte";
   import { fade, slide } from "svelte/transition";
+  import { open, save } from "@tauri-apps/plugin-dialog";
+
+  // Funciones de sistema de archivos
+  async function invokeTauri(cmd, args = {}) {
+    return await window.__TAURI__.core.invoke(cmd, args);
+  }
+
+  async function openFileToProcess(reverse = false) {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Archivos soportados',
+          extensions: ['txt', 'json', 'xml', 'log', 'docx', 'xlsx', 'pptx']
+        }]
+      });
+      if (!selected) return;
+      
+      loading = true;
+      statusMessage = "Procesando archivo...";
+      
+      const outPath = await save({
+        defaultPath: selected + (reverse ? ".clear" : ".lexishield")
+      });
+      
+      if (!outPath) {
+        loading = false;
+        statusMessage = "Operación cancelada";
+        return;
+      }
+
+      const res = await invokeTauri("process_file_command", {
+        inputPath: selected,
+        outputPath: outPath,
+        vaultPath: vaultPath || null,
+        password: password || null,
+        reverse
+      });
+      
+      report = res;
+      statusMessage = "Archivo procesado y guardado en: " + outPath;
+    } catch (err) {
+      console.error(err);
+      statusMessage = "Error al procesar archivo: " + err;
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function openVaultFile() {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Bóvedas LexiShield',
+          extensions: ['lexi']
+        }]
+      });
+      if (!selected) return;
+      
+      vaultPath = selected;
+      statusMessage = "Cargando bóveda...";
+      const items = await invokeTauri("read_vault_file", { path: vaultPath, password: password || null });
+      filteredVault = items;
+      statusMessage = "Bóveda cargada: " + vaultPath;
+    } catch (err) {
+      console.error(err);
+      statusMessage = "Error al abrir bóveda: " + err;
+    }
+  }
 
   // Control de pestañas activas
   let activeTab = "studio"; // "studio" | "scanner" | "vault" | "watch"
@@ -30,13 +100,6 @@
   let watchInterval = null;
 
   // Invocar backend de Tauri si está disponible
-  async function invokeTauri(cmd, args = {}) {
-    if (window.__TAURI__ && window.__TAURI__.core) {
-      return await window.__TAURI__.core.invoke(cmd, args);
-    }
-    console.warn("Tauri API no detectada (Modo navegador/preview). Simulación activa.");
-    return simulateTauri(cmd, args);
-  }
 
   // Fallback simulado para previsualización web pura
   function simulateTauri(cmd, args) {
@@ -247,6 +310,9 @@
               <button on:click={pasteClipboard} class="text-xs px-2.5 py-1 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg border border-white/10 flex items-center gap-1 transition">
                 📋 Pegar
               </button>
+              <button on:click={() => openFileToProcess(false)} class="text-xs px-2.5 py-1 bg-primary-600/20 hover:bg-primary-500/30 text-primary-400 rounded-lg border border-primary-500/20 flex items-center gap-1 transition">
+                📄 Ofuscar Fichero
+              </button>
             </div>
           </div>
           <textarea
@@ -263,9 +329,14 @@
               <span class="w-2.5 h-2.5 rounded-full bg-primary-400"></span>
               <span class="text-xs font-semibold text-slate-200">Resultado Sanitizado (Seguro para IA)</span>
             </div>
-            <button on:click={copyOutput} class="text-xs px-3 py-1 bg-primary-500 hover:bg-primary-400 text-slate-950 font-bold rounded-lg flex items-center gap-1.5 shadow-md shadow-primary-500/20 transition">
-              📋 Copiar
-            </button>
+            <div class="flex items-center gap-2">
+              <button on:click={() => openFileToProcess(true)} class="text-xs px-2.5 py-1 bg-rose-600/20 hover:bg-rose-500/30 text-rose-400 rounded-lg border border-rose-500/20 flex items-center gap-1 transition">
+                📄 Desofuscar Fichero
+              </button>
+              <button on:click={copyOutput} class="text-xs px-3 py-1 bg-primary-500 hover:bg-primary-400 text-slate-950 font-bold rounded-lg flex items-center gap-1.5 shadow-md shadow-primary-500/20 transition">
+                📋 Copiar
+              </button>
+            </div>
           </div>
           <textarea
             readonly
@@ -388,12 +459,17 @@
             <h2 class="text-sm font-bold text-white">Gestor de Bóvedas y Diccionarios Cifrados (.lexi)</h2>
             <p class="text-xs text-slate-400">Explora, añade y audita mapeos inyectivos persistidos de forma segura.</p>
           </div>
-          <input
-            type="text"
-            bind:value={vaultFilter}
-            placeholder="🔍 Filtrar mapeos..."
-            class="bg-slate-950/80 text-xs text-slate-200 px-3 py-1.5 rounded-xl border border-white/10 focus:border-primary-500 outline-none w-64"
-          />
+          <div class="flex items-center gap-3">
+            <button on:click={openVaultFile} class="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl border border-white/10 flex items-center gap-1.5 transition shadow-sm">
+              📂 Cargar .lexi
+            </button>
+            <input
+              type="text"
+              bind:value={vaultFilter}
+              placeholder="🔍 Filtrar mapeos..."
+              class="bg-slate-950/80 text-xs text-slate-200 px-3 py-1.5 rounded-xl border border-white/10 focus:border-primary-500 outline-none w-64"
+            />
+          </div>
         </div>
 
         <div class="flex-1 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-4">
