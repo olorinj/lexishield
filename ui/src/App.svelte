@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { fade, slide } from "svelte/transition";
 
   // Control de pestañas activas
   let activeTab = "studio"; // "studio" | "scanner" | "vault" | "watch"
@@ -176,46 +177,46 @@
   );
 </script>
 
-<div class="flex flex-col h-screen bg-slate-950 text-slate-100 font-sans">
-  <!-- Header Principal -->
-  <header class="flex items-center justify-between px-6 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-950/50">
-        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<div class="flex flex-col h-screen bg-slate-950 text-slate-100 font-sans select-none">
+  <!-- Header Principal con Región de Arrastre Nativa de Ventana -->
+  <header data-tauri-drag-region class="flex items-center justify-between px-6 py-3 bg-brand-surface/90 backdrop-blur-md border-b border-white/10 shrink-0">
+    <div class="flex items-center gap-3 pointer-events-none">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-navy to-primary-500 border border-primary-500/30 flex items-center justify-center shadow-lg shadow-cyan-950/50">
+        <svg class="w-5 h-5 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
         </svg>
       </div>
       <div>
         <div class="flex items-center gap-2">
           <h1 class="text-base font-bold tracking-wide text-white">LexiShield</h1>
-          <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">v1.0.0 GUI</span>
+          <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-primary-500/10 text-primary-400 border border-primary-500/20">v1.0.0 GUI</span>
         </div>
         <p class="text-xs text-slate-400">Escudo de Privacidad y Ofuscación Semántica para Consultas de IA</p>
       </div>
     </div>
 
-    <!-- Navegación de Pestañas -->
-    <nav class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+    <!-- Navegación de Pestañas (Bento Navigation) -->
+    <nav class="flex items-center gap-1 bg-slate-950/80 backdrop-blur p-1 rounded-xl border border-white/10">
       <button
-        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 {activeTab === 'studio' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}"
+        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2 {activeTab === 'studio' ? 'bg-primary-500 text-slate-950 font-bold shadow-md shadow-primary-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}"
         on:click={() => (activeTab = "studio")}
       >
         <span>⚡</span> Studio
       </button>
       <button
-        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 {activeTab === 'scanner' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}"
+        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2 {activeTab === 'scanner' ? 'bg-primary-500 text-slate-950 font-bold shadow-md shadow-primary-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}"
         on:click={() => (activeTab = "scanner")}
       >
         <span>🔍</span> Auditoría ({detectedItems.length})
       </button>
       <button
-        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 {activeTab === 'vault' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}"
+        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2 {activeTab === 'vault' ? 'bg-primary-500 text-slate-950 font-bold shadow-md shadow-primary-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}"
         on:click={() => (activeTab = "vault")}
       >
         <span>🔐</span> Bóveda
       </button>
       <button
-        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 {activeTab === 'watch' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}"
+        class="px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2 {activeTab === 'watch' ? 'bg-primary-500 text-slate-950 font-bold shadow-md shadow-primary-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}"
         on:click={() => (activeTab = "watch")}
       >
         <span>🛡️</span> Guardián
@@ -223,27 +224,27 @@
     </nav>
   </header>
 
-  <!-- Contenido Principal Dinámico -->
+  <!-- Contenido Principal Dinámico (Bento Grid) -->
   <main class="flex-1 overflow-hidden p-6 flex flex-col">
     {#if activeTab === "studio"}
       <!-- VISTA STUDIO -->
-      <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
+      <div in:fade={{ duration: 150 }} class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
         <!-- Panel Izquierdo: Entrada -->
-        <div class="flex flex-col bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-          <div class="flex items-center justify-between px-4 py-2.5 bg-slate-800/60 border-b border-slate-800">
+        <div class="flex flex-col bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+          <div class="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-white/10">
             <div class="flex items-center gap-2">
               <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
               <span class="text-xs font-semibold text-slate-200">Datos Sensibles Originales (Logs / Código / JSON)</span>
             </div>
             <div class="flex items-center gap-2">
-              <select bind:value={format} class="bg-slate-950 text-slate-300 text-xs px-2 py-1 rounded border border-slate-700 outline-none">
+              <select bind:value={format} class="bg-slate-950 text-slate-300 text-xs px-2 py-1 rounded-lg border border-white/10 outline-none focus:border-primary-500 transition">
                 <option value="auto">Formato: Auto</option>
                 <option value="json">JSON</option>
                 <option value="xml">XML</option>
                 <option value="log">Log</option>
                 <option value="plaintext">Texto Plano</option>
               </select>
-              <button on:click={pasteClipboard} class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 flex items-center gap-1 transition">
+              <button on:click={pasteClipboard} class="text-xs px-2.5 py-1 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg border border-white/10 flex items-center gap-1 transition">
                 📋 Pegar
               </button>
             </div>
@@ -256,13 +257,13 @@
         </div>
 
         <!-- Panel Derecho: Salida -->
-        <div class="flex flex-col bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-          <div class="flex items-center justify-between px-4 py-2.5 bg-slate-800/60 border-b border-slate-800">
+        <div class="flex flex-col bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+          <div class="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-white/10">
             <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-primary-400"></span>
               <span class="text-xs font-semibold text-slate-200">Resultado Sanitizado (Seguro para IA)</span>
             </div>
-            <button on:click={copyOutput} class="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium flex items-center gap-1.5 shadow transition">
+            <button on:click={copyOutput} class="text-xs px-3 py-1 bg-primary-500 hover:bg-primary-400 text-slate-950 font-bold rounded-lg flex items-center gap-1.5 shadow-md shadow-primary-500/20 transition">
               📋 Copiar
             </button>
           </div>
@@ -270,16 +271,16 @@
             readonly
             bind:value={outputText}
             placeholder="El resultado transformado aparecerá aquí con coherencia semántica garantizada..."
-            class="flex-1 p-4 bg-transparent text-emerald-300 text-sm font-mono resize-none focus:outline-none placeholder-slate-700 leading-relaxed"
+            class="flex-1 p-4 bg-transparent text-primary-300 text-sm font-mono resize-none focus:outline-none placeholder-slate-700 leading-relaxed"
           ></textarea>
         </div>
       </div>
 
-      <!-- Barra de Acciones y Bóveda -->
-      <div class="mt-4 p-4 bg-slate-900 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+      <!-- Barra de Acciones y Bóveda (Bento Card) -->
+      <div in:fade={{ duration: 150 }} class="mt-4 p-4 bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-white/10 flex flex-wrap items-center justify-between gap-4">
         <!-- Opciones de Bóveda -->
         <div class="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div class="flex-1 flex items-center bg-slate-950 rounded-xl px-3 py-1.5 border border-slate-800">
+          <div class="flex-1 flex items-center bg-slate-950/80 rounded-xl px-3 py-1.5 border border-white/10 focus-within:border-primary-500/50 transition">
             <span class="text-xs text-slate-500 mr-2">📁 Bóveda:</span>
             <input
               type="text"
@@ -288,7 +289,7 @@
               class="bg-transparent text-xs text-slate-300 outline-none flex-1 font-mono"
             />
           </div>
-          <div class="flex items-center bg-slate-950 rounded-xl px-3 py-1.5 border border-slate-800">
+          <div class="flex items-center bg-slate-950/80 rounded-xl px-3 py-1.5 border border-white/10 focus-within:border-primary-500/50 transition">
             <span class="text-xs text-slate-500 mr-2">🔑 Clave:</span>
             <input
               type="password"
@@ -304,21 +305,21 @@
           <button
             on:click={handleScan}
             disabled={loading || !inputText}
-            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition disabled:opacity-50"
+            class="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold rounded-xl border border-white/10 transition duration-150 disabled:opacity-50"
           >
             🔍 Auditar Entidades
           </button>
           <button
             on:click={handleDeobfuscate}
             disabled={loading || !inputText}
-            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition shadow-lg shadow-indigo-950/50 disabled:opacity-50"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition duration-150 shadow-lg shadow-indigo-950/50 disabled:opacity-50"
           >
             ↩️ Desofuscar Respuesta
           </button>
           <button
             on:click={handleObfuscate}
             disabled={loading || !inputText}
-            class="px-6 py-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-emerald-950/50 flex items-center gap-2 disabled:opacity-50"
+            class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
           >
             {#if loading}
               <span class="animate-spin">⏳</span>
@@ -332,20 +333,20 @@
 
     {:else if activeTab === "scanner"}
       <!-- VISTA AUDITORÍA Y ESCÁNER -->
-      <div class="flex-1 bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col min-h-0">
+      <div in:fade={{ duration: 150 }} class="flex-1 bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-white/10 p-6 flex flex-col min-h-0">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h2 class="text-sm font-bold text-white">Auditoría Interactiva de Entidades Detectadas</h2>
             <p class="text-xs text-slate-400">Revisa qué pares se transformarán. Puedes omitir falsos positivos marcando la casilla.</p>
           </div>
-          <span class="text-xs px-3 py-1 bg-slate-800 text-slate-300 rounded-lg border border-slate-700">
+          <span class="text-xs px-3 py-1 bg-white/5 text-slate-300 rounded-lg border border-white/10">
             Total: {detectedItems.length} detecciones
           </span>
         </div>
 
-        <div class="flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950">
+        <div class="flex-1 overflow-auto rounded-xl border border-white/10 bg-slate-950/80">
           <table class="w-full text-left text-xs font-mono">
-            <thead class="bg-slate-900 text-slate-400 sticky top-0 border-b border-slate-800">
+            <thead class="bg-slate-900/90 text-slate-400 sticky top-0 border-b border-white/10">
               <tr>
                 <th class="p-3">Omitir</th>
                 <th class="p-3">Tipo de Entidad</th>
@@ -353,19 +354,19 @@
                 <th class="p-3">Seudónimo Coherente Asignado</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-900 text-slate-300">
+            <tbody class="divide-y divide-white/5 text-slate-300">
               {#each detectedItems as item, idx}
-                <tr class="hover:bg-slate-900/50 transition {item.omitted ? 'opacity-40' : ''}">
+                <tr class="hover:bg-white/5 transition {item.omitted ? 'opacity-40' : ''}">
                   <td class="p-3">
-                    <input type="checkbox" bind:checked={item.omitted} class="rounded accent-emerald-500" />
+                    <input type="checkbox" bind:checked={item.omitted} class="rounded accent-primary-500 cursor-pointer" />
                   </td>
                   <td class="p-3">
-                    <span class="px-2 py-0.5 rounded bg-slate-800 text-emerald-400 text-[11px] border border-slate-700">
+                    <span class="px-2 py-0.5 rounded bg-primary-500/10 text-primary-400 text-[11px] border border-primary-500/20">
                       {item.detector_type}
                     </span>
                   </td>
                   <td class="p-3 text-amber-300 font-semibold">{item.original}</td>
-                  <td class="p-3 text-emerald-400">{item.omitted ? '=' : item.pseudonym}</td>
+                  <td class="p-3 text-primary-400">{item.omitted ? '=' : item.pseudonym}</td>
                 </tr>
               {:else}
                 <tr>
@@ -381,7 +382,7 @@
 
     {:else if activeTab === "vault"}
       <!-- VISTA GESTOR DE BÓVEDAS -->
-      <div class="flex-1 bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col min-h-0">
+      <div in:fade={{ duration: 150 }} class="flex-1 bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-white/10 p-6 flex flex-col min-h-0">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h2 class="text-sm font-bold text-white">Gestor de Bóvedas y Diccionarios Cifrados (.lexi)</h2>
@@ -391,19 +392,19 @@
             type="text"
             bind:value={vaultFilter}
             placeholder="🔍 Filtrar mapeos..."
-            class="bg-slate-950 text-xs text-slate-200 px-3 py-1.5 rounded-xl border border-slate-800 outline-none w-64"
+            class="bg-slate-950/80 text-xs text-slate-200 px-3 py-1.5 rounded-xl border border-white/10 focus:border-primary-500 outline-none w-64"
           />
         </div>
 
-        <div class="flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-4">
+        <div class="flex-1 overflow-auto rounded-xl border border-white/10 bg-slate-950/80 p-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             {#each filteredVault as item}
-              <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+              <div class="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
                 <div>
                   <div class="text-xs text-amber-300 font-mono font-semibold">{item.original}</div>
-                  <div class="text-xs text-emerald-400 font-mono">↳ {item.pseudonym}</div>
+                  <div class="text-xs text-primary-400 font-mono">↳ {item.pseudonym}</div>
                 </div>
-                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/5">
                   {item.detector_type}
                 </span>
               </div>
@@ -418,29 +419,29 @@
 
     {:else if activeTab === "watch"}
       <!-- VISTA GUARDIÁN DE PORTAPAPELES -->
-      <div class="flex-1 bg-slate-900 rounded-2xl border border-slate-800 p-8 flex flex-col items-center justify-center text-center">
-        <div class="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-6 shadow-2xl">
+      <div in:fade={{ duration: 150 }} class="flex-1 bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-white/10 p-8 flex flex-col items-center justify-center text-center">
+        <div class="w-20 h-20 rounded-3xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center mb-6 shadow-2xl shadow-primary-500/10">
           <span class="text-4xl">{watchActive ? "🛡️" : "💤"}</span>
         </div>
         <h2 class="text-lg font-bold text-white mb-2">Modo Guardián de Portapapeles</h2>
         <p class="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
-          Cada vez que pulses <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-mono text-[11px]">Ctrl+C</kbd> para copiar texto con datos confidenciales, LexiShield lo transformará automáticamente al vuelo con supresión de eco.
+          Cada vez que pulses <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-slate-300 font-mono text-[11px]">Ctrl+C</kbd> para copiar texto con datos confidenciales, LexiShield lo transformará automáticamente al vuelo con supresión de eco.
         </p>
 
         <div class="flex items-center gap-4 mb-8">
           <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-            <input type="radio" bind:group={watchDirection} value="obfuscate" class="accent-emerald-500" />
+            <input type="radio" bind:group={watchDirection} value="obfuscate" class="accent-primary-500" />
             Ofuscación Automática (Hacia IA)
           </label>
           <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-            <input type="radio" bind:group={watchDirection} value="deobfuscate" class="accent-emerald-500" />
+            <input type="radio" bind:group={watchDirection} value="deobfuscate" class="accent-primary-500" />
             Desofuscación Automática (Desde IA)
           </label>
         </div>
 
         <button
           on:click={toggleWatch}
-          class="px-8 py-3 rounded-2xl font-bold text-sm shadow-xl transition-all {watchActive ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/50'}"
+          class="px-8 py-3 rounded-2xl font-bold text-sm shadow-xl transition-all duration-200 {watchActive ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50' : 'bg-primary-500 hover:bg-primary-400 text-slate-950 shadow-primary-500/20'}"
         >
           {watchActive ? "Detener Guardián" : "Activar Protección de Portapapeles"}
         </button>
@@ -449,15 +450,15 @@
   </main>
 
   <!-- Footer con Telemetría / Barra de Estado -->
-  <footer class="px-6 py-2.5 bg-slate-900 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between shrink-0">
+  <footer class="px-6 py-2.5 bg-brand-surface/90 backdrop-blur-md border-t border-white/10 text-[11px] text-slate-400 flex items-center justify-between shrink-0">
     <div class="flex items-center gap-2">
-      <span class="w-2 h-2 rounded-full {loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}"></span>
+      <span class="w-2 h-2 rounded-full {loading ? 'bg-amber-400 animate-pulse' : 'bg-primary-400'}"></span>
       <span class="font-mono">{statusMessage || 'Listo para proteger tus datos.'}</span>
     </div>
     {#if report}
       <div class="flex items-center gap-4 font-mono text-slate-500">
         <span>Formato: <strong class="text-slate-300">{report.format_detected}</strong></span>
-        <span>Reemplazos: <strong class="text-emerald-400">{report.replacements_applied}</strong></span>
+        <span>Reemplazos: <strong class="text-primary-400">{report.replacements_applied}</strong></span>
         <span>Tiempo: <strong class="text-slate-300">{report.elapsed_ms.toFixed(2)}ms</strong></span>
       </div>
     {/if}

@@ -245,15 +245,32 @@ if [ "$compilar_gui" = true ]; then
         echo -e "\e[90mInstalando dependencias de UI y construyendo bundle frontend...\e[0m"
         (cd ui && npm install && npm run build)
         echo -e "\e[90mConstruyendo paquetes nativos (AppImage, .deb, etc.) con Tauri...\e[0m"
+        export APPIMAGE_EXTRACT_AND_RUN=1
+        export NO_STRIP=true
         ui/node_modules/.bin/tauri build
         
         mkdir -p dist
-        if [ -d "src-tauri/target/release/bundle" ]; then
-            cp -r src-tauri/target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || true
-            cp -r src-tauri/target/release/bundle/deb/*.deb dist/ 2>/dev/null || true
-            cp -f src-tauri/target/release/lexishield-gui "./dist/lexishield-gui-linux-amd64" 2>/dev/null || true
-            archivos_compilados+=("./dist/*.AppImage" "./dist/*.deb")
+        # Buscar en CARGO_TARGET_DIR (usado en Vagrant) o en src-tauri/target
+        bundle_dir="$CARGO_TARGET_DIR/release/bundle"
+        if [ ! -d "$bundle_dir" ]; then
+            bundle_dir="src-tauri/target/release/bundle"
         fi
+        
+        if [ -d "$bundle_dir" ]; then
+            cp -r "$bundle_dir"/appimage/*.AppImage dist/ 2>/dev/null || true
+            cp -r "$bundle_dir"/deb/*.deb dist/ 2>/dev/null || true
+            cp -r "$bundle_dir"/rpm/*.rpm dist/ 2>/dev/null || true
+        fi
+        
+        gui_bin="$CARGO_TARGET_DIR/release/lexishield-gui"
+        if [ ! -f "$gui_bin" ]; then
+            gui_bin="src-tauri/target/release/lexishield-gui"
+        fi
+        if [ -f "$gui_bin" ]; then
+            cp -f "$gui_bin" "./dist/lexishield-gui-linux-amd64" 2>/dev/null || true
+            archivos_compilados+=("./dist/lexishield-gui-linux-amd64")
+        fi
+        archivos_compilados+=("./dist/*.AppImage" "./dist/*.deb" "./dist/*.rpm")
     else
         echo -e "\e[33m[AVISO] 'npm' no encontrado en el PATH. Omitiendo compilacion de la GUI.\e[0m"
     fi
