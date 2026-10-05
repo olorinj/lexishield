@@ -174,8 +174,49 @@ fn parse_format(f: &str) -> FormatType {
     }
 }
 
+#[tauri::command]
+fn process_file_command(
+    input_path: String,
+    output_path: String,
+    vault_path: Option<String>,
+    password: Option<String>,
+    reverse: bool,
+) -> Result<ObfuscationReport, String> {
+    let config = load_config_with_rules(None, None);
+    let mut engine = ObfuscatorEngine::new(config);
+
+    if let Some(ref path_str) = vault_path {
+        let p = Path::new(path_str);
+        if p.exists() {
+            let loaded = load_mappings_auto(p, password.as_deref()).map_err(|e| e.to_string())?;
+            engine.manager.load_mappings(loaded).map_err(|e| e.to_string())?;
+        }
+    }
+
+    if !reverse {
+        engine.scan_file(Path::new(&input_path)).map_err(|e| e.to_string())?;
+        if let Some(ref path_str) = vault_path {
+            let p = Path::new(path_str);
+            let all_mappings = engine.manager.get_mappings();
+            save_mappings_auto(p, &all_mappings, password.as_deref()).map_err(|e| e.to_string())?;
+        }
+    }
+
+    let report = engine
+        .process_file(
+            Path::new(&input_path),
+            Path::new(&output_path),
+            FormatType::Auto,
+            reverse,
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(report)
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             obfuscate_content,
@@ -184,7 +225,8 @@ fn main() {
             read_vault_file,
             save_vault_file,
             get_system_clipboard,
-            set_system_clipboard
+            set_system_clipboard,
+            process_file_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
