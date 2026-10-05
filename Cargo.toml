@@ -34,6 +34,7 @@ toml = "0.8"
 mimalloc = { version = "0.1", default-features = false }
 clap_complete = "4.5"
 ignore = "0.4"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 [build-dependencies]
 winres = "0.1"

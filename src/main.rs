@@ -486,19 +486,88 @@ fn handle_obfuscate(
     config: LexiConfig,
     opts: ObfuscateOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let content = resolve_input_content(
-        opts.input.as_deref(),
-        opts.text.as_deref(),
-        opts.clipboard,
-        opts.stdin,
-    )?;
-
     let is_default = opts.save_mappings.is_none();
     let map_path = if !opts.no_save {
         Some(resolve_vault_path(opts.save_mappings)?)
     } else {
         None
     };
+
+    let is_office = if let Some(ref in_path) = opts.input {
+        if let Ok(bytes) = fs::read(in_path) {
+            lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
+                != lexishield::format_adapters::office_adapter::OfficeType::Unknown
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if is_office {
+        let in_path = opts.input.as_ref().unwrap();
+        let out_path = opts.output.clone().unwrap_or_else(|| {
+            let stem = in_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("documento");
+            let ext = in_path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("docx");
+            in_path.with_file_name(format!("{stem}_sanitized.{ext}"))
+        });
+
+        let mut engine = ObfuscatorEngine::new(config);
+        let mut final_pwd = opts.password.clone();
+        if let Some(ref path) = map_path
+            && path.exists()
+        {
+            let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(path))?;
+            final_pwd = pwd.clone();
+            if let Ok(loaded) = lexishield::load_mappings_auto(path, pwd.as_deref()) {
+                let _ = engine.manager.load_mappings(loaded);
+            }
+        }
+
+        let newly_added = engine.scan_file(in_path)?;
+        log::info!(
+            "Detectados {} NUEVOS elementos sensibles en documento Office.",
+            newly_added.len()
+        );
+
+        let report = engine.process_file(in_path, &out_path, opts.format, false)?;
+
+        if let Some(map_path) = map_path {
+            let force_ask = is_default && final_pwd.is_none();
+            let pwd = resolve_password(final_pwd, opts.ask_password || force_ask, None)?;
+            let mappings = engine.manager.get_mappings();
+            lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
+            if pwd.is_some() {
+                log::info!("Mapeos guardados y CIFRADOS en: {}", map_path.display());
+            } else {
+                log::info!("Mapeos guardados en: {}", map_path.display());
+            }
+        }
+
+        println!(
+            "✅ Documento Office sanitizado con éxito en: {}",
+            out_path.display()
+        );
+        log::info!(
+            "Informe: Reemplazos: {} | Formato: Office OpenXML | Tiempo: {:.2}ms",
+            report.replacements_applied,
+            report.elapsed_ms
+        );
+        return Ok(());
+    }
+
+    let content = resolve_input_content(
+        opts.input.as_deref(),
+        opts.text.as_deref(),
+        opts.clipboard,
+        opts.stdin,
+    )?;
 
     let mut engine = ObfuscatorEngine::new(config);
 
@@ -572,6 +641,62 @@ fn handle_deobfuscate(
     config: LexiConfig,
     opts: DeobfuscateOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let is_office = if let Some(ref in_path) = opts.input {
+        if let Ok(bytes) = fs::read(in_path) {
+            lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
+                != lexishield::format_adapters::office_adapter::OfficeType::Unknown
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if is_office {
+        let in_path = opts.input.as_ref().unwrap();
+        let out_path = opts.output.clone().unwrap_or_else(|| {
+            let stem = in_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("documento");
+            let ext = in_path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("docx");
+            in_path.with_file_name(format!("{stem}_restored.{ext}"))
+        });
+
+        let is_default = opts.mappings.is_none();
+        let map_path = opts
+            .mappings
+            .or_else(|| lexishield::config::get_default_vault_path().ok())
+            .ok_or("No se especificó archivo de mapeos y no se pudo usar el default")?;
+
+        let force_ask = is_default && opts.password.is_none();
+        let pwd = resolve_password(
+            opts.password,
+            opts.ask_password || force_ask,
+            Some(&map_path),
+        )?;
+        let loaded_mappings = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
+
+        let mut engine = ObfuscatorEngine::new(config);
+        engine.manager.load_mappings(loaded_mappings)?;
+
+        let report = engine.process_file(in_path, &out_path, opts.format, true)?;
+
+        println!(
+            "✅ Documento Office desofuscado con éxito en: {}",
+            out_path.display()
+        );
+        log::info!(
+            "Informe: Reemplazos aplicados: {} | Formato: Office OpenXML | Tiempo: {:.2}ms",
+            report.replacements_applied,
+            report.elapsed_ms
+        );
+        return Ok(());
+    }
+
     let content = resolve_input_content(
         opts.input.as_deref(),
         opts.text.as_deref(),
@@ -603,14 +728,15 @@ fn handle_deobfuscate(
         log::info!("Resultado desofuscado copiado al portapapeles.");
     } else if let Some(out_path) = opts.output {
         fs::write(&out_path, &result)?;
-        log::info!("Resultado restaurado en: {}", out_path.display());
+        log::info!("Resultado guardado en: {}", out_path.display());
     } else {
         println!("{}", result);
     }
 
     log::info!(
-        "Informe: Restauraciones aplicadas: {} | Tiempo: {:.2}ms",
+        "Informe: Reemplazos aplicados: {} | Formato: {:?} | Tiempo: {:.2}ms",
         report.replacements_applied,
+        report.format_detected,
         report.elapsed_ms
     );
 
@@ -712,8 +838,7 @@ fn is_binary_or_compressed(path: &Path, file: &mut std::fs::File) -> bool {
             "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tiff", "psd", "mp3", "mp4", "mkv",
             "avi", "mov", "wav", "flac", "ogg", "webm",
             // Documentos compilados y bases de datos
-            "pdf", "docx", "xlsx", "pptx", "db", "sqlite", "sqlite3", "mdb",
-            // Tipografías
+            "pdf", "db", "sqlite", "sqlite3", "mdb", // Tipografías
             "woff", "woff2", "ttf", "eot", "otf", // Bóvedas cifradas de LexiShield
             "lexi",
         ];
@@ -733,6 +858,13 @@ fn is_binary_or_compressed(path: &Path, file: &mut std::fs::File) -> bool {
                 return true;
             }
             if n >= 4 && header[0..4] == [0x50, 0x4b, 0x03, 0x04] {
+                // Comprobar si es un contenedor Office OpenXML (.docx, .xlsx, .pptx)
+                if let Ok(bytes) = std::fs::read(path)
+                    && lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
+                        != lexishield::format_adapters::office_adapter::OfficeType::Unknown
+                {
+                    return false;
+                }
                 return true;
             }
             if n >= 6 && header[0..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c] {
@@ -791,6 +923,33 @@ fn scan_file_with_progress(
             );
         }
         return Ok(Vec::new());
+    }
+
+    // Si es un documento Office OpenXML, usar el extractor especializado
+    if let Ok(bytes) = std::fs::read(path)
+        && lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
+            != lexishield::format_adapters::office_adapter::OfficeType::Unknown
+    {
+        if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
+            print!(
+                "\r  {}[ {} ] Analizando documento Office: {} \x1b[K",
+                tag,
+                format_size(total_bytes),
+                name
+            );
+            let _ = std::io::stdout().flush();
+        }
+        let mappings = engine.scan_file(path)?;
+        if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
+            println!(
+                "\r  {}[ {} ] Analizado (Office): {} ({} entidades) \x1b[K",
+                tag,
+                format_size(total_bytes),
+                name,
+                mappings.len()
+            );
+        }
+        return Ok(mappings);
     }
 
     let mut reader = BufReader::with_capacity(64 * 1024, file);
