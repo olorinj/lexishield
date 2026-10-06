@@ -54,7 +54,9 @@ impl ObfuscatorEngine {
 
         // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
         for m in &mut detected {
-            if self.manager.contains_original(&m.original) {
+            if let Some(existing) = self.manager.get_mapping(&m.original) {
+                m.pseudonym = existing.pseudonym.clone();
+                m.omitted = existing.omitted;
                 continue;
             }
             let mut attempts = 0;

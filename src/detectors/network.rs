@@ -182,8 +182,8 @@ impl EmailDetector {
     /// Genera un correo seguro bajo el dominio reservado RFC 2606 (example.com).
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u64 = rng.gen_range(100_000..999_999_999);
-        format!("user_{id}@example.com")
+        let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
+        format!("user_{id:08x}@example.com")
     }
 }
 
@@ -209,8 +209,8 @@ impl DomainDetector {
     /// Genera un dominio RFC 2606 seguro (.example.com).
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u64 = rng.gen_range(100_000..999_999_999);
-        format!("service{id}.example.com")
+        let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
+        format!("service-{id:08x}.example.com")
     }
 }
 
@@ -235,13 +235,13 @@ impl HostnameDetector {
 
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u64 = rng.gen_range(100_000..999_999_999);
+        let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
         let prefix = if original.to_lowercase().starts_with("srv") {
             "srv"
         } else {
             "host"
         };
-        format!("{prefix}-anon-{id}")
+        format!("{prefix}-anon-{id:08x}")
     }
 }
 

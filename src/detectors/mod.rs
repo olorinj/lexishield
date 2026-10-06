@@ -117,17 +117,17 @@ impl DetectorRegistry {
             DetectorType::O365OriginatingServer => self.o365_server.generate_pseudonym(original),
             DetectorType::AttachmentFileName => self.attachment.generate_pseudonym(original),
             DetectorType::GenericToken => {
-                let id: u64 =
-                    rand::Rng::gen_range(&mut rand::thread_rng(), 100_000_000..999_999_999);
-                format!("ANON_{id}")
+                let id: u32 =
+                    rand::Rng::gen_range(&mut rand::thread_rng(), 0x1000_0000..0xFFFF_FFFF);
+                format!("ANON_{id:08X}")
             }
             DetectorType::Custom(name) => {
                 if let Some(rule) = self.custom_rules.iter().find(|r| &r.name == name) {
                     rule.generate_pseudonym(original)
                 } else {
-                    let id: u64 =
-                        rand::Rng::gen_range(&mut rand::thread_rng(), 100_000_000..999_999_999);
-                    format!("CUSTOM_{id}")
+                    let id: u32 =
+                        rand::Rng::gen_range(&mut rand::thread_rng(), 0x1000_0000..0xFFFF_FFFF);
+                    format!("CUSTOM_{id:08X}")
                 }
             }
         }

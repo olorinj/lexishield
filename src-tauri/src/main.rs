@@ -393,7 +393,12 @@ fn clear_scan_cache_command() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn scan_file_command(app: tauri::AppHandle, path: String) -> Result<ScanAuditResponse, String> {
+fn scan_file_command(
+    app: tauri::AppHandle,
+    path: String,
+    vault_path: Option<String>,
+    password: Option<String>,
+) -> Result<ScanAuditResponse, String> {
     let p = Path::new(&path);
     if !p.exists() {
         return Err("El archivo no existe".to_string());
@@ -404,6 +409,18 @@ fn scan_file_command(app: tauri::AppHandle, path: String) -> Result<ScanAuditRes
     let current_rules_hash = lexishield::cache::ScanCache::compute_rules_hash(&config);
 
     let mut engine = ObfuscatorEngine::new(config);
+
+    // Precargar bóveda activa si se especifica para reconocer entidades existentes
+    if let Some(ref vp) = vault_path
+        && !vp.trim().is_empty()
+    {
+        let v_path = Path::new(vp);
+        if v_path.exists()
+            && let Ok(existing) = load_mappings_auto(v_path, password.as_deref())
+        {
+            let _ = engine.manager.load_mappings(existing);
+        }
+    }
 
     let mut emitted_originals = std::collections::HashSet::new();
     let mut accumulated_new_items = Vec::new();
@@ -483,6 +500,8 @@ async fn scan_directory_command(
     dir_path: String,
     recursive: Option<bool>,
     no_git_ignore: Option<bool>,
+    vault_path: Option<String>,
+    password: Option<String>,
 ) -> Result<ScanAuditResponse, String> {
     use ignore::WalkBuilder;
     let base_dir_buf = std::path::PathBuf::from(&dir_path);
@@ -516,6 +535,18 @@ async fn scan_directory_command(
 
         let ignore_cfg = config.ignore.clone();
         let mut engine = ObfuscatorEngine::new(config);
+
+        // Precargar bóveda activa si se especifica para reconocer entidades existentes
+        if let Some(ref vp) = vault_path
+            && !vp.trim().is_empty()
+        {
+            let v_path = Path::new(vp);
+            if v_path.exists()
+                && let Ok(existing) = load_mappings_auto(v_path, password.as_deref())
+            {
+                let _ = engine.manager.load_mappings(existing);
+            }
+        }
 
         let ignored_dirs = ignore_cfg.ignored_directories.clone();
         let mut builder = WalkBuilder::new(&base_dir_buf);

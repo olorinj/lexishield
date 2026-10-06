@@ -51,9 +51,9 @@ impl O365SubjectDetector {
             "Informe de operaciones",
             "Revisión de accesos",
         ];
-        let id: u64 = rng.gen_range(100_000..999_999_999);
+        let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
         let topic = topics[rng.gen_range(0..topics.len())];
-        format!("{topic} #{id}")
+        format!("{topic} [REF-{id:08X}]")
     }
 }
 
@@ -78,8 +78,8 @@ impl O365OriginatingServerDetector {
 
     pub fn generate_pseudonym(&self, _original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u64 = rng.gen_range(100_000..999_999);
-        format!("EURPRD{id:06}PROD.outlook.example.com")
+        let id: u32 = rng.gen_range(0x10_0000..0xFF_FFFF);
+        format!("EURPRD{id:06X}PROD.outlook.example.com")
     }
 }
 
@@ -104,9 +104,9 @@ impl AttachmentFileNameDetector {
 
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
-        let id: u64 = rng.gen_range(100_000_000..999_999_999);
+        let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
         let ext = original.rsplit('.').next().unwrap_or("dat");
-        format!("attachment_{id}.{ext}")
+        format!("attachment_{id:08x}.{ext}")
     }
 }
 
