@@ -31,11 +31,13 @@ fn get_current_scan_status() -> &'static Mutex<CurrentScanStatus> {
     CURRENT_SCAN.get_or_init(|| Mutex::new(CurrentScanStatus::default()))
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ScanProgressPayload {
     pub current_file: String,
     pub files_scanned: usize,
     pub entities_found: usize,
+    #[serde(default)]
+    pub new_items: Vec<DetectedItem>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -51,7 +53,7 @@ pub struct DeobfuscateResponse {
     pub report: ObfuscationReport,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DetectedItem {
     pub original: String,
     pub pseudonym: String,
@@ -492,6 +494,8 @@ async fn scan_directory_command(
         let mut files_scanned = 0;
         let mut files_ignored = 0;
         let mut last_emit = std::time::Instant::now();
+        let mut accumulated_new_items: Vec<DetectedItem> = Vec::new();
+        let mut emitted_count = 0;
 
         for result in builder.build() {
             if SCAN_CANCELLED.load(Ordering::Relaxed) {
@@ -515,28 +519,30 @@ async fn scan_directory_command(
                     let rel_path = path.strip_prefix(&base_dir_buf).unwrap_or(path);
                     let path_str = rel_path.display().to_string();
 
-                    // Actualizar estado compartido y registrar traza ANTES de analizar el fichero
+                    // Actualizar estado antes de escanear
                     if let Ok(mut status) = get_current_scan_status().lock() {
                         status.current_file = path_str.clone();
                         status.files_scanned = files_scanned;
                         status.entities_found = engine.manager.get_mappings().len();
                     }
 
-                    if last_emit.elapsed().as_millis() >= 30 {
-                        let _ = app.emit(
-                            "scan-progress",
-                            ScanProgressPayload {
-                                current_file: path_str.clone(),
-                                files_scanned,
-                                entities_found: engine.manager.get_mappings().len(),
-                            },
-                        );
-                        last_emit = std::time::Instant::now();
-                    }
-
                     if engine.scan_file(path).is_ok() {
                         files_scanned += 1;
-                        let entities_now = engine.manager.get_mappings().len();
+                        let all_mappings = engine.manager.get_mappings();
+                        let entities_now = all_mappings.len();
+
+                        if entities_now > emitted_count {
+                            for m in all_mappings.into_iter().skip(emitted_count) {
+                                accumulated_new_items.push(DetectedItem {
+                                    original: m.original,
+                                    pseudonym: m.pseudonym,
+                                    detector_type: m.detector_type.to_string(),
+                                    omitted: m.omitted,
+                                });
+                            }
+                            emitted_count = entities_now;
+                        }
+
                         log::info!("Analizado: {} (Total entidades: {})", path_str, entities_now);
                         if let Ok(mut status) = get_current_scan_status().lock() {
                             status.files_scanned = files_scanned;
@@ -544,6 +550,21 @@ async fn scan_directory_command(
                         }
                     } else {
                         files_ignored += 1;
+                    }
+
+                    if last_emit.elapsed().as_millis() >= 50 {
+                        let items_to_send = accumulated_new_items.clone();
+                        accumulated_new_items.clear();
+                        let _ = app.emit(
+                            "scan-progress",
+                            ScanProgressPayload {
+                                current_file: path_str.clone(),
+                                files_scanned,
+                                entities_found: engine.manager.get_mappings().len(),
+                                new_items: items_to_send,
+                            },
+                        );
+                        last_emit = std::time::Instant::now();
                     }
                 }
             }
@@ -565,12 +586,14 @@ async fn scan_directory_command(
             status.entities_found = entities_found;
         }
 
+        let final_items = accumulated_new_items;
         let _ = app.emit(
             "scan-progress",
             ScanProgressPayload {
                 current_file: final_status_msg,
                 files_scanned,
                 entities_found,
+                new_items: final_items,
             },
         );
 
