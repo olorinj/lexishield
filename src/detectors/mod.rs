@@ -139,6 +139,7 @@ impl DetectorRegistry {
         text: &str,
         priority_order: &[DetectorType],
         min_token_len: usize,
+        mut on_found: Option<&mut dyn FnMut(&Mapping)>,
     ) -> Vec<Mapping> {
         let mut found_mappings: Vec<Mapping> = Vec::new();
         let mut seen_originals: std::collections::HashSet<String> =
@@ -178,7 +179,9 @@ impl DetectorRegistry {
                         }
                         seen_pseudonyms.insert(pseudonym.clone());
                     }
-                    found_mappings.push(Mapping::new(candidate, pseudonym, dtype.clone()));
+                    let m = Mapping::new(candidate, pseudonym, dtype.clone());
+                    if let Some(ref mut cb) = on_found { cb(&m); }
+                    found_mappings.push(m);
                 }
             }
         }
@@ -240,7 +243,9 @@ impl DetectorRegistry {
                     log::debug!(
                         "Entidad detectada [{dtype}]: '{candidate}' -> Seudónimo: '{pseudonym}'"
                     );
-                    found_mappings.push(Mapping::new(candidate, pseudonym, dtype.clone()));
+                    let m = Mapping::new(candidate, pseudonym, dtype.clone());
+                    if let Some(ref mut cb) = on_found { cb(&m); }
+                    found_mappings.push(m);
                 }
             }
         }

@@ -384,7 +384,7 @@ pub struct ScanAuditResponse {
 }
 
 #[tauri::command]
-fn scan_file_command(path: String) -> Result<ScanAuditResponse, String> {
+fn scan_file_command(app: tauri::AppHandle, path: String) -> Result<ScanAuditResponse, String> {
     let p = Path::new(&path);
     if !p.exists() {
         return Err("El archivo no existe".to_string());
@@ -393,7 +393,39 @@ fn scan_file_command(path: String) -> Result<ScanAuditResponse, String> {
     let config = load_config_with_rules(None, None);
     let mut engine = ObfuscatorEngine::new(config);
 
-    let detected = engine.scan_file(p).map_err(|e| e.to_string())?;
+    let mut emitted_originals = std::collections::HashSet::new();
+    let mut accumulated_new_items = Vec::new();
+    let mut last_emit = std::time::Instant::now();
+    let path_str = path.clone();
+
+    let mut cb = |m: &lexishield::models::Mapping| {
+        if !emitted_originals.contains(&m.original) {
+            emitted_originals.insert(m.original.clone());
+            accumulated_new_items.push(DetectedItem {
+                original: m.original.clone(),
+                pseudonym: m.pseudonym.clone(),
+                detector_type: m.detector_type.to_string(),
+                omitted: m.omitted,
+            });
+
+            if last_emit.elapsed().as_millis() >= 100 {
+                let items_to_send = accumulated_new_items.clone();
+                accumulated_new_items.clear();
+                let _ = app.emit(
+                    "scan-progress",
+                    ScanProgressPayload {
+                        current_file: path_str.clone(),
+                        files_scanned: 1,
+                        entities_found: emitted_originals.len(),
+                        new_items: items_to_send,
+                    },
+                );
+                last_emit = std::time::Instant::now();
+            }
+        }
+    };
+
+    let detected = engine.scan_file_with_cb(p, Some(&mut cb)).map_err(|e| e.to_string())?;
     
     let mut summary = std::collections::HashMap::new();
     for m in &detected {
@@ -495,7 +527,7 @@ async fn scan_directory_command(
         let mut files_ignored = 0;
         let mut last_emit = std::time::Instant::now();
         let mut accumulated_new_items: Vec<DetectedItem> = Vec::new();
-        let mut emitted_count = 0;
+        let mut emitted_originals: std::collections::HashSet<String> = engine.manager.get_mappings().into_iter().map(|m| m.original).collect();
 
         for result in builder.build() {
             if SCAN_CANCELLED.load(Ordering::Relaxed) {
@@ -519,30 +551,42 @@ async fn scan_directory_command(
                     let rel_path = path.strip_prefix(&base_dir_buf).unwrap_or(path);
                     let path_str = rel_path.display().to_string();
 
-                    // Actualizar estado antes de escanear
                     if let Ok(mut status) = get_current_scan_status().lock() {
                         status.current_file = path_str.clone();
                         status.files_scanned = files_scanned;
-                        status.entities_found = engine.manager.get_mappings().len();
+                        status.entities_found = emitted_originals.len();
                     }
 
-                    if engine.scan_file(path).is_ok() {
-                        files_scanned += 1;
-                        let all_mappings = engine.manager.get_mappings();
-                        let entities_now = all_mappings.len();
-
-                        if entities_now > emitted_count {
-                            for m in all_mappings.into_iter().skip(emitted_count) {
-                                accumulated_new_items.push(DetectedItem {
-                                    original: m.original,
-                                    pseudonym: m.pseudonym,
-                                    detector_type: m.detector_type.to_string(),
-                                    omitted: m.omitted,
+                    let app_clone = app.clone();
+                    let p_str = path_str.clone();
+                    
+                    let mut cb = |m: &lexishield::models::Mapping| {
+                        if !emitted_originals.contains(&m.original) {
+                            emitted_originals.insert(m.original.clone());
+                            accumulated_new_items.push(DetectedItem {
+                                original: m.original.clone(),
+                                pseudonym: m.pseudonym.clone(),
+                                detector_type: m.detector_type.to_string(),
+                                omitted: m.omitted,
+                            });
+                            
+                            if last_emit.elapsed().as_millis() >= 100 {
+                                let items_to_send = accumulated_new_items.clone();
+                                accumulated_new_items.clear();
+                                let _ = app_clone.emit("scan-progress", ScanProgressPayload {
+                                    current_file: p_str.clone(),
+                                    files_scanned,
+                                    entities_found: emitted_originals.len(),
+                                    new_items: items_to_send,
                                 });
+                                last_emit = std::time::Instant::now();
                             }
-                            emitted_count = entities_now;
                         }
+                    };
 
+                    if engine.scan_file_with_cb(path, Some(&mut cb)).is_ok() {
+                        files_scanned += 1;
+                        let entities_now = engine.manager.get_mappings().len();
                         log::info!("Analizado: {} (Total entidades: {})", path_str, entities_now);
                         if let Ok(mut status) = get_current_scan_status().lock() {
                             status.files_scanned = files_scanned;
@@ -552,7 +596,7 @@ async fn scan_directory_command(
                         files_ignored += 1;
                     }
 
-                    if last_emit.elapsed().as_millis() >= 50 {
+                    if last_emit.elapsed().as_millis() >= 100 {
                         let items_to_send = accumulated_new_items.clone();
                         accumulated_new_items.clear();
                         let _ = app.emit(
