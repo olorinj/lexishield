@@ -37,11 +37,21 @@ impl ObfuscatorEngine {
         &mut self,
         content: &str,
     ) -> Result<Vec<Mapping>, ObfuscationError> {
+        self.scan_and_register_mappings_with_cb(content, None)
+    }
+
+    pub fn scan_and_register_mappings_with_cb(
+        &mut self,
+        content: &str,
+        on_found: Option<&mut dyn FnMut(&Mapping)>,
+    ) -> Result<Vec<Mapping>, ObfuscationError> {
         let mut detected = self.detectors.scan_text(
             content,
             &self.config.detector_priority_order,
             self.config.min_token_length(),
+            on_found,
         );
+
 
         // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
         for m in &mut detected {
@@ -147,7 +157,7 @@ impl ObfuscatorEngine {
     }
 
     /// Escanea un archivo en disco (de texto u Office OpenXML) y registra automáticamente sus entidades.
-    pub fn scan_file(&mut self, path: &Path) -> Result<Vec<Mapping>, ObfuscationError> {
+    pub fn scan_file_with_cb(&mut self, path: &Path, on_found: Option<&mut dyn FnMut(&Mapping)>) -> Result<Vec<Mapping>, ObfuscationError> {
         let bytes = fs::read(path)?;
         let office_type =
             crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes);
@@ -157,11 +167,15 @@ impl ObfuscatorEngine {
                     "El archivo no contiene texto UTF-8 válido: {e}"
                 ))
             })?;
-            self.scan_and_register_mappings(&content)
+            self.scan_and_register_mappings_with_cb(&content, on_found)
         } else {
             let extracted_text = self.format_orchestrator.office.extract_text(&bytes)?;
-            self.scan_and_register_mappings(&extracted_text)
+            self.scan_and_register_mappings_with_cb(&extracted_text, on_found)
         }
+    }
+
+    pub fn scan_file(&mut self, path: &Path) -> Result<Vec<Mapping>, ObfuscationError> {
+        self.scan_file_with_cb(path, None)
     }
 
     /// Procesa un archivo en disco de forma segura (detectando automáticamente texto plano vs Office OpenXML).
