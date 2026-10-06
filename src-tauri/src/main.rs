@@ -437,7 +437,7 @@ fn scan_file_command(
                 omitted: m.omitted,
             });
 
-            if last_emit.elapsed().as_millis() >= 100 {
+            if last_emit.elapsed().as_millis() >= 250 {
                 let items_to_send = accumulated_new_items.clone();
                 accumulated_new_items.clear();
                 let _ = app.emit(
@@ -626,7 +626,7 @@ async fn scan_directory_command(
                                 omitted: m.omitted,
                             });
                             
-                            if last_emit.elapsed().as_millis() >= 100 {
+                            if last_emit.elapsed().as_millis() >= 250 {
                                 let items_to_send = accumulated_new_items.clone();
                                 accumulated_new_items.clear();
                                 let _ = app_clone.emit("scan-progress", ScanProgressPayload {
@@ -653,7 +653,7 @@ async fn scan_directory_command(
                         files_ignored += 1;
                     }
 
-                    if last_emit.elapsed().as_millis() >= 100 {
+                    if last_emit.elapsed().as_millis() >= 250 {
                         let items_to_send = accumulated_new_items.clone();
                         accumulated_new_items.clear();
                         let _ = app.emit(
