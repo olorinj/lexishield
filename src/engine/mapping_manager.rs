@@ -91,6 +91,18 @@ impl MappingManager {
         self.forward.values().cloned().collect()
     }
 
+    /// Obtiene el mapeo completo para un valor original si existe.
+    #[must_use]
+    pub fn get_mapping(&self, original: &str) -> Option<&Mapping> {
+        self.forward.get(original)
+    }
+
+    /// Obtiene el seudónimo asignado a un valor original si existe.
+    #[must_use]
+    pub fn get_pseudonym(&self, original: &str) -> Option<&str> {
+        self.forward.get(original).map(|m| m.pseudonym.as_str())
+    }
+
     /// Comprueba si ya existe un valor original registrado en el gestor.
     pub fn contains_original(&self, original: &str) -> bool {
         self.forward.contains_key(original)

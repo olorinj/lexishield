@@ -414,7 +414,11 @@
       detectedItems = [];
       auditSummary = null;
       activeTab = "scanner";
-      const res = await invokeTauri("scan_file_command", { path: selected });
+      const res = await invokeTauri("scan_file_command", {
+        path: selected,
+        vaultPath: pairsSelectedVault || vaultPath || null,
+        password: password || null
+      });
       detectedItems = res.items || [];
       auditSummary = res;
       statusMessage = `🔍 Archivo escaneado: ${res.total_entities} entidades detectadas en 1 archivo.`;
@@ -459,7 +463,9 @@
       const res = await invokeTauri("scan_directory_command", {
         dirPath: selected,
         recursive: recursiveScan,
-        noGitIgnore: noGitIgnoreScan
+        noGitIgnore: noGitIgnoreScan,
+        vaultPath: pairsSelectedVault || vaultPath || null,
+        password: password || null
       });
       // detectedItems ya se va llenando dinámicamente con los eventos 'scan-progress'
       auditSummary = res;
@@ -502,7 +508,7 @@
         return {
           ...it,
           omitted: shouldOmit,
-          pseudonym: shouldOmit ? "=" : (it.pseudonym === "=" ? `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]` : it.pseudonym)
+          pseudonym: shouldOmit ? "=" : (it.pseudonym === "=" ? `[TOKEN_${Math.floor(0x1000 + Math.random() * 0xEFFF).toString(16).toUpperCase()}]` : it.pseudonym)
         };
       });
       statusMessage = shouldOmit
@@ -514,7 +520,7 @@
           return {
             ...it,
             omitted: shouldOmit,
-            pseudonym: shouldOmit ? "=" : (it.pseudonym === "=" ? `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]` : it.pseudonym)
+            pseudonym: shouldOmit ? "=" : (it.pseudonym === "=" ? `[TOKEN_${Math.floor(0x1000 + Math.random() * 0xEFFF).toString(16).toUpperCase()}]` : it.pseudonym)
           };
         }
         return it;
@@ -531,7 +537,7 @@
     if (item.omitted) {
       item.pseudonym = "=";
     } else if (item.pseudonym === "=") {
-      item.pseudonym = `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]`;
+      item.pseudonym = `[TOKEN_${Math.floor(0x1000 + Math.random() * 0xEFFF).toString(16).toUpperCase()}]`;
     }
     detectedItems = [...detectedItems];
   }
@@ -663,7 +669,7 @@
 
   async function handleToggleOmitPair(item) {
     const isCurrentlyOmitted = item.omitted || item.pseudonym === "=";
-    const newPseudo = isCurrentlyOmitted ? `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]` : "=";
+    const newPseudo = isCurrentlyOmitted ? `[TOKEN_${Math.floor(0x1000 + Math.random() * 0xEFFF).toString(16).toUpperCase()}]` : "=";
     try {
       const updated = await invokeTauri("update_mapping_pair", {
         vaultPath: pairsSelectedVault || vaultPath,
@@ -687,7 +693,7 @@
       let currentList = [...vaultMappings];
       for (const orig of selectedPairKeys) {
         const found = currentList.find(m => m.original === orig);
-        const newPseudo = shouldOmit ? "=" : `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]`;
+        const newPseudo = shouldOmit ? "=" : `[TOKEN_${Math.floor(0x1000 + Math.random() * 0xEFFF).toString(16).toUpperCase()}]`;
         currentList = await invokeTauri("update_mapping_pair", {
           vaultPath: pairsSelectedVault || vaultPath,
           password: password || null,
