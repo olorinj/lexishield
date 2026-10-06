@@ -1134,6 +1134,23 @@ fn scan_file_with_progress(
         return Ok(Vec::new());
     }
 
+    // Comprobación híbrida en caché de 2 fases (Fast-path metadatos + Hash parcial)
+    let mut scan_cache = lexishield::cache::ScanCache::load();
+    let current_rules_hash = lexishield::cache::ScanCache::compute_rules_hash(&engine.config);
+    let cache_check = scan_cache.check_file(path, current_rules_hash);
+    if let lexishield::cache::CacheCheckResult::Skip { entities_found } = cache_check {
+        if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
+            println!(
+                "\r  {}[ {} ] En caché (sin cambios): {} ({} entidades) \x1b[K",
+                tag,
+                format_size(total_bytes),
+                name,
+                entities_found
+            );
+        }
+        return Ok(Vec::new());
+    }
+
     // Si es un documento Office OpenXML, usar el extractor especializado
     if let Ok(bytes) = std::fs::read(path)
         && lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
@@ -1149,6 +1166,8 @@ fn scan_file_with_progress(
             let _ = std::io::stdout().flush();
         }
         let mappings = engine.scan_file(path)?;
+        scan_cache.record_file(path, current_rules_hash, mappings.len());
+        let _ = scan_cache.save();
         if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
             println!(
                 "\r  {}[ {} ] Analizado (Office): {} ({} entidades) \x1b[K",
@@ -1209,6 +1228,9 @@ fn scan_file_with_progress(
             last_update = std::time::Instant::now();
         }
     }
+
+    scan_cache.record_file(path, current_rules_hash, newly_added.len());
+    let _ = scan_cache.save();
 
     if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
         println!(

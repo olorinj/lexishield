@@ -384,6 +384,12 @@ pub struct ScanAuditResponse {
 }
 
 #[tauri::command]
+fn clear_scan_cache_command() -> Result<(), String> {
+    let mut cache = lexishield::cache::ScanCache::load();
+    cache.clear().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn scan_file_command(app: tauri::AppHandle, path: String) -> Result<ScanAuditResponse, String> {
     let p = Path::new(&path);
     if !p.exists() {
@@ -391,6 +397,9 @@ fn scan_file_command(app: tauri::AppHandle, path: String) -> Result<ScanAuditRes
     }
 
     let config = load_config_with_rules(None, None);
+    let mut scan_cache = lexishield::cache::ScanCache::load();
+    let current_rules_hash = lexishield::cache::ScanCache::compute_rules_hash(&config);
+
     let mut engine = ObfuscatorEngine::new(config);
 
     let mut emitted_originals = std::collections::HashSet::new();
@@ -426,6 +435,10 @@ fn scan_file_command(app: tauri::AppHandle, path: String) -> Result<ScanAuditRes
     };
 
     let detected = engine.scan_file_with_cb(p, Some(&mut cb)).map_err(|e| e.to_string())?;
+    let total = detected.len();
+
+    scan_cache.record_file(p, current_rules_hash, total);
+    let _ = scan_cache.save();
     
     let mut summary = std::collections::HashMap::new();
     for m in &detected {
@@ -438,8 +451,6 @@ fn scan_file_command(app: tauri::AppHandle, path: String) -> Result<ScanAuditRes
         detector_type: m.detector_type.to_string(),
         omitted: m.omitted,
     }).collect();
-
-    let total = items.len();
 
     Ok(ScanAuditResponse {
         files_scanned: 1,
@@ -497,6 +508,9 @@ async fn scan_directory_command(
 
     tauri::async_runtime::spawn_blocking(move || {
         let config = load_config_with_rules(None, None);
+        let mut scan_cache = lexishield::cache::ScanCache::load();
+        let current_rules_hash = lexishield::cache::ScanCache::compute_rules_hash(&config);
+
         let ignore_cfg = config.ignore.clone();
         let mut engine = ObfuscatorEngine::new(config);
 
@@ -551,6 +565,14 @@ async fn scan_directory_command(
                     let rel_path = path.strip_prefix(&base_dir_buf).unwrap_or(path);
                     let path_str = rel_path.display().to_string();
 
+                    // Comprobación híbrida en caché de 2 fases (Fast-path metadatos + Hash parcial)
+                    let cache_check = scan_cache.check_file(path, current_rules_hash);
+                    if let lexishield::cache::CacheCheckResult::Skip { entities_found: _ } = cache_check {
+                        files_scanned += 1;
+                        log::debug!("Caché HIT (Fase 1/2): {} (omitido re-análisis)", path_str);
+                        continue;
+                    }
+
                     if let Ok(mut status) = get_current_scan_status().lock() {
                         status.current_file = path_str.clone();
                         status.files_scanned = files_scanned;
@@ -587,6 +609,7 @@ async fn scan_directory_command(
                     if engine.scan_file_with_cb(path, Some(&mut cb)).is_ok() {
                         files_scanned += 1;
                         let entities_now = engine.manager.get_mappings().len();
+                        scan_cache.record_file(path, current_rules_hash, entities_now);
                         log::info!("Analizado: {} (Total entidades: {})", path_str, entities_now);
                         if let Ok(mut status) = get_current_scan_status().lock() {
                             status.files_scanned = files_scanned;
@@ -613,6 +636,8 @@ async fn scan_directory_command(
                 }
             }
         }
+
+        let _ = scan_cache.save();
 
         let is_cancelled = SCAN_CANCELLED.load(Ordering::Relaxed);
         let final_status_msg = if is_cancelled {
@@ -915,7 +940,8 @@ fn main() {
             get_debug_mode,
             set_debug_mode_command,
             get_debug_logs,
-            clear_debug_logs
+            clear_debug_logs,
+            clear_scan_cache_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
