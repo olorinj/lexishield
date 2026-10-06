@@ -37,6 +37,7 @@ ignore = "0.4"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 tar = "0.4"
 bzip2 = "0.4"
+shellexpand = "3.1.2"
 
 [build-dependencies]
 winres = "0.1"

@@ -16,6 +16,12 @@ use std::path::{Path, PathBuf};
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
+fn parse_path(s: &str) -> Result<PathBuf, String> {
+    shellexpand::full(s)
+        .map(|e| PathBuf::from(e.into_owned()))
+        .map_err(|e| e.to_string())
+}
+
 #[derive(Parser)]
 #[command(name = "lexishield")]
 #[command(about = "Motor de anonimización y ofuscación semántica de alto rendimiento", long_about = None)]
@@ -30,11 +36,11 @@ struct Cli {
     debug: bool,
 
     /// Ruta a un archivo de configuración TOML personalizado.
-    #[arg(long, global = true)]
+    #[arg(value_parser = parse_path, long, global = true)]
     config: Option<PathBuf>,
 
     /// Ruta a un archivo de reglas TOML personalizado (~/.lexishield/rules.toml).
-    #[arg(long, global = true)]
+    #[arg(value_parser = parse_path, long, global = true)]
     rules: Option<PathBuf>,
 
     #[command(subcommand)]
@@ -82,7 +88,7 @@ enum DictCommands {
     /// Lista los mapeos contenidos en un archivo de mapeos (JSON o cifrado .lexi).
     List {
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña si el archivo de mapeos está cifrado.
@@ -96,7 +102,7 @@ enum DictCommands {
     /// Cambia la contraseña de un archivo de mapeos cifrado (Rekey).
     Rekey {
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña original (actual).
@@ -118,7 +124,7 @@ enum DictCommands {
         pseudonym: String,
 
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña para cifrar o actualizar el archivo.
@@ -137,7 +143,7 @@ enum DictCommands {
         original: String,
 
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña si el archivo de mapeos está cifrado.
@@ -151,7 +157,7 @@ enum DictCommands {
     /// Vacía o elimina todos los mapeos del archivo.
     Clear {
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña si se desea mantener cifrado el archivo vacío.
@@ -166,7 +172,7 @@ enum DictCommands {
     #[command(alias = "rm")]
     Delete {
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Confirma la eliminación sin preguntar.
@@ -184,7 +190,7 @@ enum DictCommands {
         pseudonym: String,
 
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña si el archivo de mapeos está cifrado.
@@ -202,7 +208,7 @@ enum DictCommands {
         originals: Vec<String>,
 
         /// Ruta al archivo de mapeos. Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña si el archivo de mapeos está cifrado.
@@ -273,7 +279,7 @@ enum BackupCommands {
     /// Crea una copia de seguridad completa en tar.bz2 de alta compresión (con opción de cifrado AES).
     Create {
         /// Archivo de salida de la copia de seguridad (.tar.bz2 o .lexibak).
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         output: Option<PathBuf>,
         /// Contraseña para cifrar la copia de seguridad.
         #[arg(short, long)]
@@ -285,7 +291,7 @@ enum BackupCommands {
     /// Restaura una copia de seguridad comprimida (tar.bz2) sobre ~/.lexishield.
     Restore {
         /// Archivo de copia de seguridad a restaurar.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         input: PathBuf,
         /// Contraseña si la copia de seguridad está cifrada.
         #[arg(short, long)]
@@ -312,7 +318,7 @@ enum Commands {
     /// Ofusca un archivo, texto directo, entrada estándar (stdin) o portapapeles.
     Obfuscate {
         /// Archivo de entrada a procesar (use '-' para leer desde stdin).
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         input: Option<PathBuf>,
 
         /// Leer datos directamente desde la entrada estándar (stdin).
@@ -320,7 +326,7 @@ enum Commands {
         stdin: bool,
 
         /// Archivo de salida donde guardar el resultado.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         output: Option<PathBuf>,
 
         /// Guardar resultado como una copia (sufijada) en lugar de sobrescribir el original.
@@ -348,7 +354,7 @@ enum Commands {
         format: CliFormat,
 
         /// Ruta opcional para guardar la tabla de mapeos generada (soporta JSON o cifrado).
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         save_mappings: Option<PathBuf>,
 
         /// Contraseña para cifrar la tabla de mapeos guardada (Argon2 + ChaCha20-Poly1305).
@@ -367,7 +373,7 @@ enum Commands {
     /// Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada.
     Deobfuscate {
         /// Archivo de entrada a desofuscar (use '-' para leer desde stdin).
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         input: Option<PathBuf>,
 
         /// Leer datos directamente desde la entrada estándar (stdin).
@@ -375,7 +381,7 @@ enum Commands {
         stdin: bool,
 
         /// Archivo de salida.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         output: Option<PathBuf>,
 
         /// Texto directo a desofuscar.
@@ -387,7 +393,7 @@ enum Commands {
         clipboard: bool,
 
         /// Archivo con los mapeos a aplicar (JSON o bóveda cifrada .lexi). Si se omite, usa el default.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña para descifrar el archivo de mapeos.
@@ -406,7 +412,7 @@ enum Commands {
     /// Escanea un archivo, texto, stdin o portapapeles y muestra los datos sensibles detectados sin modificarlos.
     Scan {
         /// Archivo o directorio a escanear (use '-' para leer desde stdin).
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         input: Option<PathBuf>,
 
         /// Explorar subdirectorios de forma recursiva (por defecto: true).
@@ -430,7 +436,7 @@ enum Commands {
         clipboard: bool,
 
         /// Ruta opcional para guardar los mapeos detectados tras confirmar.
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         save_mappings: Option<PathBuf>,
 
         /// Contraseña si el archivo de mapeos se guardará cifrado.
@@ -453,7 +459,7 @@ enum Commands {
         direction: CliDirection,
 
         /// Archivo de mapeos a cargar y mantener sincronizado (JSON o cifrado).
-        #[arg(short, long)]
+        #[arg(value_parser = parse_path, short, long)]
         mappings: Option<PathBuf>,
 
         /// Contraseña si el archivo de mapeos está o se guardará cifrado.
