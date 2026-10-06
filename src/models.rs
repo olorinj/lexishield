@@ -78,19 +78,21 @@ impl std::str::FromStr for DetectorType {
             "Generic Token" => Ok(Self::GenericToken),
 
             other => {
-
-                if other.starts_with("Custom (") && other.ends_with(')') {
-
-                    let inner = &other[8..other.len() - 1];
-
-                    Ok(Self::Custom(inner.to_string()))
-
-                } else {
-
-                    Ok(Self::Custom(other.to_string()))
-
+                let mut current = other.trim();
+                let mut peeled = false;
+                while current.starts_with("Custom (") && current.ends_with(')') {
+                    current = current[8..current.len() - 1].trim();
+                    peeled = true;
                 }
-
+                
+                if peeled {
+                    // Try parsing the inner value in case it's a known standard type
+                    if let Ok(standard_type) = current.parse::<Self>() {
+                        return Ok(standard_type);
+                    }
+                }
+                
+                Ok(Self::Custom(current.to_string()))
             }
 
         }
