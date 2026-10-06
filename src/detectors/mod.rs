@@ -180,7 +180,9 @@ impl DetectorRegistry {
                         seen_pseudonyms.insert(pseudonym.clone());
                     }
                     let m = Mapping::new(candidate, pseudonym, dtype.clone());
-                    if let Some(ref mut cb) = on_found { cb(&m); }
+                    if let Some(ref mut cb) = on_found {
+                        cb(&m);
+                    }
                     found_mappings.push(m);
                 }
             }
@@ -244,7 +246,9 @@ impl DetectorRegistry {
                         "Entidad detectada [{dtype}]: '{candidate}' -> Seudónimo: '{pseudonym}'"
                     );
                     let m = Mapping::new(candidate, pseudonym, dtype.clone());
-                    if let Some(ref mut cb) = on_found { cb(&m); }
+                    if let Some(ref mut cb) = on_found {
+                        cb(&m);
+                    }
                     found_mappings.push(m);
                 }
             }

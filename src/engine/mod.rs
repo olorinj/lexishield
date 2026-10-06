@@ -52,7 +52,6 @@ impl ObfuscatorEngine {
             on_found,
         );
 
-
         // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
         for m in &mut detected {
             if self.manager.contains_original(&m.original) {
@@ -74,6 +73,8 @@ impl ObfuscatorEngine {
     /// Limpia las cachés y estados de sesión del motor de ofuscación.
     pub fn clean_cache(&mut self) {
         self.manager.clear();
+        let mut scan_cache = crate::cache::ScanCache::load();
+        let _ = scan_cache.clear();
         log::debug!("Caché y tabla de mapeos de sesión del motor limpiadas.");
     }
 
@@ -157,7 +158,11 @@ impl ObfuscatorEngine {
     }
 
     /// Escanea un archivo en disco (de texto u Office OpenXML) y registra automáticamente sus entidades.
-    pub fn scan_file_with_cb(&mut self, path: &Path, on_found: Option<&mut dyn FnMut(&Mapping)>) -> Result<Vec<Mapping>, ObfuscationError> {
+    pub fn scan_file_with_cb(
+        &mut self,
+        path: &Path,
+        on_found: Option<&mut dyn FnMut(&Mapping)>,
+    ) -> Result<Vec<Mapping>, ObfuscationError> {
         let bytes = fs::read(path)?;
         let office_type =
             crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes);

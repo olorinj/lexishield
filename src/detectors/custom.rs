@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 /// Estrategia de generación de seudónimos para reglas personalizadas.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum CustomStrategy {
     /// Sustituye únicamente los dígitos por dígitos aleatorios preservando la longitud.
@@ -23,7 +23,7 @@ pub enum CustomStrategy {
 }
 
 /// Definición de una regla personalizada en el archivo de configuración TOML.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct CustomRule {
     /// Nombre descriptivo de la regla (ej. "Identificador de Empleado").
     pub name: String,

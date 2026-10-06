@@ -36,15 +36,10 @@ pub enum DetectorType {
 }
 
 impl std::str::FromStr for DetectorType {
-
     type Err = ();
 
-
-
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-
         match s {
-
             "GUID/UUID" => Ok(Self::GuidUuid),
 
             "Windows SID" => Ok(Self::WindowsSid),
@@ -84,23 +79,19 @@ impl std::str::FromStr for DetectorType {
                     current = current[8..current.len() - 1].trim();
                     peeled = true;
                 }
-                
+
                 if peeled {
                     // Try parsing the inner value in case it's a known standard type
                     if let Ok(standard_type) = current.parse::<Self>() {
                         return Ok(standard_type);
                     }
                 }
-                
+
                 Ok(Self::Custom(current.to_string()))
             }
-
         }
-
     }
-
 }
-
 
 impl fmt::Display for DetectorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
