@@ -448,18 +448,6 @@
       scanEntitiesCount = 0;
       statusMessage = "Escaneando carpeta: " + selected;
 
-      if (scanPollTimer) clearInterval(scanPollTimer);
-      scanPollTimer = setInterval(async () => {
-        try {
-          const prog = await invokeTauri("get_scan_progress");
-          if (prog) {
-            scanCurrentFile = prog.current_file;
-            scanFilesCount = prog.files_scanned;
-            scanEntitiesCount = prog.entities_found;
-          }
-        } catch (e) {}
-      }, 150);
-
       const res = await invokeTauri("scan_directory_command", {
         dirPath: selected,
         recursive: recursiveScan,
@@ -473,10 +461,6 @@
     } catch (err) {
       statusMessage = "Error al escanear carpeta: " + err;
     } finally {
-      if (scanPollTimer) {
-        clearInterval(scanPollTimer);
-        scanPollTimer = null;
-      }
       loading = false;
       isScanningDirectory = false;
     }
@@ -1466,7 +1450,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
-              {#each detectedItems as item}
+              {#each detectedItems as item (item.original)}
                 <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-50' : ''}">
                   <td class="p-3 text-center">
                     <input
