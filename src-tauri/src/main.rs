@@ -512,14 +512,6 @@ async fn scan_directory_command(
                         continue;
                     }
 
-                    // Omitir ficheros superiores a 10 MB durante el escaneo general
-                    if let Ok(meta) = path.metadata() {
-                        if meta.len() > 10 * 1024 * 1024 {
-                            files_ignored += 1;
-                            continue;
-                        }
-                    }
-
                     let path_str = path.display().to_string();
 
                     // Actualizar estado compartido y registrar traza ANTES de analizar el fichero

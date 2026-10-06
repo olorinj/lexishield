@@ -482,6 +482,99 @@
     }
   }
 
+  // Selección y Omisión en la Pestaña Escáner
+  let selectedScanOriginals = [];
+
+  function toggleSelectAllScanItems() {
+    if (selectedScanOriginals.length === detectedItems.length) {
+      selectedScanOriginals = [];
+    } else {
+      selectedScanOriginals = detectedItems.map(it => it.original);
+    }
+  }
+
+  function handleBatchOmitScanItems(shouldOmit) {
+    if (selectedScanOriginals.length === 0) {
+      detectedItems = detectedItems.map(it => {
+        return {
+          ...it,
+          omitted: shouldOmit,
+          pseudonym: shouldOmit ? "=" : (it.pseudonym === "=" ? `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]` : it.pseudonym)
+        };
+      });
+      statusMessage = shouldOmit
+        ? "🚫 Todas las entidades marcadas para OMITIR (no se ofuscarán)."
+        : "🛡️ Todas las entidades reactivadas para ofuscación.";
+    } else {
+      detectedItems = detectedItems.map(it => {
+        if (selectedScanOriginals.includes(it.original)) {
+          return {
+            ...it,
+            omitted: shouldOmit,
+            pseudonym: shouldOmit ? "=" : (it.pseudonym === "=" ? `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]` : it.pseudonym)
+          };
+        }
+        return it;
+      });
+      statusMessage = shouldOmit
+        ? `🚫 ${selectedScanOriginals.length} entidades seleccionadas marcadas para OMITIR.`
+        : `🛡️ ${selectedScanOriginals.length} entidades seleccionadas reactivadas para ofuscación.`;
+      selectedScanOriginals = [];
+    }
+  }
+
+  function toggleSingleScanOmit(item) {
+    item.omitted = !item.omitted;
+    if (item.omitted) {
+      item.pseudonym = "=";
+    } else if (item.pseudonym === "=") {
+      item.pseudonym = `[TOKEN_${Math.floor(1000 + Math.random() * 9000)}]`;
+    }
+    detectedItems = [...detectedItems];
+  }
+
+  async function handleSaveScanToVault() {
+    if (detectedItems.length === 0) return;
+    const targetVault = pairsSelectedVault || vaultPath || 'default.lexi';
+    try {
+      const itemsToSave = detectedItems.map(it => ({
+        original: it.original,
+        pseudonym: it.omitted ? "=" : it.pseudonym,
+        detector_type: it.detector_type,
+        omitted: !!it.omitted
+      }));
+
+      let existingItems = [];
+      try {
+        const meta = await invokeTauri("inspect_vault_file", { path: targetVault, password: password || null });
+        if (meta && meta.items) {
+          existingItems = meta.items;
+        }
+      } catch (_) {}
+
+      const combinedMap = new Map();
+      for (const it of existingItems) {
+        combinedMap.set(it.original, it);
+      }
+      for (const it of itemsToSave) {
+        combinedMap.set(it.original, it);
+      }
+
+      const mergedList = Array.from(combinedMap.values());
+      await invokeTauri("save_vault_file", {
+        path: targetVault,
+        password: password || null,
+        items: mergedList
+      });
+
+      vaultMappings = mergedList;
+      statusMessage = `💾 ${itemsToSave.length} entidades del escaneo guardadas e integradas en '${targetVault.split('/').pop()}'.`;
+      await refreshVaultsList();
+    } catch (e) {
+      alert("Error al guardar mapeos en la bóveda: " + e);
+    }
+  }
+
   // Operaciones de la Pestaña Pares
   async function loadPairsForVault(path) {
     if (!path) return;
@@ -1302,21 +1395,82 @@
           </div>
         {/if}
 
+        {#if detectedItems.length > 0}
+          <!-- Barra de Acciones del Escáner (Simetría CLI/GUI) -->
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-xs">
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                on:click={() => handleBatchOmitScanItems(true)}
+                class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg border border-amber-500/20 transition flex items-center gap-1"
+                title="Marcar como omitidos (no se ofuscarán)"
+              >
+                <span>🚫</span> Omitir {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+              </button>
+              <button
+                type="button"
+                on:click={() => handleBatchOmitScanItems(false)}
+                class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold rounded-lg border border-emerald-500/20 transition flex items-center gap-1"
+                title="Reactivar ofuscación"
+              >
+                <span>🛡️</span> Ofuscar {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                on:click={handleSaveScanToVault}
+                class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold rounded-lg transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+                title="Guardar todos los mapeos en la bóveda activa aplicando las omisiones seleccionadas"
+              >
+                <span>💾</span> Guardar en Bóveda ({detectedItems.length})
+              </button>
+            </div>
+          </div>
+        {/if}
+
         <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
           <table class="w-full text-left text-xs font-mono">
             <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
               <tr>
-                <th class="p-3 w-16">Omitir</th>
-                <th class="p-3 w-48">Tipo de Entidad</th>
+                <th class="p-3 w-12 text-center">
+                  <input
+                    type="checkbox"
+                    checked={detectedItems.length > 0 && selectedScanOriginals.length === detectedItems.length}
+                    on:change={toggleSelectAllScanItems}
+                    class="rounded accent-primary-500 cursor-pointer"
+                    title="Seleccionar o desmarcar todos"
+                  />
+                </th>
+                <th class="p-3 w-32">Estado</th>
+                <th class="p-3 w-40">Tipo de Entidad</th>
                 <th class="p-3">Valor Original Confidencial</th>
-                <th class="p-3">Seudónimo Coherente Sugerido</th>
+                <th class="p-3">Seudónimo / Resultado</th>
+                <th class="p-3 w-28 text-center">Acción</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
               {#each detectedItems as item}
-                <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-40' : ''}">
+                <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-50' : ''}">
                   <td class="p-3 text-center">
-                    <input type="checkbox" bind:checked={item.omitted} class="rounded accent-primary-500 cursor-pointer" />
+                    <input
+                      type="checkbox"
+                      value={item.original}
+                      bind:group={selectedScanOriginals}
+                      class="rounded accent-primary-500 cursor-pointer"
+                    />
+                  </td>
+                  <td class="p-3">
+                    {#if item.omitted || item.pseudonym === '='}
+                      <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold border border-amber-500/20">
+                        🚫 Omitido
+                      </span>
+                    {:else}
+                      <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+                        🛡️ Ofuscado
+                      </span>
+                    {/if}
                   </td>
                   <td class="p-3">
                     <span class="px-2 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 text-[11px] border border-primary-500/20">
@@ -1324,11 +1478,22 @@
                     </span>
                   </td>
                   <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text">{item.original}</td>
-                  <td class="p-3 text-primary-700 dark:text-primary-400 select-text">{item.omitted ? '=' : item.pseudonym}</td>
+                  <td class="p-3 font-mono select-text {item.omitted ? 'text-slate-400 dark:text-slate-500' : 'text-primary-700 dark:text-primary-400'}">
+                    {item.omitted || item.pseudonym === '=' ? '=' : item.pseudonym}
+                  </td>
+                  <td class="p-3 text-center">
+                    <button
+                      type="button"
+                      on:click={() => toggleSingleScanOmit(item)}
+                      class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition {item.omitted ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20'}"
+                    >
+                      {item.omitted ? '✓ Ofuscar' : '🚫 Omitir'}
+                    </button>
+                  </td>
                 </tr>
               {:else}
                 <tr>
-                  <td colspan="4" class="p-12 text-center text-slate-400 dark:text-slate-500">
+                  <td colspan="6" class="p-12 text-center text-slate-400 dark:text-slate-500">
                     {#if isScanningDirectory || loading}
                       <div class="text-3xl mb-2 animate-spin inline-block">⏳</div>
                       <div class="font-medium text-primary-600 dark:text-primary-400">Escaneando archivos en curso...</div>
