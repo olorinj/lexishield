@@ -163,22 +163,48 @@ impl ObfuscatorEngine {
     pub fn scan_file_with_cb(
         &mut self,
         path: &Path,
-        on_found: Option<&mut dyn FnMut(&Mapping)>,
+        mut on_found: Option<&mut dyn FnMut(&Mapping)>,
     ) -> Result<Vec<Mapping>, ObfuscationError> {
-        let bytes = fs::read(path)?;
-        let office_type =
-            crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes);
-        if office_type == crate::format_adapters::office_adapter::OfficeType::Unknown {
-            let content = String::from_utf8(bytes).map_err(|e| {
-                ObfuscationError::InvalidFormat(format!(
-                    "El archivo no contiene texto UTF-8 válido: {e}"
-                ))
-            })?;
-            self.scan_and_register_mappings_with_cb(&content, on_found)
-        } else {
-            let extracted_text = self.format_orchestrator.office.extract_text(&bytes)?;
-            self.scan_and_register_mappings_with_cb(&extracted_text, on_found)
+        let mut file = std::fs::File::open(path)?;
+
+        // Comprobar cabecera mágica (ZIP) para delegar a OfficeAdapter si es necesario
+        let mut magic_buf = [0u8; 4];
+        use std::io::{BufRead, BufReader, Read, Seek};
+        if file.read_exact(&mut magic_buf).is_ok() {
+            if &magic_buf == b"PK\x03\x04" {
+                // Leer completo y comprobar si es office
+                let bytes = fs::read(path)?;
+                if crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
+                    != crate::format_adapters::office_adapter::OfficeType::Unknown
+                {
+                    let extracted_text = self.format_orchestrator.office.extract_text(&bytes)?;
+                    return self.scan_and_register_mappings_with_cb(
+                        &extracted_text,
+                        on_found.as_deref_mut(),
+                    );
+                }
+            }
         }
+
+        // Resetear puntero y analizar línea por línea (Alta eficiencia O(1) memoria, al igual que el CLI)
+        file.seek(std::io::SeekFrom::Start(0))?;
+        let mut reader = BufReader::with_capacity(64 * 1024, file);
+        let mut byte_buf = Vec::new();
+        let mut all_mappings = Vec::new();
+
+        loop {
+            byte_buf.clear();
+            let n = reader.read_until(b'\n', &mut byte_buf)?;
+            if n == 0 {
+                break;
+            }
+            let line = String::from_utf8_lossy(&byte_buf);
+            let mut file_new =
+                self.scan_and_register_mappings_with_cb(&line, on_found.as_deref_mut())?;
+            all_mappings.append(&mut file_new);
+        }
+
+        Ok(all_mappings)
     }
 
     pub fn scan_file(&mut self, path: &Path) -> Result<Vec<Mapping>, ObfuscationError> {
