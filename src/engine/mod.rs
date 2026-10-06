@@ -180,7 +180,7 @@ impl ObfuscatorEngine {
                     let extracted_text = self.format_orchestrator.office.extract_text(&bytes)?;
                     return self.scan_and_register_mappings_with_cb(
                         &extracted_text,
-                        on_found.as_deref_mut(),
+                        match &mut on_found { Some(f) => Some(&mut **f), None => None },
                     );
                 }
             }
@@ -200,7 +200,7 @@ impl ObfuscatorEngine {
             }
             let line = String::from_utf8_lossy(&byte_buf);
             let mut file_new =
-                self.scan_and_register_mappings_with_cb(&line, on_found.as_deref_mut())?;
+                self.scan_and_register_mappings_with_cb(&line, match &mut on_found { Some(f) => Some(&mut **f), None => None })?;
             all_mappings.append(&mut file_new);
         }
 
