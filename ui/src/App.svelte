@@ -142,6 +142,9 @@
           scanCurrentFile = payload.current_file;
           scanFilesCount = payload.files_scanned;
           scanEntitiesCount = payload.entities_found;
+          if (payload.new_items && payload.new_items.length > 0) {
+            detectedItems = [...detectedItems, ...payload.new_items];
+          }
         }
       });
     } catch (err) {
@@ -458,7 +461,7 @@
         recursive: recursiveScan,
         noGitIgnore: noGitIgnoreScan
       });
-      detectedItems = res.items || [];
+      // detectedItems ya se va llenando dinámicamente con los eventos 'scan-progress'
       auditSummary = res;
       statusMessage = `🔍 Directorio escaneado: ${res.files_scanned} analizados, ${res.files_ignored} omitidos, ${res.total_entities} entidades detectadas.`;
     } catch (err) {
@@ -569,6 +572,12 @@
 
       vaultMappings = mergedList;
       statusMessage = `💾 ${itemsToSave.length} entidades del escaneo guardadas e integradas en '${targetVault.split('/').pop()}'.`;
+      
+      // Limpiar de la pantalla los elementos guardados
+      const savedOriginals = new Set(itemsToSave.map(it => it.original));
+      detectedItems = detectedItems.filter(it => !savedOriginals.has(it.original));
+      selectedScanOriginals = []; // Limpiar selección
+
       await refreshVaultsList();
     } catch (e) {
       alert("Error al guardar mapeos en la bóveda: " + e);
