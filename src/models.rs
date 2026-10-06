@@ -35,67 +35,66 @@ pub enum DetectorType {
     Custom(String),
 }
 
+impl DetectorType {
+    /// Normaliza y desanida de forma recursiva cualquier envoltura múltiple de "Custom(...)",
+    /// restaurando el tipo estándar si coincide, o limpiando el nombre de regla personalizada.
+    #[must_use]
+    pub fn normalize(&self) -> Self {
+        match self {
+            Self::Custom(inner_str) => {
+                let mut current = inner_str.trim();
+                loop {
+                    if current.starts_with("Custom (") && current.ends_with(')') {
+                        current = current[8..current.len() - 1].trim();
+                    } else if current.starts_with("Custom(") && current.ends_with(')') {
+                        current = current[7..current.len() - 1].trim();
+                    } else if current.starts_with("custom (") && current.ends_with(')') {
+                        current = current[8..current.len() - 1].trim();
+                    } else if current.starts_with("custom(") && current.ends_with(')') {
+                        current = current[7..current.len() - 1].trim();
+                    } else {
+                        break;
+                    }
+                }
+
+                match current {
+                    "GUID/UUID" | "GuidUuid" | "GUID" | "UUID" => Self::GuidUuid,
+                    "Windows SID" | "WindowsSid" | "SID" => Self::WindowsSid,
+                    "Windows Logon ID" | "WindowsLogonId" => Self::WindowsLogonId,
+                    "Windows Hex ID" | "WindowsHexId" => Self::WindowsHexId,
+                    "IPv4" => Self::IPv4,
+                    "IPv6" => Self::IPv6,
+                    "Domain/FQDN" | "DomainFqdn" | "Domain" | "FQDN" => Self::DomainFqdn,
+                    "Email" => Self::Email,
+                    "Hostname" => Self::Hostname,
+                    "DNI/NIE" | "SpanishDniNie" | "DNI" | "NIE" => Self::SpanishDniNie,
+                    "Credit Card" | "CreditCard" => Self::CreditCard,
+                    "Telephone" | "Phone" => Self::Telephone,
+                    "O365 Subject" | "O365Subject" => Self::O365Subject,
+                    "O365 Server Hostname" | "O365OriginatingServer" => Self::O365OriginatingServer,
+                    "Attachment File Name" | "AttachmentFileName" => Self::AttachmentFileName,
+                    "Generic Token" | "GenericToken" => Self::GenericToken,
+                    other => Self::Custom(other.to_string()),
+                }
+            }
+            other => other.clone(),
+        }
+    }
+}
+
 impl std::str::FromStr for DetectorType {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "GUID/UUID" => Ok(Self::GuidUuid),
-
-            "Windows SID" => Ok(Self::WindowsSid),
-
-            "Windows Logon ID" => Ok(Self::WindowsLogonId),
-
-            "Windows Hex ID" => Ok(Self::WindowsHexId),
-
-            "IPv4" => Ok(Self::IPv4),
-
-            "IPv6" => Ok(Self::IPv6),
-
-            "Domain/FQDN" => Ok(Self::DomainFqdn),
-
-            "Email" => Ok(Self::Email),
-
-            "Hostname" => Ok(Self::Hostname),
-
-            "DNI/NIE" => Ok(Self::SpanishDniNie),
-
-            "Credit Card" => Ok(Self::CreditCard),
-
-            "Telephone" => Ok(Self::Telephone),
-
-            "O365 Subject" => Ok(Self::O365Subject),
-
-            "O365 Server Hostname" => Ok(Self::O365OriginatingServer),
-
-            "Attachment File Name" => Ok(Self::AttachmentFileName),
-
-            "Generic Token" => Ok(Self::GenericToken),
-
-            other => {
-                let mut current = other.trim();
-                let mut peeled = false;
-                while current.starts_with("Custom (") && current.ends_with(')') {
-                    current = current[8..current.len() - 1].trim();
-                    peeled = true;
-                }
-
-                if peeled {
-                    // Try parsing the inner value in case it's a known standard type
-                    if let Ok(standard_type) = current.parse::<Self>() {
-                        return Ok(standard_type);
-                    }
-                }
-
-                Ok(Self::Custom(current.to_string()))
-            }
-        }
+        let dummy = Self::Custom(s.to_string());
+        Ok(dummy.normalize())
     }
 }
 
 impl fmt::Display for DetectorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        let normalized = self.normalize();
+        match normalized {
             Self::GuidUuid => write!(f, "GUID/UUID"),
             Self::WindowsSid => write!(f, "Windows SID"),
             Self::WindowsLogonId => write!(f, "Windows Logon ID"),
@@ -228,4 +227,33 @@ pub struct ScanAuditMetrics {
     pub files_ignored: usize,
     pub total_entities: usize,
     pub duration_ms: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detector_type_recursive_onion_unwrapping() {
+        let nested1 = DetectorType::Custom("Custom (Email)".to_string());
+        assert_eq!(nested1.normalize(), DetectorType::Email);
+
+        let nested2 = DetectorType::Custom("Custom(Custom(Email))".to_string());
+        assert_eq!(nested2.normalize(), DetectorType::Email);
+
+        let nested3 =
+            DetectorType::Custom("Custom (Custom(Custom (Custom (SpanishDniNie))))".to_string());
+        assert_eq!(nested3.normalize(), DetectorType::SpanishDniNie);
+
+        let nested_custom_rule =
+            DetectorType::Custom("Custom (Custom(Identificador de Empleado))".to_string());
+        assert_eq!(
+            nested_custom_rule.normalize(),
+            DetectorType::Custom("Identificador de Empleado".to_string())
+        );
+
+        let from_str: DetectorType = "Custom (Custom(IPv4))".parse().unwrap();
+        assert_eq!(from_str, DetectorType::IPv4);
+        assert_eq!(from_str.to_string(), "IPv4");
+    }
 }

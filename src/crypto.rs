@@ -152,7 +152,10 @@ pub fn decrypt_bytes(data: &[u8], password: &str) -> Result<Vec<u8>, Obfuscation
 /// Descifra un binario de caja fuerte empaquetada y devuelve la lista de mapeos.
 pub fn decrypt_mappings(data: &[u8], password: &str) -> Result<Vec<Mapping>, ObfuscationError> {
     let decrypted_bytes = decrypt_bytes(data, password)?;
-    let mappings: Vec<Mapping> = serde_json::from_slice(&decrypted_bytes)?;
+    let mut mappings: Vec<Mapping> = serde_json::from_slice(&decrypted_bytes)?;
+    for m in &mut mappings {
+        m.detector_type = m.detector_type.normalize();
+    }
     log::debug!(
         "Descifrado completado con éxito: {} mapeos recuperados.",
         mappings.len()
@@ -167,20 +170,28 @@ pub fn load_mappings_auto(
 ) -> Result<Vec<Mapping>, ObfuscationError> {
     log::debug!("Cargando archivo de mapeos desde: {}...", path.display());
     let data = fs::read(path)?;
-    if is_encrypted_vault(&data) {
+    let mut mappings = if is_encrypted_vault(&data) {
         log::debug!("Detectada bóveda binaria cifrada (.lexi)");
         match password {
-            Some(pwd) => decrypt_mappings(&data, pwd),
-            None => Err(ObfuscationError::CryptoError(
-                "El archivo de mapeos está cifrado. Debe proporcionar una contraseña para abrirlo."
-                    .into(),
-            )),
+            Some(pwd) => decrypt_mappings(&data, pwd)?,
+            None => {
+                return Err(ObfuscationError::CryptoError(
+                    "El archivo de mapeos está cifrado. Debe proporcionar una contraseña para abrirlo."
+                        .into(),
+                ));
+            }
         }
     } else {
         log::debug!("Detectada bóveda en texto plano (JSON)");
-        let mappings: Vec<Mapping> = serde_json::from_slice(&data)?;
-        Ok(mappings)
+        let raw_mappings: Vec<Mapping> = serde_json::from_slice(&data)?;
+        raw_mappings
+    };
+
+    for m in &mut mappings {
+        m.detector_type = m.detector_type.normalize();
     }
+
+    Ok(mappings)
 }
 
 /// Guarda los mapeos en disco con escritura atómica y respaldo previo (.bak) anti-corrupción.
@@ -190,9 +201,18 @@ pub fn save_mappings_auto(
     mappings: &[Mapping],
     password: Option<&str>,
 ) -> Result<(), ObfuscationError> {
+    let normalized_mappings: Vec<Mapping> = mappings
+        .iter()
+        .cloned()
+        .map(|mut m| {
+            m.detector_type = m.detector_type.normalize();
+            m
+        })
+        .collect();
+
     log::debug!(
         "Guardando {} mapeos en: {} (Cifrado activo: {})...",
-        mappings.len(),
+        normalized_mappings.len(),
         path.display(),
         password.is_some()
     );
@@ -216,9 +236,9 @@ pub fn save_mappings_auto(
 
     // 2. Preparar los datos a escribir
     let data_to_write = if let Some(pwd) = password {
-        encrypt_mappings(mappings, pwd)?
+        encrypt_mappings(&normalized_mappings, pwd)?
     } else {
-        serde_json::to_string_pretty(mappings)?.into_bytes()
+        serde_json::to_string_pretty(&normalized_mappings)?.into_bytes()
     };
 
     // 3. Escritura atómica a través de archivo temporal en el mismo directorio
