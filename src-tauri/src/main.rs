@@ -187,7 +187,10 @@ fn inspect_vault_file(path: String, password: Option<String>) -> Result<VaultMet
 
     if !encrypted {
         // Formato JSON sin contraseña
-        let mappings: Vec<Mapping> = serde_json::from_slice(&bytes).unwrap_or_default();
+        let mut mappings: Vec<Mapping> = serde_json::from_slice(&bytes).unwrap_or_default();
+        for m in &mut mappings {
+            m.detector_type = m.detector_type.normalize();
+        }
         let items: Vec<DetectedItem> = mappings
             .into_iter()
             .map(|m| DetectedItem {
