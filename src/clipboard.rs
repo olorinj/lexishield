@@ -29,6 +29,15 @@ pub fn set_clipboard_text(text: &str) -> Result<(), String> {
         .map_err(|e| format!("Error al escribir texto en el portapapeles: {e}"))
 }
 
+/// Vacía de forma explícita el contenido del portapapeles del sistema.
+pub fn clear_clipboard() -> Result<(), String> {
+    let mut clipboard =
+        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {e}"))?;
+    clipboard
+        .set_text(String::new())
+        .map_err(|e| format!("Error al vaciar texto del portapapeles: {e}"))
+}
+
 /// Dirección de monitorización para el comando watch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WatchDirection {

@@ -25,6 +25,10 @@ struct Cli {
     #[arg(short, long, global = true)]
     verbose: bool,
 
+    /// Activa el modo de depuración detallada (DEBUG) con telemetría completa en stderr.
+    #[arg(long, global = true)]
+    debug: bool,
+
     /// Ruta a un archivo de configuración TOML personalizado.
     #[arg(long, global = true)]
     config: Option<PathBuf>,
@@ -169,6 +173,138 @@ enum DictCommands {
         #[arg(short = 'y', long = "yes")]
         yes: bool,
     },
+    /// Actualiza un mapeo existente en el archivo de mapeos.
+    Update {
+        /// Valor original sensible existente.
+        #[arg(short, long)]
+        original: String,
+
+        /// Nuevo seudónimo ofuscado.
+        #[arg(short = 's', long)]
+        pseudonym: String,
+
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
+        #[arg(short, long)]
+        mappings: Option<PathBuf>,
+
+        /// Contraseña si el archivo de mapeos está cifrado.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de forma interactiva y oculta.
+        #[arg(long)]
+        ask_password: bool,
+    },
+    /// Elimina múltiples mapeos en lote por sus valores originales.
+    BatchRemove {
+        /// Valores originales a eliminar separados por coma o repetidos.
+        #[arg(short, long, value_delimiter = ',')]
+        originals: Vec<String>,
+
+        /// Ruta al archivo de mapeos. Si se omite, usa el default.
+        #[arg(short, long)]
+        mappings: Option<PathBuf>,
+
+        /// Contraseña si el archivo de mapeos está cifrado.
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Solicitar la contraseña de forma interactiva y oculta.
+        #[arg(long)]
+        ask_password: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum VaultCommands {
+    /// Lista todas las bóvedas disponibles en ~/.lexishield con su tamaño y estado.
+    List,
+    /// Crea una nueva bóveda vacía (opcionalmente cifrada).
+    Create {
+        /// Nombre de la nueva bóveda (ej: clientes.lexi).
+        name: String,
+        /// Contraseña si se desea cifrar la bóveda.
+        #[arg(short, long)]
+        password: Option<String>,
+        /// Solicitar contraseña interactivamente.
+        #[arg(long)]
+        ask_password: bool,
+    },
+    /// Renombra una bóveda existente.
+    Rename {
+        /// Nombre actual de la bóveda.
+        old_name: String,
+        /// Nuevo nombre de la bóveda.
+        new_name: String,
+    },
+    /// Elimina una bóveda existente de ~/.lexishield.
+    #[command(alias = "rm")]
+    Delete {
+        /// Nombre de la bóveda a eliminar.
+        name: String,
+        /// Confirma la eliminación sin preguntar.
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
+    /// Exporta una bóveda copiando el archivo a una ruta externa.
+    Export {
+        /// Nombre de la bóveda a exportar.
+        name: String,
+        /// Ruta de destino del archivo.
+        destination: PathBuf,
+    },
+    /// Importa un archivo de bóveda externo al almacén ~/.lexishield.
+    Import {
+        /// Ruta al archivo externo a importar.
+        source: PathBuf,
+        /// Nombre opcional de destino.
+        #[arg(short, long)]
+        name: Option<String>,
+    },
+    /// Restaura una bóveda desde su copia de seguridad automática (.bak).
+    RestoreBackup {
+        /// Nombre de la bóveda a recuperar desde .bak.
+        name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum BackupCommands {
+    /// Crea una copia de seguridad completa en tar.bz2 de alta compresión (con opción de cifrado AES).
+    Create {
+        /// Archivo de salida de la copia de seguridad (.tar.bz2 o .lexibak).
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Contraseña para cifrar la copia de seguridad.
+        #[arg(short, long)]
+        password: Option<String>,
+        /// Solicitar la contraseña interactivamente.
+        #[arg(long)]
+        ask_password: bool,
+    },
+    /// Restaura una copia de seguridad comprimida (tar.bz2) sobre ~/.lexishield.
+    Restore {
+        /// Archivo de copia de seguridad a restaurar.
+        #[arg(short, long)]
+        input: PathBuf,
+        /// Contraseña si la copia de seguridad está cifrada.
+        #[arg(short, long)]
+        password: Option<String>,
+        /// Solicitar la contraseña interactivamente.
+        #[arg(long)]
+        ask_password: bool,
+        /// Confirmar sobreescritura sin preguntar.
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum ClipboardCommands {
+    /// Vacía de forma explícita el contenido del portapapeles del sistema.
+    Clear,
+    /// Muestra el contenido actual del portapapeles.
+    Get,
 }
 
 #[derive(Subcommand)]
@@ -186,6 +322,18 @@ enum Commands {
         /// Archivo de salida donde guardar el resultado.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Guardar resultado como una copia (sufijada) en lugar de sobrescribir el original.
+        #[arg(long)]
+        copy: bool,
+
+        /// Sufijo personalizado para modo copia (por defecto: _obfuscated).
+        #[arg(long)]
+        suffix: Option<String>,
+
+        /// Limpiar cachés y tablas de sesión antes de procesar.
+        #[arg(long)]
+        clean_cache: bool,
 
         /// Texto directo a procesar (si no se especifica archivo).
         #[arg(short, long)]
@@ -261,6 +409,14 @@ enum Commands {
         #[arg(short, long)]
         input: Option<PathBuf>,
 
+        /// Explorar subdirectorios de forma recursiva (por defecto: true).
+        #[arg(short = 'r', long, default_value_t = true, action = clap::ArgAction::Set)]
+        recursive: bool,
+
+        /// Desactivar el filtrado de .gitignore durante el escaneo de directorios.
+        #[arg(long)]
+        no_git_ignore: bool,
+
         /// Leer datos directamente desde la entrada estándar (stdin).
         #[arg(long)]
         stdin: bool,
@@ -317,6 +473,24 @@ enum Commands {
     Dict {
         #[command(subcommand)]
         subcommand: DictCommands,
+    },
+
+    /// Gestiona las bóvedas de mapeos en el perfil del usuario (~/.lexishield).
+    Vault {
+        #[command(subcommand)]
+        subcommand: VaultCommands,
+    },
+
+    /// Gestiona copias de seguridad de alta compresión (tar.bz2) y restauración cifrada.
+    Backup {
+        #[command(subcommand)]
+        subcommand: BackupCommands,
+    },
+
+    /// Herramientas de consulta y vaciado seguro del portapapeles del sistema.
+    Clipboard {
+        #[command(subcommand)]
+        subcommand: ClipboardCommands,
     },
 
     /// Gestiona la configuración del sistema (~/.lexishield/config.toml).
@@ -472,6 +646,9 @@ struct ObfuscateOptions {
     input: Option<PathBuf>,
     stdin: bool,
     output: Option<PathBuf>,
+    copy: bool,
+    suffix: Option<String>,
+    clean_cache: bool,
     text: Option<String>,
     clipboard: bool,
     format: FormatType,
@@ -479,6 +656,19 @@ struct ObfuscateOptions {
     password: Option<String>,
     ask_password: bool,
     no_save: bool,
+}
+
+struct ScanOptions {
+    input: Option<PathBuf>,
+    recursive: bool,
+    no_git_ignore: bool,
+    stdin: bool,
+    text: Option<String>,
+    clipboard: bool,
+    save_mappings: Option<PathBuf>,
+    password: Option<String>,
+    ask_password: bool,
+    yes: bool,
 }
 
 /// Manejador de la acción de ofuscación.
@@ -504,9 +694,28 @@ fn handle_obfuscate(
         false
     };
 
+    let target_out_path = if let Some(ref out) = opts.output {
+        Some(out.clone())
+    } else if opts.copy
+        && let Some(ref in_path) = opts.input
+    {
+        let stem = in_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("archivo");
+        let ext = in_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("txt");
+        let suffix = opts.suffix.as_deref().unwrap_or("_obfuscated");
+        Some(in_path.with_file_name(format!("{stem}{suffix}.{ext}")))
+    } else {
+        None
+    };
+
     if is_office {
         let in_path = opts.input.as_ref().unwrap();
-        let out_path = opts.output.clone().unwrap_or_else(|| {
+        let out_path = target_out_path.unwrap_or_else(|| {
             let stem = in_path
                 .file_stem()
                 .and_then(|s| s.to_str())
@@ -519,6 +728,9 @@ fn handle_obfuscate(
         });
 
         let mut engine = ObfuscatorEngine::new(config);
+        if opts.clean_cache {
+            engine.clean_cache();
+        }
         let mut final_pwd = opts.password.clone();
         if let Some(ref path) = map_path
             && path.exists()
@@ -570,6 +782,9 @@ fn handle_obfuscate(
     )?;
 
     let mut engine = ObfuscatorEngine::new(config);
+    if opts.clean_cache {
+        engine.clean_cache();
+    }
 
     let mut final_pwd = opts.password.clone();
     if let Some(ref path) = map_path
@@ -607,7 +822,7 @@ fn handle_obfuscate(
     if opts.clipboard {
         set_clipboard_text(&result)?;
         log::info!("Resultado ofuscado copiado al portapapeles.");
-    } else if let Some(out_path) = opts.output {
+    } else if let Some(out_path) = target_out_path {
         fs::write(&out_path, &result)?;
         log::info!("Resultado guardado en: {}", out_path.display());
     } else {
@@ -743,21 +958,12 @@ fn handle_deobfuscate(
     Ok(())
 }
 
-struct ScanOptions {
-    input: Option<PathBuf>,
-    stdin: bool,
-    text: Option<String>,
-    clipboard: bool,
-    save_mappings: Option<PathBuf>,
-    password: Option<String>,
-    ask_password: bool,
-    yes: bool,
-}
-
 /// Recopila archivos a procesar usando el motor de ignorados estilo ripgrep (.gitignore, .lexiignore y extensiones configuradas).
 fn collect_files_with_ignore(
     dir: &Path,
     ignore_cfg: &lexishield::config::IgnoreConfig,
+    recursive: bool,
+    git_ignore_enabled: bool,
 ) -> std::io::Result<Vec<PathBuf>> {
     if !dir.is_dir() {
         return Ok(vec![dir.to_path_buf()]);
@@ -767,9 +973,12 @@ fn collect_files_with_ignore(
     let mut builder = WalkBuilder::new(dir);
     builder.add_custom_ignore_filename(".lexiignore");
     builder.hidden(true);
-    builder.git_ignore(true);
-    builder.git_global(true);
-    builder.git_exclude(true);
+    builder.git_ignore(git_ignore_enabled);
+    builder.git_global(git_ignore_enabled);
+    builder.git_exclude(git_ignore_enabled);
+    if !recursive {
+        builder.max_depth(Some(1));
+    }
 
     let mut files = Vec::new();
     for result in builder.build() {
@@ -1215,7 +1424,12 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
         }
     } else if let Some(ref path) = opts.input {
         if path.is_dir() {
-            let files = collect_files_with_ignore(path, &engine.config.ignore)?;
+            let files = collect_files_with_ignore(
+                path,
+                &engine.config.ignore,
+                opts.recursive,
+                !opts.no_git_ignore,
+            )?;
             let total = files.len();
             println!(
                 "🔍 Escaneando directorio '{}' ({} archivos)...",
@@ -1445,6 +1659,76 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
                 log::warn!("No se encontró el mapeo '{}' en la bóveda.", original);
             }
         }
+        DictCommands::Update {
+            original,
+            pseudonym,
+            mappings,
+            password,
+            ask_password,
+        } => {
+            let is_default = mappings.is_none();
+            let map_path = resolve_vault_path(mappings)?;
+            let force_ask = is_default && password.is_none();
+
+            let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
+            let mut list = if map_path.exists() {
+                lexishield::load_mappings_auto(&map_path, pwd.as_deref()).unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+
+            let mut found = false;
+            for m in &mut list {
+                if m.original == original {
+                    m.pseudonym = pseudonym.clone();
+                    m.omitted = pseudonym == "=";
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                list.push(Mapping {
+                    original: original.clone(),
+                    pseudonym: pseudonym.clone(),
+                    detector_type: DetectorType::GenericToken,
+                    omitted: pseudonym == "=",
+                });
+            }
+
+            lexishield::save_mappings_auto(&map_path, &list, pwd.as_deref())?;
+            log::info!(
+                "Mapeo '{}' actualizado con éxito en {}",
+                original,
+                map_path.display()
+            );
+        }
+        DictCommands::BatchRemove {
+            originals,
+            mappings,
+            password,
+            ask_password,
+        } => {
+            let is_default = mappings.is_none();
+            let map_path = resolve_vault_path(mappings)?;
+            let force_ask = is_default && password.is_none();
+
+            let pwd = resolve_password(password, ask_password || force_ask, Some(&map_path))?;
+            if !map_path.exists() {
+                return Err("El archivo de mapeos no existe.".into());
+            }
+
+            let mut list = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
+            let initial_len = list.len();
+            list.retain(|m| !originals.contains(&m.original));
+            let removed_count = initial_len - list.len();
+
+            lexishield::save_mappings_auto(&map_path, &list, pwd.as_deref())?;
+            log::info!(
+                "Se eliminaron {} mapeos de la bóveda '{}'.",
+                removed_count,
+                map_path.display()
+            );
+        }
         DictCommands::Clear {
             mappings,
             password,
@@ -1482,6 +1766,173 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
 
             fs::remove_file(&map_path)?;
             log::info!("Bóveda de mapeos eliminada: {}", map_path.display());
+        }
+    }
+    Ok(())
+}
+
+/// Manejador del comando Vault.
+fn handle_vault(subcommand: VaultCommands) -> Result<(), Box<dyn std::error::Error>> {
+    match subcommand {
+        VaultCommands::List => {
+            let vaults = lexishield::vault::list_vaults()?;
+            println!("🗄️  Bóvedas disponibles en ~/.lexishield:");
+            println!(
+                "{:<28} {:<12} {:<14} {:<20}",
+                "Nombre", "Tamaño", "Estado", "Última Modificación"
+            );
+            println!("{}", "-".repeat(78));
+            if vaults.is_empty() {
+                println!("  (No hay bóvedas creadas todavía)");
+            } else {
+                for v in vaults {
+                    let status = if v.is_encrypted {
+                        "🔒 Cifrada"
+                    } else {
+                        "🔓 Plana"
+                    };
+                    let mod_time = v.last_modified.unwrap_or_else(|| "N/A".into());
+                    println!(
+                        "{:<28} {:<12} {:<14} {:<20}",
+                        v.name, v.size_formatted, status, mod_time
+                    );
+                }
+            }
+        }
+        VaultCommands::Create {
+            name,
+            password,
+            ask_password: _,
+        } => {
+            let pwd = if let Some(p) = password {
+                if p.trim().is_empty() {
+                    prompt_new_password(&format!(
+                        "Introduce la contraseña obligatoria para la nueva bóveda '{name}': "
+                    ))?
+                } else {
+                    p
+                }
+            } else {
+                prompt_new_password(&format!(
+                    "Introduce la contraseña obligatoria para la nueva bóveda '{name}': "
+                ))?
+            };
+            let path = lexishield::vault::create_vault(&name, Some(&pwd))?;
+            println!("✅ Bóveda cifrada creada con éxito en: {}", path.display());
+        }
+        VaultCommands::Rename { old_name, new_name } => {
+            let path = lexishield::vault::rename_vault(&old_name, &new_name)?;
+            println!("✅ Bóveda renombrada a: {}", path.display());
+        }
+        VaultCommands::Delete { name, yes } => {
+            if !yes {
+                use std::io::{self, Write};
+                print!(
+                    "⚠️  ¿Seguro que deseas eliminar la bóveda '{}'? [s/N]: ",
+                    name
+                );
+                io::stdout().flush()?;
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                let trimmed = input.trim().to_lowercase();
+                if trimmed != "s" && trimmed != "si" && trimmed != "y" && trimmed != "yes" {
+                    log::info!("Operación cancelada.");
+                    return Ok(());
+                }
+            }
+            lexishield::vault::delete_vault(&name)?;
+            println!("✅ Bóveda '{}' eliminada con éxito.", name);
+        }
+        VaultCommands::Export { name, destination } => {
+            lexishield::vault::export_vault(&name, &destination)?;
+            println!(
+                "✅ Bóveda '{}' exportada a: {}",
+                name,
+                destination.display()
+            );
+        }
+        VaultCommands::Import { source, name } => {
+            let path = lexishield::vault::import_vault(&source, name.as_deref())?;
+            println!("✅ Bóveda importada con éxito a: {}", path.display());
+        }
+        VaultCommands::RestoreBackup { name } => {
+            let path = lexishield::vault::restore_vault_backup(&name)?;
+            println!(
+                "✅ Bóveda '{}' recuperada exitosamente desde su copia (.bak) en: {}",
+                name,
+                path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Manejador del comando Backup (tar.bz2 + cifrado AES).
+fn handle_backup(subcommand: BackupCommands) -> Result<(), Box<dyn std::error::Error>> {
+    match subcommand {
+        BackupCommands::Create {
+            output,
+            password,
+            ask_password,
+        } => {
+            let out_path = if let Some(p) = output {
+                p
+            } else {
+                let config_dir = lexishield::config::get_user_config_dir()?;
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                config_dir.join(format!("backup_lexishield_{ts}.tar.bz2"))
+            };
+
+            let pwd = resolve_password(password, ask_password, None)?;
+            let res = lexishield::backup::create_backup(&out_path, pwd.as_deref())?;
+            println!(
+                "📦 Copia de seguridad Bzip2 creada con éxito en: {}",
+                res.display()
+            );
+        }
+        BackupCommands::Restore {
+            input,
+            password,
+            ask_password,
+            yes,
+        } => {
+            if !yes {
+                use std::io::{self, Write};
+                print!(
+                    "⚠️  ¿Restaurar copia de seguridad desde '{}'? Se sobrescribirán configuraciones y bóvedas con el mismo nombre. [s/N]: ",
+                    input.display()
+                );
+                io::stdout().flush()?;
+                let mut input_str = String::new();
+                io::stdin().read_line(&mut input_str)?;
+                let trimmed = input_str.trim().to_lowercase();
+                if trimmed != "s" && trimmed != "si" && trimmed != "y" && trimmed != "yes" {
+                    log::info!("Operación cancelada.");
+                    return Ok(());
+                }
+            }
+
+            let pwd = resolve_password(password, ask_password, Some(&input))?;
+            let count = lexishield::backup::restore_backup(&input, pwd.as_deref())?;
+            println!("✅ Copia de seguridad restaurada con éxito: {count} archivos recuperados.");
+        }
+    }
+    Ok(())
+}
+
+/// Manejador del comando Clipboard.
+fn handle_clipboard(subcommand: ClipboardCommands) -> Result<(), Box<dyn std::error::Error>> {
+    match subcommand {
+        ClipboardCommands::Clear => {
+            lexishield::clipboard::clear_clipboard()?;
+            println!("🧹 Portapapeles vaciado con éxito.");
+        }
+        ClipboardCommands::Get => {
+            let text = lexishield::clipboard::get_clipboard_text()?;
+            println!("{text}");
         }
     }
     Ok(())
@@ -1534,19 +1985,24 @@ fn handle_config(
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    if cli.verbose {
-        lexishield::logger::init_logger_with_level(log::LevelFilter::Debug);
-    } else {
-        init_logger();
+    init_logger();
+    if cli.verbose || cli.debug {
+        lexishield::logger::set_debug_mode(true);
     }
     let config = load_config_with_rules(cli.config.as_deref(), cli.rules.as_deref());
 
     match cli.command {
         Commands::Config { subcommand } => handle_config(cli.config.as_deref(), subcommand),
+        Commands::Vault { subcommand } => handle_vault(subcommand),
+        Commands::Backup { subcommand } => handle_backup(subcommand),
+        Commands::Clipboard { subcommand } => handle_clipboard(subcommand),
         Commands::Obfuscate {
             input,
             stdin,
             output,
+            copy,
+            suffix,
+            clean_cache,
             text,
             clipboard,
             format,
@@ -1560,6 +2016,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 input,
                 stdin,
                 output,
+                copy,
+                suffix,
+                clean_cache,
                 text,
                 clipboard,
                 format: format.into(),
@@ -1597,6 +2056,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         Commands::Scan {
             input,
+            recursive,
+            no_git_ignore,
             stdin,
             text,
             clipboard,
@@ -1608,6 +2069,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             config,
             ScanOptions {
                 input,
+                recursive,
+                no_git_ignore,
                 stdin,
                 text,
                 clipboard,

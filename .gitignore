@@ -12,3 +12,4 @@ fuzz/corpus/
 fuzz/artifacts/
 fuzz/coverage/
 node_modules/
+src-tauri/target/

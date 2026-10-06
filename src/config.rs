@@ -97,10 +97,26 @@ ignored_directories = [
 # Extensiones de archivos binarios/multimedia ignoradas durante el escaneo
 ignored_extensions = [
     "png", "jpg", "jpeg", "gif", "ico", "svg", "webp",
-    "pdf", "zip", "tar", "gz", "tgz", "bz2", "7z", "rar",
+    "pdf", "zip", "tar", "gz", "tgz", "bz2", "7z", "rar", "xz", "zst", "iso", "7zip",
     "exe", "bin", "dll", "so", "dylib", "lock",
     "woff", "woff2", "ttf", "eot", "mp4", "mp3", "avi", "mkv",
 ]
+
+[gui]
+default_tab = "studio"
+show_cli_dock = true
+
+[gui.tabs]
+show_studio = true
+show_scanner = true
+show_pairs = true
+show_vaults = true
+show_watch = true
+
+[gui.clipboard]
+notification_type = "toast" # "toast" | "visual_flash" | "silent"
+auto_clear_enabled = false
+auto_clear_seconds = 5
 
 # Orden de prioridad de los detectores estándar incorporados
 detector_priority_order = [
@@ -257,6 +273,10 @@ fn default_ignored_extensions() -> Vec<String> {
         "bz2".into(),
         "7z".into(),
         "rar".into(),
+        "xz".into(),
+        "zst".into(),
+        "iso".into(),
+        "7zip".into(),
         "exe".into(),
         "bin".into(),
         "dll".into(),
@@ -279,6 +299,91 @@ impl Default for IgnoreConfig {
         Self {
             ignored_directories: default_ignored_directories(),
             ignored_extensions: default_ignored_extensions(),
+        }
+    }
+}
+
+/// Configuración de visibilidad de pestañas de la interfaz gráfica.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuiTabsConfig {
+    #[serde(default = "default_true")]
+    pub show_studio: bool,
+    #[serde(default = "default_true")]
+    pub show_scanner: bool,
+    #[serde(default = "default_true")]
+    pub show_pairs: bool,
+    #[serde(default = "default_true")]
+    pub show_vaults: bool,
+    #[serde(default = "default_true")]
+    pub show_watch: bool,
+}
+
+impl Default for GuiTabsConfig {
+    fn default() -> Self {
+        Self {
+            show_studio: true,
+            show_scanner: true,
+            show_pairs: true,
+            show_vaults: true,
+            show_watch: true,
+        }
+    }
+}
+
+/// Configuración de comportamiento del portapapeles y notificaciones.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuiClipboardConfig {
+    #[serde(default = "default_notification_type")]
+    pub notification_type: String, // "toast" | "visual_flash" | "silent"
+    #[serde(default)]
+    pub auto_clear_enabled: bool,
+    #[serde(default = "default_auto_clear_seconds")]
+    pub auto_clear_seconds: u64,
+}
+
+fn default_notification_type() -> String {
+    "toast".to_string()
+}
+
+fn default_auto_clear_seconds() -> u64 {
+    5
+}
+
+impl Default for GuiClipboardConfig {
+    fn default() -> Self {
+        Self {
+            notification_type: default_notification_type(),
+            auto_clear_enabled: false,
+            auto_clear_seconds: default_auto_clear_seconds(),
+        }
+    }
+}
+
+/// Configuración de la interfaz gráfica y ergonomía de usuario.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuiConfig {
+    #[serde(default = "default_default_tab")]
+    pub default_tab: String,
+    #[serde(default = "default_true")]
+    pub show_cli_dock: bool,
+    #[serde(default)]
+    pub tabs: GuiTabsConfig,
+    #[serde(default)]
+    pub clipboard: GuiClipboardConfig,
+}
+
+fn default_default_tab() -> String {
+    "studio".to_string()
+}
+
+impl Default for GuiConfig {
+    fn default() -> Self {
+        Self {
+            default_tab: default_default_tab(),
+            show_cli_dock: true,
+            tabs: GuiTabsConfig::default(),
+            clipboard: GuiClipboardConfig::default(),
         }
     }
 }
@@ -320,6 +425,9 @@ pub struct LexiConfig {
     #[serde(default)]
     pub ignore: IgnoreConfig,
 
+    #[serde(default)]
+    pub gui: GuiConfig,
+
     #[serde(default = "default_priority_order")]
     pub detector_priority_order: Vec<DetectorType>,
 
@@ -333,6 +441,7 @@ impl Default for LexiConfig {
             general: GeneralConfig::default(),
             vault: VaultConfig::default(),
             ignore: IgnoreConfig::default(),
+            gui: GuiConfig::default(),
             detector_priority_order: default_priority_order(),
             custom_rules: Vec::new(),
         }
@@ -604,4 +713,15 @@ pub fn load_config_with_rules(
 /// Carga la configuración del usuario desde disco o devuelve la predeterminada en caso de fallo.
 pub fn load_config(custom_path: Option<&Path>) -> LexiConfig {
     load_config_with_rules(custom_path, None)
+}
+
+/// Guarda la configuración actualizada en ~/.lexishield/config.toml.
+pub fn save_user_config(config: &LexiConfig) -> Result<(), ObfuscationError> {
+    let path = get_user_config_path()?;
+    let toml_str = toml::to_string_pretty(config).map_err(|e| {
+        ObfuscationError::ConfigError(format!("Error serializando configuración TOML: {e}"))
+    })?;
+    fs::write(&path, toml_str)?;
+    log::info!("Configuración guardada con éxito en: {}", path.display());
+    Ok(())
 }

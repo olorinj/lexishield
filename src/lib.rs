@@ -16,6 +16,7 @@
     clippy::unreadable_literal
 )]
 
+pub mod backup;
 pub mod clipboard;
 pub mod config;
 pub mod crypto;
@@ -26,10 +27,14 @@ pub mod logger;
 pub mod models;
 pub mod stopwords;
 pub mod validator;
+pub mod vault;
 
 pub use config::LexiConfig;
 pub use crypto::{
     decrypt_mappings, encrypt_mappings, is_encrypted_vault, load_mappings_auto, save_mappings_auto,
 };
 pub use engine::{MappingManager, ObfuscatorEngine};
-pub use models::{DetectorType, FormatType, Mapping, ObfuscationError, ObfuscationReport};
+pub use models::{
+    DetectorType, FormatType, Mapping, ObfuscationError, ObfuscationReport, ScanAuditMetrics,
+    VaultFileInfo,
+};

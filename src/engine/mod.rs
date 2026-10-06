@@ -61,6 +61,12 @@ impl ObfuscatorEngine {
         Ok(newly_added)
     }
 
+    /// Limpia las cachés y estados de sesión del motor de ofuscación.
+    pub fn clean_cache(&mut self) {
+        self.manager.clear();
+        log::debug!("Caché y tabla de mapeos de sesión del motor limpiadas.");
+    }
+
     /// Añade un mapeo manual asegurando inyectividad.
     pub fn add_mapping(&mut self, mapping: Mapping) -> Result<(), ObfuscationError> {
         self.manager.add_mapping(mapping)
