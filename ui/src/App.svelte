@@ -408,11 +408,13 @@
       });
       if (!selected) return;
       loading = true;
+      detectedItems = [];
+      auditSummary = null;
+      activeTab = "scanner";
       const res = await invokeTauri("scan_file_command", { path: selected });
       detectedItems = res.items || [];
       auditSummary = res;
       statusMessage = `🔍 Archivo escaneado: ${res.total_entities} entidades detectadas en 1 archivo.`;
-      activeTab = "scanner";
     } catch (err) {
       statusMessage = "Error al escanear archivo: " + err;
     } finally {
@@ -430,6 +432,9 @@
 
       loading = true;
       isScanningDirectory = true;
+      detectedItems = [];
+      auditSummary = null;
+      activeTab = "scanner";
       scanCurrentFile = "Iniciando recorrido...";
       scanFilesCount = 0;
       scanFilesIgnored = 0;
@@ -456,7 +461,6 @@
       detectedItems = res.items || [];
       auditSummary = res;
       statusMessage = `🔍 Directorio escaneado: ${res.files_scanned} analizados, ${res.files_ignored} omitidos, ${res.total_entities} entidades detectadas.`;
-      activeTab = "scanner";
     } catch (err) {
       statusMessage = "Error al escanear carpeta: " + err;
     } finally {
@@ -1255,7 +1259,36 @@
           </div>
         </div>
 
-        {#if auditSummary}
+        {#if isScanningDirectory}
+          <div in:fade={{ duration: 150 }} class="mb-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-500 flex items-center justify-center animate-spin text-base">
+                ⏳
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Escaneando carpeta en tiempo real...</span>
+                  <span class="inline-block w-2 h-2 rounded-full bg-primary-500 animate-ping"></span>
+                </div>
+                <div class="text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate" title={scanCurrentFile}>
+                  {scanCurrentFile}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-4 text-xs font-mono">
+              <span class="text-slate-700 dark:text-slate-300">Archivos: <strong class="text-primary-600 dark:text-primary-400 font-bold">{scanFilesCount}</strong></span>
+              <span class="text-slate-700 dark:text-slate-300">Entidades: <strong class="text-amber-600 dark:text-amber-400 font-bold">{scanEntitiesCount}</strong></span>
+              
+              <button
+                on:click={cancelScan}
+                class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-lg border border-rose-500/20 transition flex items-center gap-1"
+              >
+                <span>🛑</span> Cancelar
+              </button>
+            </div>
+          </div>
+        {:else if auditSummary}
           <div class="mb-4 p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div class="flex items-center gap-2">
               <span class="text-slate-500">Origen escaneado:</span>
@@ -1296,9 +1329,15 @@
               {:else}
                 <tr>
                   <td colspan="4" class="p-12 text-center text-slate-400 dark:text-slate-500">
-                    <div class="text-3xl mb-2">🔍</div>
-                    <div class="font-medium text-slate-600 dark:text-slate-300">No hay entidades escaneadas todavía</div>
-                    <div class="text-xs text-slate-400 mt-1">Usa los botones superiores "Escanear Fichero" o "Escanear Carpeta".</div>
+                    {#if isScanningDirectory || loading}
+                      <div class="text-3xl mb-2 animate-spin inline-block">⏳</div>
+                      <div class="font-medium text-primary-600 dark:text-primary-400">Escaneando archivos en curso...</div>
+                      <div class="text-xs text-slate-400 mt-1 max-w-md mx-auto truncate font-mono">{scanCurrentFile}</div>
+                    {:else}
+                      <div class="text-3xl mb-2">🔍</div>
+                      <div class="font-medium text-slate-600 dark:text-slate-300">No hay entidades escaneadas todavía</div>
+                      <div class="text-xs text-slate-400 mt-1">Usa los botones superiores "Escanear Fichero" o "Escanear Carpeta".</div>
+                    {/if}
                   </td>
                 </tr>
               {/each}
