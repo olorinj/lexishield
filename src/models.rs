@@ -35,6 +35,71 @@ pub enum DetectorType {
     Custom(String),
 }
 
+impl std::str::FromStr for DetectorType {
+
+    type Err = ();
+
+
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+
+        match s {
+
+            "GUID/UUID" => Ok(Self::GuidUuid),
+
+            "Windows SID" => Ok(Self::WindowsSid),
+
+            "Windows Logon ID" => Ok(Self::WindowsLogonId),
+
+            "Windows Hex ID" => Ok(Self::WindowsHexId),
+
+            "IPv4" => Ok(Self::IPv4),
+
+            "IPv6" => Ok(Self::IPv6),
+
+            "Domain/FQDN" => Ok(Self::DomainFqdn),
+
+            "Email" => Ok(Self::Email),
+
+            "Hostname" => Ok(Self::Hostname),
+
+            "DNI/NIE" => Ok(Self::SpanishDniNie),
+
+            "Credit Card" => Ok(Self::CreditCard),
+
+            "Telephone" => Ok(Self::Telephone),
+
+            "O365 Subject" => Ok(Self::O365Subject),
+
+            "O365 Server Hostname" => Ok(Self::O365OriginatingServer),
+
+            "Attachment File Name" => Ok(Self::AttachmentFileName),
+
+            "Generic Token" => Ok(Self::GenericToken),
+
+            other => {
+
+                if other.starts_with("Custom (") && other.ends_with(')') {
+
+                    let inner = &other[8..other.len() - 1];
+
+                    Ok(Self::Custom(inner.to_string()))
+
+                } else {
+
+                    Ok(Self::Custom(other.to_string()))
+
+                }
+
+            }
+
+        }
+
+    }
+
+}
+
+
 impl fmt::Display for DetectorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

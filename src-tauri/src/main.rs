@@ -297,7 +297,7 @@ fn save_vault_file(
         Mapping {
             original: it.original,
             pseudonym: it.pseudonym,
-            detector_type: DetectorType::Custom(it.detector_type),
+            detector_type: it.detector_type.parse().unwrap_or(DetectorType::Custom(it.detector_type)),
             omitted: it.omitted,
         }
     }).collect();
@@ -774,7 +774,7 @@ fn update_mapping_pair(
 
     let omitted = pseudonym == "=";
     let det_type = detector_type
-        .map(DetectorType::Custom)
+        .map(|t| t.parse().unwrap_or(DetectorType::Custom(t)))
         .unwrap_or(DetectorType::GenericToken);
 
     let mut found = false;
