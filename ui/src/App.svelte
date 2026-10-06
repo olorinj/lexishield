@@ -1363,8 +1363,8 @@
                   <span>Escaneando carpeta en tiempo real...</span>
                   <span class="inline-block w-2 h-2 rounded-full bg-primary-500 animate-ping"></span>
                 </div>
-                <div class="text-[11px] font-mono text-slate-600 dark:text-slate-400 truncate" title={scanCurrentFile}>
-                  {scanCurrentFile}
+                <div class="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate font-semibold" title={scanCurrentFile}>
+                  📄 {scanCurrentFile}
                 </div>
               </div>
             </div>
@@ -1497,7 +1497,7 @@
                     {#if isScanningDirectory || loading}
                       <div class="text-3xl mb-2 animate-spin inline-block">⏳</div>
                       <div class="font-medium text-primary-600 dark:text-primary-400">Escaneando archivos en curso...</div>
-                      <div class="text-xs text-slate-400 mt-1 max-w-md mx-auto truncate font-mono">{scanCurrentFile}</div>
+                      <div class="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto truncate font-mono font-semibold">📄 {scanCurrentFile}</div>
                     {:else}
                       <div class="text-3xl mb-2">🔍</div>
                       <div class="font-medium text-slate-600 dark:text-slate-300">No hay entidades escaneadas todavía</div>

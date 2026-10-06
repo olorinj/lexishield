@@ -512,7 +512,8 @@ async fn scan_directory_command(
                         continue;
                     }
 
-                    let path_str = path.display().to_string();
+                    let rel_path = path.strip_prefix(&base_dir_buf).unwrap_or(path);
+                    let path_str = rel_path.display().to_string();
 
                     // Actualizar estado compartido y registrar traza ANTES de analizar el fichero
                     if let Ok(mut status) = get_current_scan_status().lock() {
@@ -536,7 +537,7 @@ async fn scan_directory_command(
                     if engine.scan_file(path).is_ok() {
                         files_scanned += 1;
                         let entities_now = engine.manager.get_mappings().len();
-                        log::info!("Analizado: {} (Total entidades: {})", path.file_name().and_then(|f| f.to_str()).unwrap_or(&path_str), entities_now);
+                        log::info!("Analizado: {} (Total entidades: {})", path_str, entities_now);
                         if let Ok(mut status) = get_current_scan_status().lock() {
                             status.files_scanned = files_scanned;
                             status.entities_found = entities_now;
