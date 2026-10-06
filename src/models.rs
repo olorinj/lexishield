@@ -148,3 +148,26 @@ impl From<serde_json::Error> for ObfuscationError {
         Self::JsonError(err)
     }
 }
+
+/// Información descriptiva de un archivo de bóveda .lexi en disco.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultFileInfo {
+    pub name: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub size_formatted: String,
+    pub is_encrypted: bool,
+    pub last_modified: Option<String>,
+    #[serde(default)]
+    pub has_backup: bool,
+}
+
+/// Parámetros de auditoría detallada de escaneo.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ScanAuditMetrics {
+    pub path_analyzed: String,
+    pub files_scanned: usize,
+    pub files_ignored: usize,
+    pub total_entities: usize,
+    pub duration_ms: f64,
+}

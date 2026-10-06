@@ -35,6 +35,8 @@ mimalloc = { version = "0.1", default-features = false }
 clap_complete = "4.5"
 ignore = "0.4"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
+tar = "0.4"
+bzip2 = "0.4"
 
 [build-dependencies]
 winres = "0.1"

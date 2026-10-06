@@ -2,14 +2,15 @@
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/main/crates/tauri-config-schema/schema.json",
   "productName": "LexiShield",
   "version": "1.0.0",
-  "identifier": "com.lexishield.app",
+  "identifier": "com.lexishield.desktop",
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm --prefix ../ui run dev",
-    "beforeBuildCommand": ""
+    "beforeBuildCommand": "npm --prefix ../ui run build"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "LexiShield - Motor de Ofuscación Semántica",

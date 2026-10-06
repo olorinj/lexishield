@@ -60,7 +60,14 @@ impl DetectorRegistry {
         let mut compiled = Vec::new();
         for r in custom_rules {
             match CompiledCustomRule::try_from_rule(r) {
-                Ok(c) => compiled.push(c),
+                Ok(c) => {
+                    log::debug!(
+                        "Regla personalizada compilada con éxito: '{}' [{}]",
+                        r.name,
+                        r.pattern
+                    );
+                    compiled.push(c);
+                }
                 Err(e) => {
                     log::warn!(
                         "Regla personalizada '{}' descartada por regex inválida: {}",
@@ -230,10 +237,19 @@ impl DetectorRegistry {
                         attempts += 1;
                     }
                     seen_pseudonyms.insert(pseudonym.clone());
+                    log::debug!(
+                        "Entidad detectada [{dtype}]: '{candidate}' -> Seudónimo: '{pseudonym}'"
+                    );
                     found_mappings.push(Mapping::new(candidate, pseudonym, dtype.clone()));
                 }
             }
         }
+
+        log::debug!(
+            "Escaneo de texto finalizado ({} caracteres). Entidades únicas registradas: {}",
+            text.len(),
+            found_mappings.len()
+        );
 
         found_mappings
     }

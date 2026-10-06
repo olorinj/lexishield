@@ -121,6 +121,35 @@ impl MappingManager {
         self.forward.len()
     }
 
+    /// Elimina un mapeo por su valor original.
+    pub fn remove_mapping(&mut self, original: &str) -> bool {
+        if let Some(m) = self.forward.remove(original) {
+            if !m.omitted && m.pseudonym != "=" {
+                self.reverse.remove(&m.pseudonym);
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Elimina múltiples mapeos en lote. Devuelve el número de eliminados.
+    pub fn batch_remove(&mut self, originals: &[String]) -> usize {
+        let mut removed = 0;
+        for orig in originals {
+            if self.remove_mapping(orig) {
+                removed += 1;
+            }
+        }
+        removed
+    }
+
+    /// Actualiza o reemplaza un mapeo existente.
+    pub fn update_mapping(&mut self, mapping: Mapping) -> Result<(), ObfuscationError> {
+        self.remove_mapping(&mapping.original);
+        self.add_mapping(mapping)
+    }
+
     pub fn clear(&mut self) {
         self.forward.clear();
         self.reverse.clear();
