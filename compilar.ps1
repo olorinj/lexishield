@@ -9,7 +9,7 @@ param (
     [switch]$Mac,
 
     [Alias("g", "gui")]
-    [switch]$Gui,
+    [switch]$GuiVersion,
 
     [Alias("a")]
     [switch]$All,
@@ -24,7 +24,7 @@ param (
     [switch]$KeepVm,
 
     [Alias("native")]
-    [switch]$Native
+    [switch]$NativeHost
 )
 
 # Activar codificacion UTF-8 para consola en PowerShell
@@ -37,7 +37,7 @@ try {
     Push-Location -Path $PSScriptRoot
 
     # Modo Nativo: Si el usuario fuerza compilación local con herramientas instaladas en Windows
-    if ($Native) {
+    if ($NativeHost) {
         Write-Host "Ejecutando en modo nativo local (Windows)..." -ForegroundColor Cyan
         
         # Comprobar si link.exe (MSVC) esta disponible
@@ -91,7 +91,7 @@ try {
         if ($Windows) { $argsBash += "-w" }
         if ($Linux)   { $argsBash += "-l" }
         if ($Mac)     { $argsBash += "-m" }
-        if ($Gui)     { $argsBash += "-g" }
+        if ($GuiVersion)     { $argsBash += "-g" }
     }
     if ($Clean)  { $argsBash += "-c" }
     if ($Update) { $argsBash += "-u" }
