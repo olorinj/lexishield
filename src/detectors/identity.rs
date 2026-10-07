@@ -8,7 +8,7 @@ use std::sync::LazyLock;
 const DNI_LETTERS: &[u8] = b"TRWAGMYFPDXBNJZSQVHLCKE";
 
 static DNI_NIE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b(?:([XYZxyz])\s*(\d{7})|(\d{8}))\s*([A-Za-z])\b")
+    Regex::new(r"(?i)\b(?:([XYZxyz])[\s-]*(\d{7})|(\d{8}))[\s-]*([A-Za-z])\b")
         .expect("Regex DNI/NIE inválida")
 });
 
@@ -17,7 +17,7 @@ static CREDIT_CARD_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static PHONE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b(?:\+34[\s.-]?)?[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b")
+    Regex::new(r"(?:(?:\+|00)34[\s.-]?|\b)[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b")
         .expect("Regex Phone inválida")
 });
 
@@ -86,7 +86,11 @@ impl SpanishDniNieDetector {
         } else {
             letter.to_ascii_lowercase()
         };
-        format!("{num:08}{out_letter}")
+        if original.contains('-') {
+            format!("{num:08}-{out_letter}")
+        } else {
+            format!("{num:08}{out_letter}")
+        }
     }
 }
 
@@ -459,6 +463,16 @@ impl TelephoneDetector {
             return true;
         }
 
+        // Falso positivo si está precedido inmediatamente por un carácter alfanumérico (ej: var+34600123123)
+        if start > 0
+            && full_text[..start]
+                .chars()
+                .next_back()
+                .is_some_and(char::is_alphanumeric)
+        {
+            return true;
+        }
+
         false
     }
 
@@ -474,9 +488,11 @@ impl TelephoneDetector {
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
 
-        // 1. Identificar si tiene prefijo +34
+        // 1. Identificar si tiene prefijo internacional (+34 o 0034)
         let (prefix, body) = if let Some(stripped) = original.strip_prefix("+34") {
             ("+34", stripped)
+        } else if let Some(stripped) = original.strip_prefix("0034") {
+            ("0034", stripped)
         } else {
             ("", original)
         };
@@ -570,5 +586,27 @@ mod tests {
         let pseudo_intl = detector.generate_pseudonym("+34 694 185 579");
         assert!(pseudo_intl.starts_with("+34 "));
         assert_eq!(pseudo_intl.len(), "+34 694 185 579".len());
+
+        // Teléfono compacto con +34
+        let matches_compact = detector.find_matches("Contacto: +34694185579");
+        assert_eq!(matches_compact.len(), 1);
+        assert_eq!(matches_compact[0].2, "+34694185579");
+
+        // Falso positivo adjunto a palabra
+        let matches_attached = detector.find_matches("identificador+34694185579");
+        assert_eq!(matches_attached.len(), 0);
+    }
+
+    #[test]
+    fn test_spanish_dni_with_hyphen() {
+        let detector = SpanishDniNieDetector::new();
+        let matches = detector.find_matches("DNI con guión: 12345678-Z y NIE: X-1234567-L");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].2, "12345678-Z");
+        assert_eq!(matches[1].2, "X-1234567-L");
+
+        let pseudo = detector.generate_pseudonym("12345678-Z");
+        assert!(pseudo.contains('-'));
+        assert_eq!(pseudo.len(), 10);
     }
 }

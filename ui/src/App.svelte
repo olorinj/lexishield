@@ -366,7 +366,7 @@
     try {
       const selected = await open({
         filters: [
-          { name: "Documentos y Logs", extensions: ["txt", "log", "json", "xml", "csv", "tsv", "docx", "xlsx", "pptx"] },
+          { name: "Documentos y Logs", extensions: ["txt", "log", "json", "xml", "csv", "tsv", "docx", "xlsx", "pptx", "md", "markdown"] },
           { name: "Todos los archivos", extensions: ["*"] }
         ],
         multiple: false
