@@ -16,7 +16,7 @@ static ORIGINATING_SERVER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 
 static ATTACHMENT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)\b([a-zA-Z0-9_\-\s]{3,}\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv))\b",
+        r"(?i)\b([a-zA-Z0-9_\-\s]{3,}\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown))\b",
     )
     .expect("Regex Attachment inválida")
 });

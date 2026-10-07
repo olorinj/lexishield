@@ -354,8 +354,12 @@ enum Commands {
         format: CliFormat,
 
         /// Ruta opcional para guardar la tabla de mapeos generada (soporta JSON o cifrado).
-        #[arg(value_parser = parse_path, short, long)]
+        #[arg(value_parser = parse_path, short, long, alias = "mappings")]
         save_mappings: Option<PathBuf>,
+
+        /// Exporta el documento Office sanitizado a Markdown (.md) extrayendo imágenes mediante Pandoc para revisión con IA.
+        #[arg(long, num_args = 0..=1, default_missing_value = "auto")]
+        export_md: Option<String>,
 
         /// Contraseña para cifrar la tabla de mapeos guardada (Argon2 + ChaCha20-Poly1305).
         #[arg(short, long)]
@@ -407,6 +411,10 @@ enum Commands {
         /// Formato estructural (auto, json, xml, log, text).
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
+
+        /// Exporta el documento Office desofuscado a Markdown (.md) extrayendo imágenes mediante Pandoc para revisión con IA.
+        #[arg(long, num_args = 0..=1, default_missing_value = "auto")]
+        export_md: Option<String>,
     },
 
     /// Escanea un archivo, texto, stdin o portapapeles y muestra los datos sensibles detectados sin modificarlos.
@@ -662,6 +670,71 @@ struct ObfuscateOptions {
     password: Option<String>,
     ask_password: bool,
     no_save: bool,
+    export_md: Option<String>,
+}
+
+fn export_office_to_md_with_pandoc(
+    docx_path: &Path,
+    export_md_arg: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (md_path, media_dir) = if export_md_arg == "auto" || export_md_arg.is_empty() {
+        let parent = docx_path.parent().unwrap_or(Path::new("."));
+        let stem = docx_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("documento");
+        let md = parent.join(format!("{stem}.md"));
+        let media = parent.join(stem);
+        (md, media)
+    } else {
+        let md = PathBuf::from(export_md_arg);
+        let stem = md.file_stem().and_then(|s| s.to_str()).unwrap_or("media");
+        let parent = md.parent().unwrap_or(Path::new("."));
+        let media = parent.join(stem);
+        (md, media)
+    };
+
+    println!(
+        "🔄 Exportando a Markdown mediante Pandoc: {}...",
+        docx_path.display()
+    );
+
+    let status = std::process::Command::new("pandoc")
+        .arg(docx_path)
+        .arg("-o")
+        .arg(&md_path)
+        .arg("--wrap=none")
+        .arg("-s")
+        .arg(format!("--extract-media={}", media_dir.display()))
+        .status();
+
+    match status {
+        Ok(exit_status) => {
+            if exit_status.success() {
+                println!(
+                    "✅ Exportación a Markdown completada con éxito: {}\n   Imágenes y medios extraídos en: {}",
+                    md_path.display(),
+                    media_dir.display()
+                );
+            } else {
+                eprintln!(
+                    "⚠️ Pandoc terminó con código de error: {:?}. Verifique que el documento sea compatible.",
+                    exit_status.code()
+                );
+            }
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                eprintln!(
+                    "⚠️ Pandoc no se encuentra instalado o no está en el PATH del sistema.\n   Para exportar a Markdown instale Pandoc (ej: 'sudo apt install pandoc' o 'winget install JohnMacFarlane.Pandoc')."
+                );
+            } else {
+                eprintln!("⚠️ Error al ejecutar Pandoc: {}", e);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 struct ScanOptions {
@@ -777,6 +850,11 @@ fn handle_obfuscate(
             report.replacements_applied,
             report.elapsed_ms
         );
+
+        if let Some(ref md_arg) = opts.export_md {
+            export_office_to_md_with_pandoc(&out_path, md_arg)?;
+        }
+
         return Ok(());
     }
 
@@ -835,6 +913,12 @@ fn handle_obfuscate(
         println!("{}", result);
     }
 
+    if opts.export_md.is_some() {
+        println!(
+            "ℹ️ El archivo procesado es texto plano o Markdown; no se requiere conversión con Pandoc."
+        );
+    }
+
     log::info!(
         "Informe: Reemplazos: {} | Formato: {:?} | Tiempo: {:.2}ms",
         report.replacements_applied,
@@ -855,6 +939,7 @@ struct DeobfuscateOptions {
     password: Option<String>,
     ask_password: bool,
     format: FormatType,
+    export_md: Option<String>,
 }
 
 /// Manejador de la acción de desofuscación.
@@ -915,6 +1000,11 @@ fn handle_deobfuscate(
             report.replacements_applied,
             report.elapsed_ms
         );
+
+        if let Some(ref md_arg) = opts.export_md {
+            export_office_to_md_with_pandoc(&out_path, md_arg)?;
+        }
+
         return Ok(());
     }
 
@@ -2038,6 +2128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             password,
             ask_password,
             no_save,
+            export_md,
         } => handle_obfuscate(
             config,
             ObfuscateOptions {
@@ -2054,6 +2145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 password,
                 ask_password,
                 no_save,
+                export_md,
             },
         ),
 
@@ -2067,6 +2159,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             password,
             ask_password,
             format,
+            export_md,
         } => handle_deobfuscate(
             config,
             DeobfuscateOptions {
@@ -2079,6 +2172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 password,
                 ask_password,
                 format: format.into(),
+                export_md,
             },
         ),
 

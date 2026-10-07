@@ -8,8 +8,10 @@ use crate::format_adapters::xml_adapter::XmlAdapter;
 use crate::models::ObfuscationError;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
+use regex::Regex;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
+use std::sync::LazyLock;
 use zip::write::SimpleFileOptions;
 use zip::{ZipArchive, ZipWriter};
 
@@ -77,28 +79,66 @@ impl OfficeAdapter {
             return false;
         }
 
+        let name_lower = name.to_ascii_lowercase();
         match office_type {
             OfficeType::Word => {
-                name == "word/document.xml"
-                    || name.starts_with("word/header")
-                    || name.starts_with("word/footer")
-                    || name == "word/footnotes.xml"
-                    || name == "word/endnotes.xml"
-                    || name == "word/comments.xml"
+                name_lower.starts_with("word/")
+                    && (name_lower.contains("document")
+                        || name_lower.contains("header")
+                        || name_lower.contains("footer")
+                        || name_lower.contains("footnote")
+                        || name_lower.contains("endnote")
+                        || name_lower.contains("comment"))
             }
             OfficeType::Excel => {
-                name == "xl/sharedStrings.xml"
-                    || name.starts_with("xl/worksheets/sheet")
-                    || name.starts_with("xl/comments")
-                    || name.starts_with("xl/drawings/drawing")
+                name_lower.starts_with("xl/")
+                    && (name_lower.contains("sharedstrings")
+                        || name_lower.contains("sheet")
+                        || name_lower.contains("comment")
+                        || name_lower.contains("drawing"))
             }
             OfficeType::PowerPoint => {
-                name.starts_with("ppt/slides/slide")
-                    || name.starts_with("ppt/notesSlides/notesSlide")
-                    || name.starts_with("ppt/comments/comment")
+                name_lower.starts_with("ppt/")
+                    && (name_lower.contains("slide")
+                        || name_lower.contains("notesslide")
+                        || name_lower.contains("comment"))
             }
             OfficeType::Unknown => true,
         }
+    }
+
+    /// Desfragmenta y normaliza los elementos de texto en XML de Word (.docx).
+    /// Elimina marcas de corrección ortográfica (<w:proofErr>) que fracturan palabras
+    /// y une etiquetas adyacentes <w:r><w:t> dentro del mismo párrafo para evitar falsos negativos en fronteras de palabras.
+    pub fn consolidate_word_xml_runs(xml: &str) -> String {
+        static PROOF_ERR_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"<w:proofErr\b[^>]*/>").expect("Regex proofErr inválida"));
+        static ADJACENT_RUNS_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(
+                r#"(?s)<w:r>\s*<w:t(?:\s+xml:space="preserve")?>([^<]*)</w:t>\s*</w:r>\s*<w:r>\s*<w:t(?:\s+xml:space="preserve")?>([^<]*)</w:t>\s*</w:r>"#,
+            )
+            .expect("Regex adjacent runs inválida")
+        });
+
+        // 1. Eliminar etiquetas proofErr que cortan palabras
+        let without_proof = PROOF_ERR_RE.replace_all(xml, "");
+
+        // 2. Unificar ejecuciones consecutivas simples en bucle hasta convergencia
+        let mut current = without_proof.into_owned();
+        loop {
+            let replaced = ADJACENT_RUNS_RE.replace_all(&current, |caps: &regex::Captures| {
+                format!(
+                    r#"<w:r><w:t xml:space="preserve">{}{}</w:t></w:r>"#,
+                    &caps[1], &caps[2]
+                )
+            });
+            if replaced == current {
+                break;
+            }
+            current = replaced.into_owned();
+        }
+
+        current
     }
 
     /// Extrae todo el texto plano de un documento Office para permitir su escaneo e identificación de entidades.
@@ -120,9 +160,16 @@ impl OfficeAdapter {
             if Self::is_translatable_xml(&file_name, office_type) {
                 let mut xml_content = String::new();
                 if file.read_to_string(&mut xml_content).is_ok() {
-                    let mut reader = Reader::from_str(&xml_content);
+                    let normalized = if office_type == OfficeType::Word {
+                        Self::consolidate_word_xml_runs(&xml_content)
+                    } else {
+                        xml_content
+                    };
+
+                    let mut reader = Reader::from_str(&normalized);
                     reader.config_mut().trim_text(false);
                     let mut buf = Vec::new();
+                    let mut current_block = String::new();
 
                     while let Ok(event) = reader.read_event_into(&mut buf) {
                         match event {
@@ -131,15 +178,27 @@ impl OfficeAdapter {
                                 if let Ok(decoded) = std::str::from_utf8(&t)
                                     && let Ok(raw) = quick_xml::escape::unescape(decoded)
                                 {
-                                    let trimmed = raw.trim();
+                                    current_block.push_str(&raw);
+                                }
+                            }
+                            Event::End(ref e) => {
+                                let local = e.local_name();
+                                let tag = local.as_ref();
+                                if tag == b"p" || tag == b"tc" || tag == b"si" || tag == b"row" {
+                                    let trimmed = current_block.trim();
                                     if !trimmed.is_empty() {
                                         extracted_chunks.push(trimmed.to_string());
                                     }
+                                    current_block.clear();
                                 }
                             }
                             _ => {}
                         }
                         buf.clear();
+                    }
+                    let trimmed = current_block.trim();
+                    if !trimmed.is_empty() {
+                        extracted_chunks.push(trimmed.to_string());
                     }
                 }
             }
@@ -194,8 +253,14 @@ impl OfficeAdapter {
                         ))
                     })?;
 
+                    let normalized_xml = if office_type == OfficeType::Word {
+                        Self::consolidate_word_xml_runs(&xml_content)
+                    } else {
+                        xml_content
+                    };
+
                     let (replaced_xml, count) = self.xml_adapter.process_xml(
-                        &xml_content,
+                        &normalized_xml,
                         replacement_map,
                         strict_word_boundaries,
                     )?;
@@ -367,5 +432,37 @@ mod tests {
         let extracted = adapter.extract_text(&obfuscated_bytes).unwrap();
         assert!(extracted.contains("user01@anon.com"));
         assert!(!extracted.contains("admin@empresa.com"));
+    }
+
+    #[test]
+    fn test_docx_fragmented_runs_and_punctuation() {
+        let adapter = OfficeAdapter::new();
+        // Simular documento con palabra 'Trampa' cortada por marcas de Word y punto final
+        let docx_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                <w:p>
+                    <w:r><w:t>.... </w:t></w:r>
+                    <w:proofErr w:type="spellStart"/>
+                    <w:r><w:t>Tram</w:t></w:r>
+                    <w:proofErr w:type="spellEnd"/>
+                    <w:r><w:t>pa.</w:t></w:r>
+                </w:p>
+            </w:body>
+        </w:document>"#;
+
+        let original_bytes = create_mock_docx(docx_xml);
+        let extracted = adapter.extract_text(&original_bytes).unwrap();
+        assert!(extracted.contains(".... Trampa."));
+
+        let mut map = HashMap::new();
+        map.insert("Trampa".to_string(), "kjdhdakjdka".to_string());
+
+        let (obfuscated_bytes, count, _) =
+            adapter.process_office(&original_bytes, &map, true).unwrap();
+
+        assert_eq!(count, 1);
+        let extracted_obf = adapter.extract_text(&obfuscated_bytes).unwrap();
+        assert!(extracted_obf.contains(".... kjdhdakjdka."));
     }
 }

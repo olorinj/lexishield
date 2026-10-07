@@ -10,6 +10,7 @@ use crate::models::{FormatType, Mapping, ObfuscationError, ObfuscationReport};
 use crate::validator::SyntaxValidator;
 pub use mapping_manager::MappingManager;
 use std::fs;
+use std::io::{BufRead, BufReader, Read, Seek};
 use std::path::Path;
 use std::time::Instant;
 
@@ -169,20 +170,20 @@ impl ObfuscatorEngine {
 
         // Comprobar cabecera mágica (ZIP) para delegar a OfficeAdapter si es necesario
         let mut magic_buf = [0u8; 4];
-        use std::io::{BufRead, BufReader, Read, Seek};
-        if file.read_exact(&mut magic_buf).is_ok() {
-            if &magic_buf == b"PK\x03\x04" {
-                // Leer completo y comprobar si es office
-                let bytes = fs::read(path)?;
-                if crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
-                    != crate::format_adapters::office_adapter::OfficeType::Unknown
-                {
-                    let extracted_text = self.format_orchestrator.office.extract_text(&bytes)?;
-                    return self.scan_and_register_mappings_with_cb(
-                        &extracted_text,
-                        match &mut on_found { Some(f) => Some(&mut **f), None => None },
-                    );
-                }
+        if file.read_exact(&mut magic_buf).is_ok() && &magic_buf == b"PK\x03\x04" {
+            // Leer completo y comprobar si es office
+            let bytes = fs::read(path)?;
+            if crate::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
+                != crate::format_adapters::office_adapter::OfficeType::Unknown
+            {
+                let extracted_text = self.format_orchestrator.office.extract_text(&bytes)?;
+                return self.scan_and_register_mappings_with_cb(
+                    &extracted_text,
+                    match &mut on_found {
+                        Some(f) => Some(&mut **f),
+                        None => None,
+                    },
+                );
             }
         }
 
@@ -199,8 +200,13 @@ impl ObfuscatorEngine {
                 break;
             }
             let line = String::from_utf8_lossy(&byte_buf);
-            let mut file_new =
-                self.scan_and_register_mappings_with_cb(&line, match &mut on_found { Some(f) => Some(&mut **f), None => None })?;
+            let mut file_new = self.scan_and_register_mappings_with_cb(
+                &line,
+                match &mut on_found {
+                    Some(f) => Some(&mut **f),
+                    None => None,
+                },
+            )?;
             all_mappings.append(&mut file_new);
         }
 
