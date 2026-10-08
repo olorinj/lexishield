@@ -28,10 +28,18 @@ Vagrant.configure("2") do |config|
       echo "=== Actualizando repositorios ==="
       apt-get update
 
-      echo "=== Instalando dependencias de compilacion (Linux, Docker y GUI Tauri) ==="
+      echo "=== Instalando dependencias de compilacion (Linux, Docker, GUI Tauri y utilidades de VirtualBox) ==="
       apt-get install -y --no-install-recommends \
         curl build-essential pkg-config libssl-dev git dos2unix docker.io ca-certificates \
-        libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf file libfuse2
+        libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf file libfuse2 \
+        virtualbox-guest-utils
+
+      # Asegurar soporte de carpetas compartidas y punto de montaje
+      modprobe vboxsf 2>/dev/null || true
+      mkdir -p /vagrant
+      if ! mountpoint -q /vagrant; then
+        mount -t vboxsf -o uid=1000,gid=1000,dmode=775,fmode=775 vagrant /vagrant 2>/dev/null || true
+      fi
 
       echo "=== Instalando Node.js (v20 LTS) y npm ==="
       curl -fsSL https://deb.nodesource.com/setup_20.x | bash -

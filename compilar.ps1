@@ -105,7 +105,7 @@ try {
         }
 
         Write-Host "Ejecutando proceso de compilacion dentro de builder-linux..." -ForegroundColor Cyan
-        vagrant ssh builder-linux -c "cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $argsLinuxStr"
+        vagrant ssh builder-linux -c "if ! mountpoint -q /vagrant; then sudo mkdir -p /vagrant && sudo mount -t vboxsf -o uid=`$(id -u vagrant),gid=`$(id -g vagrant) vagrant /vagrant 2>/dev/null || true; fi; cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $argsLinuxStr"
         $exitCodeBuild = $LASTEXITCODE
 
         # Apagar builder-linux para liberar memoria y CPU antes de la siguiente fase

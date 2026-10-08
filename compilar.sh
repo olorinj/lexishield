@@ -74,7 +74,7 @@ if [ "$is_inside_vagrant" = false ] && [ "$native_mode" = false ]; then
             fi
 
             echo -e "\e[36mEjecutando compilacion dentro de builder-linux...\e[0m"
-            vagrant ssh builder-linux -c "cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $*"
+            vagrant ssh builder-linux -c "if ! mountpoint -q /vagrant; then sudo mkdir -p /vagrant && sudo mount -t vboxsf -o uid=\$(id -u vagrant),gid=\$(id -g vagrant) vagrant /vagrant 2>/dev/null || true; fi; cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $*"
             exit_code=$?
             
             # Apagar builder-linux para liberar recursos
