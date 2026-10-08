@@ -26,10 +26,16 @@ Los scripts (`compilar.sh` y `compilar.ps1`) aceptan los siguientes argumentos p
 
 | Opción Linux | Opción Windows | Descripción |
 | :--- | :--- | :--- |
+| `-i`, `--menu` | `-Interactive`, `-menu` | **Abre el menú interactivo guiado** para seleccionar fácilmente el escenario deseado (también se abre por defecto al ejecutar sin argumentos). |
+| `-l`, `--linux` | `-Linux` | Compila solo para Linux (x86_64). |
+| `-w`, `--windows` | `-Windows` | Compila para Windows (x86_64). |
+| `-m`, `--mac` | `-Mac` | Compila para macOS (x86_64 y ARM64 con Docker). |
 | `-g`, `--gui` | `-Gui` | Compila la interfaz gráfica (GUI) con Tauri y el frontend web. |
-| `-a`, `--all` | `-All` | Realiza una compilación cruzada completa (todas las plataformas). |
-| `-u`, `--provision` | `-Update` | **Fuerza la actualización de dependencias en Vagrant.** Útil si el `Vagrantfile` ha cambiado (ej. Node.js) y la VM ya estaba creada. |
-| `-c`, `--clean` | `-Clean` | Destruye la máquina virtual (`vagrant destroy -f`) antes de empezar. |
+| `-a`, `--all` | `-All` | Realiza una compilación completa (todas las plataformas). |
+| `-u`, `--provision` | `-Update` | **Fuerza la actualización de dependencias y aprovisionamiento en Vagrant.** |
+| `-c`, `--clean` | `-Clean` | Realiza una limpieza de compilaciones anteriores (`cargo clean`). |
+| `-k`, `--keep-vm` | `-KeepVm` | Mantiene las máquinas virtuales encendidas tras compilar para ahorrar tiempo en ejecuciones sucesivas. |
+| `--native` | `-Native` | Ejecuta la compilación de forma nativa en el sistema anfitrión actual (sin usar Vagrant). |
 
 ## 🧪 Flujo de Calidad Obligatorio (Quality Gate)
 

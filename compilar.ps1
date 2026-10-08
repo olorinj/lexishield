@@ -24,7 +24,10 @@ param (
     [switch]$KeepVm,
 
     [Alias("native")]
-    [switch]$NativeHost
+    [switch]$NativeHost,
+
+    [Alias("i", "menu")]
+    [switch]$Interactive
 )
 
 # Activar codificacion UTF-8 para consola en PowerShell
@@ -36,10 +39,76 @@ $directorioOriginal = Get-Location
 try {
     Push-Location -Path $PSScriptRoot
 
+    $showMenu = $Interactive
+    if ($PSBoundParameters.Count -eq 0) {
+        $showMenu = $true
+    }
+
+    if ($showMenu) {
+        Write-Host "`n========================================================" -ForegroundColor Cyan
+        Write-Host "         LexiShield - Menú de Compilación" -ForegroundColor Yellow
+        Write-Host "========================================================" -ForegroundColor Cyan
+        Write-Host " 1) Todo (Linux, macOS, Windows CLI + GUI) -> [VMs secuenciales]"
+        Write-Host " 2) Solo Linux (CLI + GUI)                 -> [builder-linux]"
+        Write-Host " 3) Solo Windows (CLI + GUI)               -> [builder-windows]"
+        Write-Host " 4) Solo macOS (Intel + ARM64)             -> [builder-linux con Docker]"
+        Write-Host " 5) Solo CLI (Linux + Windows)             -> [Sin interfaces gráficas]"
+        Write-Host " 6) Modo Nativo Local (Host actual)        -> [Sin usar Vagrant]"
+        Write-Host " 0) Salir"
+        Write-Host "========================================================" -ForegroundColor Cyan
+
+        $opcion = Read-Host "Seleccione una opción [0-6]"
+
+        switch ($opcion) {
+            "1" {
+                $All = $true
+                $GuiVersion = $true
+            }
+            "2" {
+                $Linux = $true
+                $GuiVersion = $true
+            }
+            "3" {
+                $Windows = $true
+                $GuiVersion = $true
+            }
+            "4" {
+                $Mac = $true
+            }
+            "5" {
+                $Linux = $true
+                $Windows = $true
+            }
+            "6" {
+                $NativeHost = $true
+                $respGui = Read-Host "¿Desea compilar también la interfaz gráfica (GUI)? [s/N]"
+                if ($respGui -match '^[sSyY]') {
+                    $GuiVersion = $true
+                }
+            }
+            "0" {
+                Write-Host "Operación cancelada." -ForegroundColor Yellow
+                return
+            }
+            default {
+                Write-Host "Opción no válida: '$opcion'." -ForegroundColor Red
+                exit 1
+            }
+        }
+
+        if (-not $Clean) {
+            $respClean = Read-Host "¿Desea realizar una limpieza previa (cargo clean)? [s/N]"
+            if ($respClean -match '^[sSyY]') {
+                $Clean = $true
+            }
+        }
+    }
+
     # Modo Nativo: Si el usuario fuerza compilación local con herramientas instaladas en Windows
     if ($NativeHost) {
         Write-Host "Ejecutando en modo nativo local (Windows)..." -ForegroundColor Cyan
         $argsWin = @()
+        if ($Windows)    { $argsWin += "-w" }
         if ($GuiVersion) { $argsWin += "-g" }
         if ($All)        { $argsWin += "-a" }
         if ($Clean)      { $argsWin += "-c" }
@@ -124,6 +193,7 @@ try {
     if ($needWindows) {
         Write-Host "`n[Fase 2] Preparando VM 'builder-windows'..." -ForegroundColor Cyan
         $argsWin = @()
+        if ($Windows)    { $argsWin += "-w" }
         if ($GuiVersion) { $argsWin += "-g" }
         if ($All)        { $argsWin += "-a" }
         if ($Clean)      { $argsWin += "-c" }

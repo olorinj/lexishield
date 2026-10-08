@@ -10,6 +10,84 @@ if [ -d "/vagrant" ] && [ "$PWD" = "/vagrant" ]; then
     is_inside_vagrant=true
 fi
 
+show_menu=false
+if [ $# -eq 0 ] && [ "$is_inside_vagrant" = false ]; then
+    show_menu=true
+fi
+
+for arg in "$@"; do
+    if [ "$arg" == "-i" ] || [ "$arg" == "--menu" ] || [ "$arg" == "-menu" ]; then
+        show_menu=true
+        break
+    fi
+done
+
+if [ "$show_menu" = true ]; then
+    echo -e "\n\e[36m========================================================\e[0m"
+    echo -e "\e[33m         LexiShield - Menú de Compilación\e[0m"
+    echo -e "\e[36m========================================================\e[0m"
+    echo -e " \e[97m1)\e[0m Todo (Linux, macOS, Windows CLI + GUI) -> \e[90m[VMs secuenciales]\e[0m"
+    echo -e " \e[97m2)\e[0m Solo Linux (CLI + GUI)                 -> \e[90m[builder-linux]\e[0m"
+    echo -e " \e[97m3)\e[0m Solo Windows (CLI + GUI)               -> \e[90m[builder-windows]\e[0m"
+    echo -e " \e[97m4)\e[0m Solo macOS (Intel + ARM64)             -> \e[90m[builder-linux con Docker]\e[0m"
+    echo -e " \e[97m5)\e[0m Solo CLI (Linux + Windows)             -> \e[90m[Sin interfaces gráficas]\e[0m"
+    echo -e " \e[97m6)\e[0m Modo Nativo Local (Host actual)        -> \e[90m[Sin usar Vagrant]\e[0m"
+    echo -e " \e[97m0)\e[0m Salir"
+    echo -e "\e[36m========================================================\e[0m"
+
+    read -r -p "Seleccione una opción [0-6]: " opcion_menu
+
+    selected_args=()
+    case "$opcion_menu" in
+        1)
+            selected_args+=("-a")
+            ;;
+        2)
+            selected_args+=("-l" "-g")
+            ;;
+        3)
+            selected_args+=("-w" "-g")
+            ;;
+        4)
+            selected_args+=("-m")
+            ;;
+        5)
+            selected_args+=("-l" "-w")
+            ;;
+        6)
+            selected_args+=("--native")
+            read -r -p "¿Desea compilar también la interfaz gráfica (GUI)? [s/N]: " resp_gui
+            if [[ "$resp_gui" =~ ^[sSyY]$ ]]; then
+                selected_args+=("-g")
+            fi
+            ;;
+        0)
+            echo -e "\e[33mOperación cancelada.\e[0m"
+            exit 0
+            ;;
+        *)
+            echo -e "\e[31mOpción no válida: '$opcion_menu'.\e[0m"
+            exit 1
+            ;;
+    esac
+
+    read -r -p "¿Desea realizar una limpieza previa (cargo clean)? [s/N]: " resp_clean
+    if [[ "$resp_clean" =~ ^[sSyY]$ ]]; then
+        selected_args+=("-c")
+    fi
+
+    # Preservar flags adicionales pasados al llamar al script (-u, -k)
+    for arg in "$@"; do
+        if [ "$arg" == "-u" ] || [ "$arg" == "--update" ] || [ "$arg" == "--provision" ]; then
+            selected_args+=("-u")
+        elif [ "$arg" == "-k" ] || [ "$arg" == "--keep-vm" ] || [ "$arg" == "--keep-intermediate" ]; then
+            selected_args+=("-k")
+        fi
+    done
+
+    set -- "${selected_args[@]}"
+fi
+
 native_mode=false
 do_update=false
 for arg in "$@"; do
@@ -170,12 +248,15 @@ while [[ $# -gt 0 ]]; do
             keep_intermediate=true
             shift
             ;;
+        -i|--menu|-menu)
+            shift
+            ;;
         --native)
             shift
             ;;
         *)
             echo "Argumento no reconocido: $1"
-            echo "Uso: ./compilar.sh [-w|--windows] [-l|--linux] [-m|--mac] [-g|--gui] [-a|--all] [-c|--clean] [-u|--update] [-k|--keep-vm] [--native]"
+            echo "Uso: ./compilar.sh [-i|--menu] [-w|--windows] [-l|--linux] [-m|--mac] [-g|--gui] [-a|--all] [-c|--clean] [-u|--update] [-k|--keep-vm] [--native]"
             exit 1
             ;;
     esac
