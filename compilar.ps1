@@ -214,10 +214,6 @@ try {
 
         Write-Host "Ejecutando proceso de compilacion dentro de builder-windows..." -ForegroundColor Cyan
         vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\vagrant\compilar-win.ps1 $argsWinStr"
-        if ($LASTEXITCODE -ne 0) {
-            # Intentar via ssh si winrm no responde
-            vagrant ssh builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\vagrant\compilar-win.ps1 $argsWinStr"
-        }
         $exitCodeBuild = $LASTEXITCODE
 
         # Apagar builder-windows para liberar memoria y CPU

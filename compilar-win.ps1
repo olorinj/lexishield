@@ -21,6 +21,16 @@ $directorioOriginal = Get-Location
 try {
     Push-Location -Path $PSScriptRoot
 
+    # Asegurar que Cargo y Node.js esten en el PATH de esta sesion
+    $cargoPath = "$env:USERPROFILE\.cargo\bin"
+    if ($env:PATH -notlike "*$cargoPath*") {
+        $env:PATH = "$cargoPath;$env:PATH"
+    }
+    $nodePath = "$env:ProgramFiles\nodejs"
+    if ($env:PATH -notlike "*$nodePath*") {
+        $env:PATH = "$nodePath;$env:PATH"
+    }
+
     Write-Host "`n========================================================" -ForegroundColor Cyan
     Write-Host "Iniciando compilacion nativa para Windows (MSVC)..." -ForegroundColor Cyan
     Write-Host "========================================================" -ForegroundColor Cyan
