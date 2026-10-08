@@ -52,6 +52,15 @@ try {
         }
     }
 
+    # Asegurar que haya un toolchain por defecto (corrige error "no default is configured")
+    if (Get-Command "rustup" -ErrorAction SilentlyContinue) {
+        $active = rustup show active-toolchain 2>&1
+        if ("$active" -match "no active toolchain" -or "$active" -match "no default is configured") {
+            Write-Host "Configurando toolchain de Rust (stable) por defecto..." -ForegroundColor Yellow
+            rustup default stable
+        }
+    }
+
     if ($Clean) {
         Write-Host "Limpiando artefactos previos de compilacion..." -ForegroundColor Yellow
         cargo clean
