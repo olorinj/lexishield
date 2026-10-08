@@ -41,25 +41,71 @@ if [ "$is_inside_vagrant" = false ] && [ "$native_mode" = false ]; then
             fi
         fi
 
-        if [ "$do_update" = true ]; then
-            echo -e "\e[36mIniciando y actualizando entorno de compilacion (Vagrant --provision)...\e[0m"
-            vagrant up --provision
-            echo -e "\e[36mActualizando toolchain de Rust dentro de la maquina virtual...\e[0m"
-            vagrant ssh -c "rustup update && sudo -i rustup update >/dev/null 2>&1 || true"
-        else
-            echo -e "\e[36mIniciando entorno de compilacion centralizado en Vagrant...\e[0m"
-            vagrant up
+        need_linux=false
+        need_win=false
+
+        if [[ " $* " =~ " -w " ]] || [[ " $* " =~ " --windows " ]] || [[ " $* " =~ " --win " ]]; then
+            need_win=true
+        fi
+        if [[ " $* " =~ " -l " ]] || [[ " $* " =~ " --linux " ]] || [[ " $* " =~ " -m " ]] || [[ " $* " =~ " --mac " ]] || [[ " $* " =~ " --macos " ]]; then
+            need_linux=true
+        fi
+        if [[ " $* " =~ " -a " ]] || [[ " $* " =~ " --all " ]]; then
+            need_linux=true
+            need_win=true
+        fi
+        # Si no se pasó ningún target específico (-l, -m, -w, -a), por defecto es Linux
+        if [ "$need_linux" = false ] && [ "$need_win" = false ]; then
+            need_linux=true
         fi
 
-        echo -e "\e[36mEjecutando compilacion dentro de la maquina virtual...\e[0m"
-        vagrant ssh -c "cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $*"
-        exit_code=$?
-        
-        # Apagar la maquina virtual si no se pidio mantenerla (-k / --keep-vm)
-        if [[ ! " $* " =~ " -k " ]] && [[ ! " $* " =~ " --keep-vm " ]]; then
-            echo -e "\e[90mApagando la maquina virtual para liberar recursos de memoria/CPU...\e[0m"
-            vagrant halt
+        exit_code=0
+
+        # 1. Compilar en builder-linux si es requerido
+        if [ "$need_linux" = true ]; then
+            if [ "$do_update" = true ]; then
+                echo -e "\e[36mIniciando y actualizando entorno Linux/macOS (Vagrant builder-linux --provision)...\e[0m"
+                vagrant up builder-linux --provision
+                echo -e "\e[36mActualizando toolchain de Rust dentro de builder-linux...\e[0m"
+                vagrant ssh builder-linux -c "rustup update && sudo -i rustup update >/dev/null 2>&1 || true"
+            else
+                echo -e "\e[36mIniciando entorno Linux/macOS en Vagrant (builder-linux)...\e[0m"
+                vagrant up builder-linux
+            fi
+
+            echo -e "\e[36mEjecutando compilacion dentro de builder-linux...\e[0m"
+            vagrant ssh builder-linux -c "cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $*"
+            exit_code=$?
+            
+            # Apagar builder-linux para liberar recursos
+            if [[ ! " $* " =~ " -k " ]] && [[ ! " $* " =~ " --keep-vm " ]]; then
+                echo -e "\e[90mApagando la maquina virtual builder-linux para liberar memoria/CPU...\e[0m"
+                vagrant halt builder-linux
+            fi
         fi
+
+        # 2. Compilar en builder-windows si es requerido
+        if [ "$need_win" = true ] && [ $exit_code -eq 0 ]; then
+            if [ "$do_update" = true ]; then
+                echo -e "\n\e[36mIniciando y actualizando entorno Windows (Vagrant builder-windows --provision)...\e[0m"
+                vagrant up builder-windows --provision
+            else
+                echo -e "\n\e[36mIniciando entorno Windows en Vagrant (builder-windows)...\e[0m"
+                vagrant up builder-windows
+            fi
+
+            echo -e "\e[36mEjecutando compilacion dentro de builder-windows...\e[0m"
+            vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\\vagrant\\compilar-win.ps1 $*" || \
+            vagrant ssh builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\\vagrant\\compilar-win.ps1 $*"
+            exit_code=$?
+
+            # Apagar builder-windows para liberar recursos
+            if [[ ! " $* " =~ " -k " ]] && [[ ! " $* " =~ " --keep-vm " ]]; then
+                echo -e "\e[90mApagando la maquina virtual builder-windows para liberar memoria/CPU...\e[0m"
+                vagrant halt builder-windows
+            fi
+        fi
+
         exit $exit_code
     fi
 fi
@@ -183,25 +229,9 @@ if [ "$compilar_linux" = true ]; then
     fi
 fi
 
-# 2. Compilacion cruzada para Windows (.exe con MinGW)
-if [ "$especifico" = false ]; then
-    read -p $'\n¿Desea compilar tambien para Windows (x86_64 .exe)? (s/N) ' resp_win
-    if [[ "$resp_win" =~ ^[sS]$ ]]; then
-        compilar_win=true
-    fi
-fi
-
+# 2. Información sobre compilación de Windows
 if [ "$compilar_win" = true ]; then
-    echo -e "\n\e[36m[2/3] Compilando version Release para Windows (x86_64-pc-windows-gnu)...\e[0m"
-    rustup target add x86_64-pc-windows-gnu 2>/dev/null || true
-    cargo build --target x86_64-pc-windows-gnu --release
-    
-    bin_win="$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/lexishield.exe"
-    if [ -f "$bin_win" ]; then
-        mkdir -p dist
-        cp -f "$bin_win" "./dist/lexishield-windows-amd64.exe"
-        archivos_compilados+=("./dist/lexishield-windows-amd64.exe")
-    fi
+    echo -e "\n\e[33m[INFO] La compilacion para Windows ahora se gestiona de forma nativa en la VM 'builder-windows' (MSVC/Tauri).\e[0m"
 fi
 
 # 3. Compilacion cruzada para macOS (usando Docker con crazymax/osxcross)
@@ -213,7 +243,7 @@ if [ "$especifico" = false ]; then
 fi
 
 if [ "$compilar_mac" = true ]; then
-    echo -e "\n\e[36m[3/3] Compilando version Release para macOS (Intel y Apple Silicon)...\e[0m"
+    echo -e "\n\e[36m[2/3] Compilando version Release para macOS (Intel y Apple Silicon)...\e[0m"
     if ! command -v docker &> /dev/null; then
         echo -e "\e[31m[ERROR] Docker no esta disponible para la compilacion de macOS.\e[0m"
     else
@@ -238,16 +268,16 @@ if [ "$compilar_mac" = true ]; then
     fi
 fi
 
-# 4. Compilacion de Interfaz Grafica (Tauri GUI)
+# 3. Compilacion de Interfaz Grafica (Tauri GUI Linux)
 if [ "$compilar_gui" = true ]; then
-    echo -e "\n\e[36m[4/4] Compilando Interfaz Grafica de Usuario (LexiShield Tauri GUI)...\e[0m"
+    echo -e "\n\e[36m[3/3] Compilando Interfaz Grafica de Usuario (LexiShield Tauri GUI Linux)...\e[0m"
     if command -v npm &> /dev/null; then
         echo -e "\e[90mInstalando dependencias de UI y construyendo bundle frontend...\e[0m"
         (cd ui && npm install && npm run build)
-        echo -e "\e[90mConstruyendo paquetes nativos (AppImage, .deb, etc.) con Tauri...\e[0m"
+        echo -e "\e[90mConstruyendo paquetes nativos (.deb, .rpm) con Tauri...\e[0m"
         export APPIMAGE_EXTRACT_AND_RUN=1
         export NO_STRIP=true
-        ui/node_modules/.bin/tauri build
+        ui/node_modules/.bin/tauri build --bundles deb,rpm
         
         mkdir -p dist
         # Buscar en CARGO_TARGET_DIR (usado en Vagrant) o en src-tauri/target
