@@ -73,6 +73,37 @@ try {
             Copy-Item -Path .\target\release\lexishield.exe -Destination .\dist\lexishield-windows-amd64.exe -Force
             Write-Host "Binario generado: .\dist\lexishield-windows-amd64.exe" -ForegroundColor Green
         }
+
+        if ($GuiVersion -or $All) {
+            Write-Host "Compilando Interfaz Grafica de Usuario (Tauri GUI) en Windows..." -ForegroundColor Cyan
+            if (Get-Command "npm" -ErrorAction SilentlyContinue) {
+                Push-Location .\ui
+                npm install
+                npm run build
+                Pop-Location
+                
+                $env:NO_STRIP="true"
+                .\ui\node_modules\.bin\tauri.cmd build
+        
+                # Copiar los binarios e instaladores generados a la carpeta dist/
+                if (-not (Test-Path ".\dist")) { New-Item -ItemType Directory -Force -Path ".\dist" | Out-Null }
+                if (Test-Path ".\src-tauri\target\release\lexishield-gui.exe") {
+                    Copy-Item -Path ".\src-tauri\target\release\lexishield-gui.exe" -Destination ".\dist\lexishield-gui-windows-amd64.exe" -Force
+                    Write-Host "Binario GUI generado: .\dist\lexishield-gui-windows-amd64.exe" -ForegroundColor Green
+                }
+                if (Test-Path ".\src-tauri\target\release\bundle\msi\*.msi") {
+                    Copy-Item -Path ".\src-tauri\target\release\bundle\msi\*.msi" -Destination ".\dist\" -Force
+                    Write-Host "Instalador MSI generado en .\dist\" -ForegroundColor Green
+                }
+                if (Test-Path ".\src-tauri\target\release\bundle\nsis\*.exe") {
+                    Copy-Item -Path ".\src-tauri\target\release\bundle\nsis\*.exe" -Destination ".\dist\" -Force
+                    Write-Host "Instalador NSIS generado en .\dist\" -ForegroundColor Green
+                }
+            } else {
+                Write-Host "[AVISO] 'npm' no encontrado. Omitiendo compilacion de GUI." -ForegroundColor Yellow
+            }
+        }
+
         return
     }
 
