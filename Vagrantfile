@@ -118,6 +118,9 @@ Vagrant.configure("2") do |config|
     win.vm.provision "shell", privileged: true, inline: <<-POWERSHELL
       Write-Host "=== Aplicando optimizaciones de sistema (Chris Titus Tech) ===" -ForegroundColor Cyan
       & ([ScriptBlock]::Create((irm https://christitus.com/win))) -Preset Standard
+
+      Write-Host "=== Aplicando Windows 11 Debloat (Raphi) ===" -ForegroundColor Cyan
+      & ([scriptblock]::Create((irm "https://debloat.raphi.re/"))) -RunDefaults -Silent
     POWERSHELL
   end
 end
