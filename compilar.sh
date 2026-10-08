@@ -76,6 +76,11 @@ if [ "$show_menu" = true ]; then
         selected_args+=("-c")
     fi
 
+    read -r -p "¿Desea instalar/actualizar herramientas en la VM (Vagrant provision)? [s/N]: " resp_prov
+    if [[ "$resp_prov" =~ ^[sSyY]$ ]]; then
+        selected_args+=("-u")
+    fi
+
     # Preservar flags adicionales pasados al llamar al script (-u, -k)
     for arg in "$@"; do
         if [ "$arg" == "-u" ] || [ "$arg" == "--update" ] || [ "$arg" == "--provision" ]; then
