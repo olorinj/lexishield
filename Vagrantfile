@@ -73,6 +73,7 @@ Vagrant.configure("2") do |config|
   # =========================================================================
   config.vm.define "builder-windows", autostart: false do |win|
     win.vm.box = "gusztavvargadr/visual-studio-2022-community-windows-11"
+    win.vm.boot_timeout = 600
     win.vm.synced_folder ".", "c:/vagrant"
 
     win.vm.provider "virtualbox" do |vb|
