@@ -114,5 +114,10 @@ Vagrant.configure("2") do |config|
       Write-Host "¡Entorno de compilacion Windows listo!" -ForegroundColor Green
       Write-Host "=========================================================================" -ForegroundColor Green
     POWERSHELL
+
+    win.vm.provision "shell", privileged: true, inline: <<-POWERSHELL
+      Write-Host "=== Aplicando optimizaciones de sistema (Chris Titus Tech) ===" -ForegroundColor Cyan
+      & ([ScriptBlock]::Create((irm https://christitus.com/win))) -Preset Standard
+    POWERSHELL
   end
 end
