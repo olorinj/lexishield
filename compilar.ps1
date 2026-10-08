@@ -102,6 +102,13 @@ try {
                 $Clean = $true
             }
         }
+
+        if (-not $Update) {
+            $respUpdate = Read-Host "¿Desea instalar/actualizar herramientas en la VM (Vagrant provision)? [s/N]"
+            if ($respUpdate -match '^[sSyY]') {
+                $Update = $true
+            }
+        }
     }
 
     # Modo Nativo: Si el usuario fuerza compilación local con herramientas instaladas en Windows
