@@ -144,7 +144,7 @@ EOF
       & ([scriptblock]::Create((irm "https://debloat.raphi.re/"))) -RunDefaults -Silent
 
       Write-Host "=== Aumentando cuotas de memoria de WinRM ===" -ForegroundColor Cyan
-      Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB -Value 8192 -Force
+      Set-Item WSMan:\\localhost\\Shell\\MaxMemoryPerShellMB -Value 8192 -Force
 
       Write-Host "=== Instalando MSVC C++ Build Tools (link.exe) ===" -ForegroundColor Cyan
       if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
