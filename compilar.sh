@@ -177,6 +177,9 @@ if [ "$is_inside_vagrant" = false ] && [ "$native_mode" = false ]; then
                 vagrant up builder-windows
             fi
 
+            echo -e "\n\e[36mMaximizando limites de memoria de la sesion WinRM...\e[0m"
+            vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -Command \"Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB -Value 8192 -Force\"" >/dev/null 2>&1 || true
+            
             echo -e "\e[36mEjecutando compilacion dentro de builder-windows...\e[0m"
             vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\\vagrant\\compilar-win.ps1 $*"
             exit_code=$?
