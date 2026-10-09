@@ -93,7 +93,7 @@ EOF
 
     win.vm.provider "virtualbox" do |vb|
       vb.name = "WINDOWS-DEV"
-      vb.memory = "4096"
+      vb.memory = "8192"
       vb.cpus = 4
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "hyperv"]
