@@ -8,7 +8,7 @@ echo -e "\e[36m========================================================\e[0m"
 # Validar argumento
 if [ -z "$1" ]; then
     echo -e "\e[31mError: Debes indicar la versión.\e[0m"
-    echo "Uso: ./publicar_version.sh v1.0.0"
+    echo "Uso: ./publicar_version.sh v2.0.0"
     exit 1
 fi
 
@@ -16,7 +16,7 @@ VERSION=$1
 
 # Comprobar que empieza por 'v'
 if [[ ! $VERSION == v* ]]; then
-    echo -e "\e[33mAviso: Se recomienda que la versión empiece por 'v' (ej: v1.0.0). Añadiendo 'v'...\e[0m"
+    echo -e "\e[33mAviso: Se recomienda que la versión empiece por 'v' (ej: v2.0.0). Añadiendo 'v'...\e[0m"
     VERSION="v$VERSION"
 fi
 

@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory=$true, HelpMessage="Indica la version (ej: v1.0.0)")]
+    [Parameter(Mandatory=$true, HelpMessage="Indica la version (ej: v2.0.0)")]
     [string]$Version
 )
 
