@@ -85,6 +85,9 @@ Vagrant.configure("2") do |config|
       vb.cpus = 4
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "hyperv"]
+      vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
+      vb.customize ["modifyvm", :id, "--largepages", "on"]
+      vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
       vb.customize ["modifyvm", :id, "--audio", "none"]
       vb.customize ["modifyvm", :id, "--vram", "128"]
@@ -162,10 +165,11 @@ Vagrant.configure("2") do |config|
 
       Write-Host "=== Optimizaciones de rendimiento (Exclusiones de Defender y Servicios) ===" -ForegroundColor Cyan
       Add-MpPreference -ExclusionPath "C:\\vagrant", "$env:USERPROFILE\\.cargo", "$env:USERPROFILE\\.rustup" -ErrorAction SilentlyContinue
-      Stop-Service -Name "WSearch" -Force -ErrorAction SilentlyContinue
-      Set-Service -Name "WSearch" -StartupType Disabled -ErrorAction SilentlyContinue
-      Stop-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
-      Set-Service -Name "wuauserv" -StartupType Disabled -ErrorAction SilentlyContinue
+      $servicios = @("WSearch", "wuauserv", "SysMain", "DiagTrack", "WerSvc")
+      foreach ($svc in $servicios) {
+          Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
+          Set-Service -Name $svc -StartupType Disabled -ErrorAction SilentlyContinue
+      }
     POWERSHELL
   end
 end
