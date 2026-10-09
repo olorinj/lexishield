@@ -127,7 +127,7 @@ EOF
           Write-Host "Instalando Rust (MSVC Toolchain)..." -ForegroundColor Gray
           $rustupInit = "$env:TEMP\\rustup-init.exe"
           Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile $rustupInit
-          Start-Process -FilePath $rustupInit -ArgumentList "-y", "--default-host", "x86_64-pc-windows-msvc", "--default-toolchain", "stable" -Wait -NoNewWindow
+          & $rustupInit -y --default-host x86_64-pc-windows-msvc --default-toolchain stable 2>&1 | Write-Host
           Remove-Item -Force $rustupInit -ErrorAction SilentlyContinue
       }
 
