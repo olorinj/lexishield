@@ -94,14 +94,17 @@ Vagrant.configure("2") do |config|
       [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
       Write-Host "=== Verificando herramientas de compilacion en Windows ===" -ForegroundColor Cyan
 
-      # Instalar Node.js LTS si no existe
+      # Instalar Node.js LTS si no existe (usando Chocolatey)
       if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
           Write-Host "Instalando Node.js LTS..." -ForegroundColor Gray
-          if (Get-Command choco -ErrorAction SilentlyContinue) {
-              choco install -y nodejs-lts
-          } else {
-              winget install --id OpenJS.NodeJS.LTS -e --silent --accept-source-agreements --accept-package-agreements
+          if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+              Write-Host "Instalando Chocolatey..." -ForegroundColor Gray
+              Set-ExecutionPolicy Bypass -Scope Process -Force
+              [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+              iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+              $env:PATH = "$env:ALLUSERSPROFILE\chocolatey\bin;$env:PATH"
           }
+          choco install -y nodejs-lts
       }
 
       # Instalar Rustup y Toolchain MSVC si no existe
