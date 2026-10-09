@@ -137,19 +137,42 @@ try {
     if ($GuiVersion -or $All) {
         Write-Host "`n[2/2] Compilando GUI de LexiShield con Tauri..." -ForegroundColor Cyan
         if (Get-Command "npm" -ErrorAction SilentlyContinue) {
-            Write-Host "Instalando dependencias frontend (npm install)..." -ForegroundColor Gray
-            Push-Location .\ui
+            Write-Host "Copiando frontend a disco local para evitar bugs de red en VirtualBox (esbuild)..." -ForegroundColor Gray
+            $localUi = "$env:TEMP\lexi_ui"
+            if (Test-Path $localUi) { Remove-Item -Recurse -Force $localUi }
+            Copy-Item -Path ".\ui" -Destination $localUi -Recurse -Force
+            
+            Push-Location $localUi
+            Write-Host "Compilando frontend (npm install && npm run build)..." -ForegroundColor Gray
             npm install
             npm run build
             Pop-Location
 
+            Write-Host "Copiando build de UI al entorno compartido..." -ForegroundColor Gray
+            if (-not (Test-Path ".\ui\dist")) { New-Item -ItemType Directory -Force -Path ".\ui\dist" | Out-Null }
+            Copy-Item -Path "$localUi\dist\*" -Destination ".\ui\dist\" -Recurse -Force
+
+            Write-Host "Preparando Tauri (omitiendo beforeBuildCommand)..." -ForegroundColor Gray
+            $tauriConf = ".\src-tauri\tauri.conf.json"
+            $tauriConfBackup = ".\src-tauri\tauri.conf.json.bak"
+            Copy-Item $tauriConf $tauriConfBackup -Force
+            
+            $confContent = Get-Content $tauriConf -Raw
+            $confContent = $confContent -replace '`"beforeBuildCommand`"\s*:\s*`".*?`"\s*,?', ''
+            Set-Content $tauriConf $confContent
+
+            # Instalar tauri-cli temporalmente para compilar sin depender de los node_modules compartidos
+            Push-Location .\src-tauri
+            npm install @tauri-apps/cli --no-save
+            
             $env:NO_STRIP = "true"
             Write-Host "Construyendo ejecutable nativo e instaladores con Tauri..." -ForegroundColor Gray
-            if (Test-Path ".\ui\node_modules\.bin\tauri.cmd") {
-                & .\ui\node_modules\.bin\tauri.cmd build
-            } else {
-                npx tauri build
-            }
+            npx tauri build
+            Pop-Location
+
+            # Restaurar tauri.conf.json
+            Copy-Item $tauriConfBackup $tauriConf -Force
+            Remove-Item $tauriConfBackup -Force
 
             if (Test-Path ".\src-tauri\target\release\lexishield-gui.exe") {
                 Copy-Item -Path ".\src-tauri\target\release\lexishield-gui.exe" -Destination ".\dist\lexishield-gui-windows-amd64.exe" -Force
@@ -159,18 +182,22 @@ try {
 
             # Copiar instaladores MSI
             $msiFiles = Get-ChildItem -Path ".\src-tauri\target\release\bundle\msi\*.msi" -ErrorAction SilentlyContinue
-            foreach ($msi in $msiFiles) {
-                Copy-Item -Path $msi.FullName -Destination ".\dist\" -Force
-                $archivosGenerados += ".\dist\$($msi.Name)"
-                Write-Host "  -> Instalador MSI generado: .\dist\$($msi.Name)" -ForegroundColor Green
+            if ($msiFiles) {
+                foreach ($msi in $msiFiles) {
+                    Copy-Item -Path $msi.FullName -Destination ".\dist\" -Force
+                    $archivosGenerados += ".\dist\$($msi.Name)"
+                    Write-Host "  -> Instalador MSI generado: .\dist\$($msi.Name)" -ForegroundColor Green
+                }
             }
 
             # Copiar instaladores NSIS
             $nsisFiles = Get-ChildItem -Path ".\src-tauri\target\release\bundle\nsis\*.exe" -ErrorAction SilentlyContinue
-            foreach ($nsis in $nsisFiles) {
-                Copy-Item -Path $nsis.FullName -Destination ".\dist\" -Force
-                $archivosGenerados += ".\dist\$($nsis.Name)"
-                Write-Host "  -> Instalador NSIS generado: .\dist\$($nsis.Name)" -ForegroundColor Green
+            if ($nsisFiles) {
+                foreach ($nsis in $nsisFiles) {
+                    Copy-Item -Path $nsis.FullName -Destination ".\dist\" -Force
+                    $archivosGenerados += ".\dist\$($nsis.Name)"
+                    Write-Host "  -> Instalador NSIS generado: .\dist\$($nsis.Name)" -ForegroundColor Green
+                }
             }
         } else {
             Write-Host "[AVISO] 'npm' no encontrado en el PATH. Omitiendo compilacion de GUI." -ForegroundColor Yellow
