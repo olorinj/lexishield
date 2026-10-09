@@ -357,12 +357,40 @@ fi
 if [ "$compilar_gui" = true ]; then
     echo -e "\n\e[36m[3/3] Compilando Interfaz Grafica de Usuario (LexiShield Tauri GUI Linux)...\e[0m"
     if command -v npm &> /dev/null; then
+        echo -e "\e[90mCopiando frontend a disco local (/tmp) para evitar I/O lento en vboxsf...\e[0m"
+        local_ui="/tmp/lexi_ui"
+        rm -rf "$local_ui"
+        cp -r ui "$local_ui"
+        
         echo -e "\e[90mInstalando dependencias de UI y construyendo bundle frontend...\e[0m"
-        (cd ui && npm install && npm run build)
+        (cd "$local_ui" && npm install && npm run build)
+        
+        echo -e "\e[90mCopiando build de UI al entorno compartido...\e[0m"
+        mkdir -p ui/dist
+        cp -r "$local_ui/dist/"* ui/dist/
+        
         echo -e "\e[90mConstruyendo paquetes nativos (.deb, .rpm) con Tauri...\e[0m"
         export APPIMAGE_EXTRACT_AND_RUN=1
         export NO_STRIP=true
-        ui/node_modules/.bin/tauri build --bundles deb,rpm
+        
+        echo -e "\e[90mPreparando Tauri (omitiendo beforeBuildCommand)...\e[0m"
+        tauri_conf="src-tauri/tauri.conf.json"
+        tauri_conf_bak="src-tauri/tauri.conf.json.bak"
+        cp "$tauri_conf" "$tauri_conf_bak"
+        sed -i 's/"beforeBuildCommand"[[:space:]]*:[[:space:]]*"[^"]*"/"beforeBuildCommand": ""/g' "$tauri_conf"
+        
+        # Tauri CLI relies on the local package.json, so we must run it via npx or global tauri
+        # Since we just installed in /tmp, we should run it from there or ensure it works from shared
+        # We can use npx --yes @tauri-apps/cli build
+        npx --yes @tauri-apps/cli build --bundles deb,rpm
+        if [ $? -ne 0 ]; then
+            echo -e "\e[31m[ERROR] La compilacion de Tauri fallo.\e[0m"
+            mv -f "$tauri_conf_bak" "$tauri_conf"
+            exit 1
+        fi
+        
+        # Restaurar tauri.conf.json
+        mv -f "$tauri_conf_bak" "$tauri_conf"
         
         mkdir -p dist
         # Buscar en CARGO_TARGET_DIR (usado en Vagrant) o en src-tauri/target
