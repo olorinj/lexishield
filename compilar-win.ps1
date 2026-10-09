@@ -101,8 +101,13 @@ try {
         Write-Host "Reparando integridad del toolchain de Rust y limitando concurrencia de memoria..." -ForegroundColor Yellow
         rustup toolchain install stable-x86_64-pc-windows-msvc --force 2>&1 | Out-Null
         rustup default stable-x86_64-pc-windows-msvc 2>&1 | Out-Null
-        $env:CARGO_BUILD_JOBS = "1"
     }
+    
+    # Asegurar que se limita la memoria en TODO el proceso actual y procesos hijos (incluyendo npx/tauri)
+    [Environment]::SetEnvironmentVariable("CARGO_BUILD_JOBS", "1", "Process")
+    $env:CARGO_BUILD_JOBS = "1"
+    [Environment]::SetEnvironmentVariable("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "1", "Process")
+    $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1"
 
     if ($Clean) {
         Write-Host "Limpiando artefactos previos de compilacion..." -ForegroundColor Yellow
