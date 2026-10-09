@@ -158,7 +158,7 @@ try {
             Copy-Item $tauriConf $tauriConfBackup -Force
             
             $confContent = Get-Content $tauriConf -Raw
-            $confContent = $confContent -replace '`"beforeBuildCommand`"\s*:\s*`".*?`"\s*,?', ''
+            $confContent = $confContent -replace '"beforeBuildCommand"\s*:\s*".*?"', '"beforeBuildCommand": ""'
             Set-Content $tauriConf $confContent
 
             # Instalar tauri-cli temporalmente para compilar sin depender de los node_modules compartidos
