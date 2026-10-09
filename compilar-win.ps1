@@ -95,13 +95,13 @@ try {
         }
     }
 
-    # Asegurar que haya un toolchain por defecto (corrige error "no default is configured")
+    # Forzar reinstalacion del toolchain para restaurar archivos .rlib eliminados previamente por Windows Defender
+    # y configurar CARGO_BUILD_JOBS para evitar que cargo consuma toda la RAM (4GB) y crashee WinRM (WSMAN 1726).
     if (Get-Command "rustup" -ErrorAction SilentlyContinue) {
-        $active = rustup show active-toolchain 2>&1
-        if ("$active" -match "no active toolchain" -or "$active" -match "no default is configured") {
-            Write-Host "Configurando toolchain de Rust (stable) por defecto..." -ForegroundColor Yellow
-            rustup default stable
-        }
+        Write-Host "Reparando integridad del toolchain de Rust y limitando concurrencia de memoria..." -ForegroundColor Yellow
+        rustup toolchain install stable-x86_64-pc-windows-msvc --force 2>&1 | Out-Null
+        rustup default stable-x86_64-pc-windows-msvc 2>&1 | Out-Null
+        $env:CARGO_BUILD_JOBS = "1"
     }
 
     if ($Clean) {
