@@ -45,7 +45,8 @@ try {
             # La ruta de vcvars64.bat es típicamente: <VS_PATH>\VC\Auxiliary\Build\vcvars64.bat
             # Las herramientas del compilador residen en: <VS_PATH>\VC\Tools\MSVC\
             $vsPath = $vcvars.Directory.Parent.Parent.Parent.FullName
-            if (Test-Path "$vsPath\VC\Tools\MSVC") {
+            $linkerFound = Get-ChildItem -Path "$vsPath\VC\Tools\MSVC" -Filter "link.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($linkerFound) {
                 $validVcvars = $vcvars
                 break
             }
@@ -61,7 +62,8 @@ try {
             $vcvarsFiles = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Filter "vcvars64.bat" -Recurse -ErrorAction SilentlyContinue
             foreach ($vcvars in $vcvarsFiles) {
                 $vsPath = $vcvars.Directory.Parent.Parent.Parent.FullName
-                if (Test-Path "$vsPath\VC\Tools\MSVC") {
+                $linkerFound = Get-ChildItem -Path "$vsPath\VC\Tools\MSVC" -Filter "link.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($linkerFound) {
                     $validVcvars = $vcvars
                     break
                 }
