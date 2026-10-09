@@ -53,6 +53,7 @@ try {
             }
         }
     }
+}
 
     # Asegurar que haya un toolchain por defecto (corrige error "no default is configured")
     if (Get-Command "rustup" -ErrorAction SilentlyContinue) {
