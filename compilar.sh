@@ -157,8 +157,8 @@ if [ "$is_inside_vagrant" = false ] && [ "$native_mode" = false ]; then
             fi
 
             echo -e "\e[36mEjecutando compilacion dentro de builder-linux...\e[0m"
-            vagrant ssh builder-linux -c "if ! mountpoint -q /vagrant; then sudo mkdir -p /vagrant && sudo mount -t vboxsf -o uid=\$(id -u vagrant),gid=\$(id -g vagrant) vagrant /vagrant 2>/dev/null || true; fi; cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $*"
-            exit_code=$?
+            exit_code=0
+            vagrant ssh builder-linux -c "if ! mountpoint -q /vagrant; then sudo mkdir -p /vagrant && sudo mount -t vboxsf -o uid=\$(id -u vagrant),gid=\$(id -g vagrant) vagrant /vagrant 2>/dev/null || true; fi; cd /vagrant && dos2unix compilar.sh >/dev/null 2>&1 && bash ./compilar.sh $*" || exit_code=$?
             
             # Apagar builder-linux para liberar recursos
             if [[ ! " $* " =~ " -k " ]] && [[ ! " $* " =~ " --keep-vm " ]]; then
@@ -181,8 +181,8 @@ if [ "$is_inside_vagrant" = false ] && [ "$native_mode" = false ]; then
             vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -Command \"Set-Item WSMan:\\localhost\\Shell\\MaxMemoryPerShellMB -Value 8192 -Force\"" >/dev/null 2>&1 || true
             
             echo -e "\e[36mEjecutando compilacion dentro de builder-windows...\e[0m"
-            vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\\vagrant\\compilar-win.ps1 $*"
-            exit_code=$?
+            exit_code=0
+            vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\\vagrant\\compilar-win.ps1 $*" || exit_code=$?
 
             # Apagar builder-windows para liberar recursos
             if [[ ! " $* " =~ " -k " ]] && [[ ! " $* " =~ " --keep-vm " ]]; then
