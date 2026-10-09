@@ -37,18 +37,30 @@ try {
 
     # Asegurar vcvars64 si link.exe no esta en el PATH
     if (-not (Get-Command "link.exe" -ErrorAction SilentlyContinue)) {
-        Write-Host "Buscando vcvars64.bat..." -ForegroundColor Gray
-        $vcvars = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Filter "vcvars64.bat" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($vcvars) {
-            Write-Host "Inicializando entorno de compilacion MSVC desde $($vcvars.FullName)..." -ForegroundColor Gray
-            $envLines = cmd.exe /c "call `"$($vcvars.FullName)`" > nul && set"
-            foreach ($line in $envLines) {
-                if ($line -match "^(.*?)=(.*)$") {
-                    Set-Item -Path "env:\$($matches[1])" -Value $matches[2]
+        Write-Host "Buscando entorno MSVC con vswhere..." -ForegroundColor Gray
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (Test-Path $vswhere) {
+            $vsPaths = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($vsPaths) {
+                $vsPath = $vsPaths | Select-Object -First 1
+                $vcvars = "$vsPath\VC\Auxiliary\Build\vcvars64.bat"
+                if (Test-Path $vcvars) {
+                    Write-Host "Inicializando entorno de compilacion MSVC desde $vcvars..." -ForegroundColor Gray
+                    
+                    # Usar archivo temporal para evitar problemas con comillas y cmd.exe
+                    $tempBat = "$env:TEMP\init_msvc.bat"
+                    "call `"$vcvars`" > nul" | Out-File -FilePath $tempBat -Encoding ascii
+                    "set" | Out-File -FilePath $tempBat -Append -Encoding ascii
+                    
+                    $envLines = cmd.exe /c $tempBat
+                    foreach ($line in $envLines) {
+                        if ($line -match "^(.*?)=(.*)$") {
+                            Set-Item -Path "env:\$($matches[1])" -Value $matches[2]
+                        }
+                    }
+                    Remove-Item -Force $tempBat -ErrorAction SilentlyContinue
                 }
             }
-        } else {
-            Write-Host "ERROR: No se encontro vcvars64.bat en el sistema. Asegurate de que MSVC Build Tools se instalo." -ForegroundColor Red
         }
     }
 
