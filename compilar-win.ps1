@@ -108,10 +108,17 @@ try {
     $env:CARGO_BUILD_JOBS = "1"
     [Environment]::SetEnvironmentVariable("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "1", "Process")
     $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1"
+    
+    # Mover el directorio de target fuera de la carpeta compartida de VirtualBox (vboxsf)
+    # Esto evita corrupción de archivos (STATUS_STACK_BUFFER_OVERRUN) y acelera masivamente la compilación.
+    $targetDir = "$env:TEMP\lexishield_target"
+    [Environment]::SetEnvironmentVariable("CARGO_TARGET_DIR", $targetDir, "Process")
+    $env:CARGO_TARGET_DIR = $targetDir
 
     if ($Clean) {
         Write-Host "Limpiando artefactos previos de compilacion..." -ForegroundColor Yellow
         cargo clean
+        if (Test-Path $targetDir) { Remove-Item -Recurse -Force $targetDir -ErrorAction SilentlyContinue }
         if (Test-Path ".\target") { Remove-Item -Recurse -Force ".\target" -ErrorAction SilentlyContinue }
         if (Test-Path ".\src-tauri\target") { Remove-Item -Recurse -Force ".\src-tauri\target" -ErrorAction SilentlyContinue }
     }
@@ -129,8 +136,8 @@ try {
 
     $archivosGenerados = @()
 
-    if (Test-Path ".\target\release\lexishield.exe") {
-        Copy-Item -Path ".\target\release\lexishield.exe" -Destination ".\dist\lexishield-windows-amd64.exe" -Force
+    if (Test-Path "$targetDir\release\lexishield.exe") {
+        Copy-Item -Path "$targetDir\release\lexishield.exe" -Destination ".\dist\lexishield-windows-amd64.exe" -Force
         $archivosGenerados += ".\dist\lexishield-windows-amd64.exe"
         Write-Host "  -> Binario CLI generado: .\dist\lexishield-windows-amd64.exe" -ForegroundColor Green
     } else {
@@ -173,20 +180,24 @@ try {
             $env:NO_STRIP = "true"
             Write-Host "Construyendo ejecutable nativo e instaladores con Tauri..." -ForegroundColor Gray
             npx tauri build
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[ERROR] La compilacion de Tauri fallo con el codigo $LASTEXITCODE." -ForegroundColor Red
+                exit 1
+            }
             Pop-Location
 
             # Restaurar tauri.conf.json
             Copy-Item $tauriConfBackup $tauriConf -Force
             Remove-Item $tauriConfBackup -Force
 
-            if (Test-Path ".\src-tauri\target\release\lexishield-gui.exe") {
-                Copy-Item -Path ".\src-tauri\target\release\lexishield-gui.exe" -Destination ".\dist\lexishield-gui-windows-amd64.exe" -Force
+            if (Test-Path "$targetDir\release\lexishield-gui.exe") {
+                Copy-Item -Path "$targetDir\release\lexishield-gui.exe" -Destination ".\dist\lexishield-gui-windows-amd64.exe" -Force
                 $archivosGenerados += ".\dist\lexishield-gui-windows-amd64.exe"
                 Write-Host "  -> Binario GUI generado: .\dist\lexishield-gui-windows-amd64.exe" -ForegroundColor Green
             }
 
             # Copiar instaladores MSI
-            $msiFiles = Get-ChildItem -Path ".\src-tauri\target\release\bundle\msi\*.msi" -ErrorAction SilentlyContinue
+            $msiFiles = Get-ChildItem -Path "$targetDir\release\bundle\msi\*.msi" -ErrorAction SilentlyContinue
             if ($msiFiles) {
                 foreach ($msi in $msiFiles) {
                     Copy-Item -Path $msi.FullName -Destination ".\dist\" -Force
@@ -196,7 +207,7 @@ try {
             }
 
             # Copiar instaladores NSIS
-            $nsisFiles = Get-ChildItem -Path ".\src-tauri\target\release\bundle\nsis\*.exe" -ErrorAction SilentlyContinue
+            $nsisFiles = Get-ChildItem -Path "$targetDir\release\bundle\nsis\*.exe" -ErrorAction SilentlyContinue
             if ($nsisFiles) {
                 foreach ($nsis in $nsisFiles) {
                     Copy-Item -Path $nsis.FullName -Destination ".\dist\" -Force
