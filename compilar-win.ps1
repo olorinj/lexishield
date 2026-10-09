@@ -37,30 +37,53 @@ try {
 
     # Asegurar vcvars64 si link.exe no esta en el PATH
     if (-not (Get-Command "link.exe" -ErrorAction SilentlyContinue)) {
-        Write-Host "Buscando entorno MSVC con vswhere..." -ForegroundColor Gray
-        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-        if (Test-Path $vswhere) {
-            $vsPaths = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-            if ($vsPaths) {
-                $vsPath = $vsPaths | Select-Object -First 1
-                $vcvars = "$vsPath\VC\Auxiliary\Build\vcvars64.bat"
-                if (Test-Path $vcvars) {
-                    Write-Host "Inicializando entorno de compilacion MSVC desde $vcvars..." -ForegroundColor Gray
-                    
-                    # Usar archivo temporal para evitar problemas con comillas y cmd.exe
-                    $tempBat = "$env:TEMP\init_msvc.bat"
-                    "call `"$vcvars`" > nul" | Out-File -FilePath $tempBat -Encoding ascii
-                    "set" | Out-File -FilePath $tempBat -Append -Encoding ascii
-                    
-                    $envLines = cmd.exe /c $tempBat
-                    foreach ($line in $envLines) {
-                        if ($line -match "^(.*?)=(.*)$") {
-                            Set-Item -Path "env:\$($matches[1])" -Value $matches[2]
-                        }
-                    }
-                    Remove-Item -Force $tempBat -ErrorAction SilentlyContinue
+        Write-Host "Buscando una instalacion valida de MSVC en el disco..." -ForegroundColor Gray
+        $vcvarsFiles = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Filter "vcvars64.bat" -Recurse -ErrorAction SilentlyContinue
+        
+        $validVcvars = $null
+        foreach ($vcvars in $vcvarsFiles) {
+            # La ruta de vcvars64.bat es típicamente: <VS_PATH>\VC\Auxiliary\Build\vcvars64.bat
+            # Las herramientas del compilador residen en: <VS_PATH>\VC\Tools\MSVC\
+            $vsPath = $vcvars.Directory.Parent.Parent.Parent.FullName
+            if (Test-Path "$vsPath\VC\Tools\MSVC") {
+                $validVcvars = $vcvars
+                break
+            }
+        }
+
+        if (-not $validVcvars) {
+            Write-Host "AVISO: No se encontro el compilador de C++ (VC\Tools\MSVC). Instalando directamente..." -ForegroundColor Yellow
+            $vsInstaller = "$env:TEMP\vs_buildtools.exe"
+            Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vs_buildtools.exe" -OutFile $vsInstaller
+            Start-Process -FilePath $vsInstaller -ArgumentList "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait --norestart --nocache" -Wait -NoNewWindow
+            Remove-Item -Force $vsInstaller -ErrorAction SilentlyContinue
+            
+            $vcvarsFiles = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Filter "vcvars64.bat" -Recurse -ErrorAction SilentlyContinue
+            foreach ($vcvars in $vcvarsFiles) {
+                $vsPath = $vcvars.Directory.Parent.Parent.Parent.FullName
+                if (Test-Path "$vsPath\VC\Tools\MSVC") {
+                    $validVcvars = $vcvars
+                    break
                 }
             }
+        }
+
+        if ($validVcvars) {
+            Write-Host "Inicializando entorno de compilacion MSVC desde $($validVcvars.FullName)..." -ForegroundColor Gray
+            
+            $tempBat = "$env:TEMP\init_msvc.bat"
+            "call `"$($validVcvars.FullName)`" > nul" | Out-File -FilePath $tempBat -Encoding ascii
+            "set" | Out-File -FilePath $tempBat -Append -Encoding ascii
+            
+            $envLines = cmd.exe /c $tempBat
+            foreach ($line in $envLines) {
+                if ($line -match "^(.*?)=(.*)$") {
+                    Set-Item -Path "env:\$($matches[1])" -Value $matches[2]
+                }
+            }
+            Remove-Item -Force $tempBat -ErrorAction SilentlyContinue
+        } else {
+            Write-Host "ERROR: No se pudo instalar ni localizar MSVC Build Tools. La compilacion de Rust fallara." -ForegroundColor Red
         }
     }
 
