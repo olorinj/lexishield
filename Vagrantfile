@@ -17,7 +17,6 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--paravirtprovider", "kvm"]
       vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
       vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
-      vb.customize ["modifyvm", :id, "--largepages", "on"]
       vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
       vb.customize ["modifyvm", :id, "--audio", "none"]
@@ -86,7 +85,7 @@ EOF
   # =========================================================================
   config.vm.define "builder-windows", autostart: false do |win|
     win.vm.box = "gusztavvargadr/visual-studio-2022-community-windows-11"
-    win.vm.boot_timeout = 600
+    win.vm.boot_timeout = 1800
     win.vm.communicator = "winrm"
     win.winrm.retry_limit = 60
     win.winrm.retry_delay = 10
@@ -99,7 +98,6 @@ EOF
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "hyperv"]
       vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
-      vb.customize ["modifyvm", :id, "--largepages", "on"]
       vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
       vb.customize ["modifyvm", :id, "--audio", "none"]
