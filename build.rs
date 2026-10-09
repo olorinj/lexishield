@@ -3,6 +3,11 @@
 use std::path::PathBuf;
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=DISABLE_WINRES");
+    if std::env::var("DISABLE_WINRES").is_ok() {
+        return;
+    }
+
     let target = std::env::var("TARGET").unwrap_or_default();
     if target.contains("windows") {
         let mut res = winres::WindowsResource::new();
