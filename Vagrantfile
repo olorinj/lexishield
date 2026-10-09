@@ -11,11 +11,14 @@ Vagrant.configure("2") do |config|
 
     linux.vm.provider "virtualbox" do |vb|
       vb.name = "LINUX-DEV"
-      vb.memory = "4096"
+      vb.memory = "8192"
       vb.cpus = 4
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "kvm"]
       vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
+      vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
+      vb.customize ["modifyvm", :id, "--largepages", "on"]
+      vb.customize ["modifyvm", :id, "--vtxvpid", "on"]
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
       vb.customize ["modifyvm", :id, "--audio", "none"]
       vb.customize ["modifyvm", :id, "--vram", "16"]
@@ -32,7 +35,7 @@ Vagrant.configure("2") do |config|
       apt-get install -y --no-install-recommends \
         curl build-essential pkg-config libssl-dev git dos2unix docker.io ca-certificates \
         libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf file libfuse2 \
-        virtualbox-guest-utils
+        virtualbox-guest-utils mold clang lld
 
       # Asegurar soporte de carpetas compartidas y punto de montaje
       modprobe vboxsf 2>/dev/null || true
@@ -61,6 +64,16 @@ Vagrant.configure("2") do |config|
       chmod +x /etc/profile.d/rust.sh
       ln -sf /root/.cargo/bin/* /usr/local/bin/ || true
       ln -sf /home/vagrant/.cargo/bin/* /usr/local/bin/ || true
+
+      echo "=== Configurando 'mold' como enlazador para compilacion ultrarrapida ==="
+      mkdir -p /home/vagrant/.cargo /root/.cargo
+      cat << 'EOF' > /home/vagrant/.cargo/config.toml
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+EOF
+      cp /home/vagrant/.cargo/config.toml /root/.cargo/config.toml
+      chown -R vagrant:vagrant /home/vagrant/.cargo
 
       echo "========================================================================="
       echo "¡Entorno de compilacion Linux/macOS listo!"
