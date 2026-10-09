@@ -158,6 +158,13 @@ Vagrant.configure("2") do |config|
       Set-ItemProperty -Path $Path -Name "NoLockScreen" -Value 1 -Type DWord -Force
       
       Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects" -Name "VisualFXSetting" -Value 2
+
+      Write-Host "=== Optimizaciones de rendimiento (Exclusiones de Defender y Servicios) ===" -ForegroundColor Cyan
+      Add-MpPreference -ExclusionPath "C:\\vagrant", "$env:USERPROFILE\\.cargo", "$env:USERPROFILE\\.rustup" -ErrorAction SilentlyContinue
+      Stop-Service -Name "WSearch" -Force -ErrorAction SilentlyContinue
+      Set-Service -Name "WSearch" -StartupType Disabled -ErrorAction SilentlyContinue
+      Stop-Service -Name "wuauserv" -Force -ErrorAction SilentlyContinue
+      Set-Service -Name "wuauserv" -StartupType Disabled -ErrorAction SilentlyContinue
     POWERSHELL
   end
 end
