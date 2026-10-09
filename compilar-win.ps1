@@ -225,6 +225,7 @@ try {
     Write-Host "`n========================================================" -ForegroundColor Green
     Write-Host "Compilacion de Windows finalizada exitosamente." -ForegroundColor Green
     Write-Host "========================================================" -ForegroundColor Green
+    exit 0
 }
 finally {
     Pop-Location
