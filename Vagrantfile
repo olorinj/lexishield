@@ -11,7 +11,7 @@ Vagrant.configure("2") do |config|
 
     linux.vm.provider "virtualbox" do |vb|
       vb.name = "LINUX-DEV"
-      vb.memory = "8192"
+      vb.memory = "4096"
       vb.cpus = 4
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "kvm"]
@@ -94,7 +94,7 @@ EOF
 
     win.vm.provider "virtualbox" do |vb|
       vb.name = "WINDOWS-DEV"
-      vb.memory = "8192"
+      vb.memory = "4096"
       vb.cpus = 4
       vb.customize ["modifyvm", :id, "--ioapic", "on"]
       vb.customize ["modifyvm", :id, "--paravirtprovider", "hyperv"]
