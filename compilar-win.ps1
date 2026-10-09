@@ -178,6 +178,8 @@ try {
             npm install @tauri-apps/cli --no-save
             
             $env:NO_STRIP = "true"
+            $env:DISABLE_WINRES = "1"
+            [Environment]::SetEnvironmentVariable("DISABLE_WINRES", "1", "Process")
             Write-Host "Construyendo ejecutable nativo e instaladores con Tauri..." -ForegroundColor Gray
             npx tauri build
             if ($LASTEXITCODE -ne 0) {
