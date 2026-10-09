@@ -1099,7 +1099,7 @@
       <div>
         <h1 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
           LexiShield
-          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20">v1.0.0</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20">v2.0.0</span>
         </h1>
       </div>
     </div>

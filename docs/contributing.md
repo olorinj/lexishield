@@ -109,12 +109,12 @@ Una vez tu código esté en GitHub, generar instaladores para tus usuarios es ta
 
 **En Linux / macOS:**
 ```bash
-./publicar_version.sh v1.0.0
+./publicar_version.sh v2.0.0
 ```
 
 **En Windows (PowerShell):**
 ```powershell
-.\publicar_version.ps1 v1.0.0
+.\publicar_version.ps1 v2.0.0
 ```
 
-Estos scripts se asegurarán de que tu código esté limpio, crearán una etiqueta git (`v1.0.0`) y la subirán. Inmediatamente después, los servidores de GitHub Actions arrancarán y compilarán los instaladores gráficos para todos los sistemas operativos, depositándolos en la pestaña "Releases" (Lanzamientos) de tu repositorio.
+Estos scripts se asegurarán de que tu código esté limpio, crearán una etiqueta git (`v2.0.0`) y la subirán. Inmediatamente después, los servidores de GitHub Actions arrancarán y compilarán los instaladores gráficos para todos los sistemas operativos, depositándolos en la pestaña "Releases" (Lanzamientos) de tu repositorio.
