@@ -127,6 +127,37 @@ Vagrant.configure("2") do |config|
 
       Write-Host "=== Aplicando Windows 11 Debloat (Raphi) ===" -ForegroundColor Cyan
       & ([scriptblock]::Create((irm "https://debloat.raphi.re/"))) -RunDefaults -Silent
+
+      Write-Host "=== Instalando MSVC C++ Build Tools (link.exe) ===" -ForegroundColor Cyan
+      if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          $env:PATH = "$env:ALLUSERSPROFILE\\chocolatey\\bin;$env:PATH"
+      }
+      choco install visualstudio2022buildtools -y --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart"
+
+      Write-Host "=== Desinstalando OneDrive ===" -ForegroundColor Cyan
+      choco uninstall onedrive -y --force -ErrorAction SilentlyContinue
+      Stop-Process -Name "OneDrive" -Force -ErrorAction SilentlyContinue
+      $oneDriveUninstaller = "$env:SystemRoot\\SysWOW64\\OneDriveSetup.exe"
+      if (Test-Path $oneDriveUninstaller) { Start-Process -FilePath $oneDriveUninstaller -ArgumentList "/uninstall" -Wait -NoNewWindow }
+
+      Write-Host "=== Configurando teclado a Español ===" -ForegroundColor Cyan
+      Set-WinUserLanguageList -LanguageList es-ES, en-US -Force
+
+      Write-Host "=== Configurando Alto Rendimiento y Estética ===" -ForegroundColor Cyan
+      powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+      
+      Set-ItemProperty -Path "HKCU:\\Control Panel\\Colors" -Name "Background" -Value "0 0 0"
+      Set-ItemProperty -Path "HKCU:\\Control Panel\\Desktop" -Name "Wallpaper" -Value ""
+      RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters
+      
+      $Path = "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization"
+      if (-not (Test-Path $Path)) { New-Item -Path $Path -Force | Out-Null }
+      Set-ItemProperty -Path $Path -Name "NoLockScreen" -Value 1 -Type DWord -Force
+      
+      Set-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects" -Name "VisualFXSetting" -Value 2
     POWERSHELL
   end
 end
