@@ -37,7 +37,7 @@ Vagrant.configure("2") do |config|
       apt-get install -y --no-install-recommends \
         curl build-essential pkg-config libssl-dev git dos2unix docker.io ca-certificates \
         libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf file libfuse2 \
-        virtualbox-guest-utils mold clang lld
+        mold clang lld rpm
 
       # Asegurar soporte de carpetas compartidas y punto de montaje
       modprobe vboxsf 2>/dev/null || true
