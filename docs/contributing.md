@@ -37,6 +37,21 @@ Los scripts (`compilar.sh` y `compilar.ps1`) aceptan los siguientes argumentos p
 | `-k`, `--keep-vm` | `-KeepVm` | Mantiene las máquinas virtuales encendidas tras compilar para ahorrar tiempo en ejecuciones sucesivas. |
 | `--native` | `-Native` | Ejecuta la compilación de forma nativa en el sistema anfitrión actual (sin usar Vagrant). |
 
+### 💡 Ergonomía de Terminal: Starship Prompt y Vagrantfile
+
+Si utilizas [Starship](https://starship.rs/) como prompt en tu terminal, por defecto intentará consultar la versión de Vagrant cada vez que entres al directorio del repositorio o ejecutes un comando debido a la presencia del `Vagrantfile`. Dado que el arranque de Vagrant (basado en Ruby y carga de plugins) toma entre 1.5 y 2 segundos y supera el límite de espera predeterminado de Starship (500 ms), se producirán advertencias de tiempo de espera:
+```text
+[WARN] - (starship::utils): Executing command "/usr/bin/vagrant" timed out.
+```
+
+Para evitar este retraso y mantener la terminal ágil e instantánea, se desactiva el módulo de Vagrant en la configuración de usuario (`~/.config/starship.toml`):
+
+```toml
+# ~/.config/starship.toml
+[vagrant]
+disabled = true
+```
+
 ## 🧪 Flujo de Calidad Obligatorio (Quality Gate)
 
 Antes de enviar cualquier contribución o abrir una *Pull Request*, debes pasar el control de calidad en cuatro pasos:
