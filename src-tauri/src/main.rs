@@ -10,7 +10,7 @@ use lexishield::logger::{
 use lexishield::models::{DetectorType, FormatType, Mapping, ObfuscationReport};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -977,6 +977,35 @@ fn clear_debug_logs() -> Result<(), String> {
 fn main() {
     init_logger();
     tauri::Builder::default()
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                if let Ok(icon) = tauri::image::Image::from_bytes(include_bytes!("../icons/128x128.png")) {
+                    let _ = window.set_icon(icon);
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    // En Wayland (KDE Plasma/GNOME), el servidor de ventanas resuelve el icono
+                    // a traves de la asociacion de app_id / StartupWMClass con los iconos del usuario.
+                    if let Some(data_dir) = dirs::data_dir() {
+                        let icons_dir = data_dir.join("icons/hicolor/128x128/apps");
+                        let apps_dir = data_dir.join("applications");
+                        let _ = std::fs::create_dir_all(&icons_dir);
+                        let _ = std::fs::create_dir_all(&apps_dir);
+
+                        let icon_bytes = include_bytes!("../icons/128x128.png");
+                        let _ = std::fs::write(icons_dir.join("lexishield-gui.png"), icon_bytes);
+                        let _ = std::fs::write(icons_dir.join("com.lexishield.desktop.png"), icon_bytes);
+
+                        let desktop_file = apps_dir.join("com.lexishield.desktop.desktop");
+                        if !desktop_file.exists() {
+                            let content = "[Desktop Entry]\nType=Application\nName=LexiShield\nExec=lexishield-gui\nIcon=com.lexishield.desktop\nStartupWMClass=com.lexishield.desktop\nTerminal=false\nCategories=Utility;Security;\n";
+                            let _ = std::fs::write(desktop_file, content);
+                        }
+                    }
+                }
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
