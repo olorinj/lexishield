@@ -2771,12 +2771,17 @@
   <!-- MODAL DE AYUDA CONTEXTUAL Y GUÍA DE USUARIO -->
   {#if activeHelpTab}
     <div
-      class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
-      on:click|self={closeHelp}
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
     >
-      <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <button
+        type="button"
+        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
+        on:click={closeHelp}
+        aria-label="Cerrar manual de ayuda"
+      ></button>
+      <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         <!-- Cabecera del modal de ayuda -->
         <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
           <div class="flex items-center gap-2.5">
@@ -2984,12 +2989,17 @@
   <!-- MODAL DE CONFIRMACIÓN Y DETALLE DE ACCIÓN COMPLETADA -->
   {#if actionResultModal}
     <div
-      class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
-      on:click|self={() => (actionResultModal = null)}
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
     >
-      <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 flex flex-col shadow-2xl space-y-4">
+      <button
+        type="button"
+        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
+        on:click={() => (actionResultModal = null)}
+        aria-label="Cerrar ventana de confirmación"
+      ></button>
+      <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 flex flex-col shadow-2xl space-y-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl {actionResultModal.type === 'info' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'} flex items-center justify-center text-xl shrink-0">
             {actionResultModal.type === 'info' ? 'ℹ️' : '✅'}
