@@ -4,6 +4,9 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
+  import packageInfo from "../package.json";
+
+  const appVersion = packageInfo.version || "2.0.0";
 
   // Control de Tema Claro / Oscuro
   let darkMode = true;
@@ -1223,7 +1226,7 @@
       <div>
         <h1 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
           LexiShield
-          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20">v2.0.0</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20">v{appVersion}</span>
         </h1>
       </div>
     </div>

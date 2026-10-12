@@ -1,4 +1,4 @@
-﻿param (
+param (
     [Alias("w", "win")]
     [switch]$Windows,
 
@@ -38,6 +38,61 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $directorioOriginal = Get-Location
 try {
     Push-Location -Path $PSScriptRoot
+
+    # ==============================================================================
+    # SINCRONIZACIÓN DE VERSIÓN DESDE RAMA GIT
+    # ==============================================================================
+    function Sync-BranchVersion {
+        param([string]$BasePath)
+        if (-not (Get-Command "git" -ErrorAction SilentlyContinue)) {
+            return
+        }
+
+        $branch = git -C $BasePath rev-parse --abbrev-ref HEAD 2>$null
+        if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq "HEAD") {
+            return
+        }
+
+        $cleanName = $branch -replace '^(feature|bugfix|release|hotfix)/', ''
+        if ($cleanName -match '^v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)$') {
+            $detectedVer = $Matches[1]
+            Write-Host "[Sincronización] Rama activa: '$branch' -> Versión de compilación: '$detectedVer'" -ForegroundColor Cyan
+
+            # 1. Cargo.toml raíz
+            $rootCargo = Join-Path $BasePath "Cargo.toml"
+            if (Test-Path $rootCargo) {
+                $content = Get-Content -Raw -Encoding UTF8 $rootCargo
+                $content = [regex]::Replace($content, '(?m)^version = "[^"]+"', "version = `"$detectedVer`"", 1)
+                [System.IO.File]::WriteAllText($rootCargo, $content, [System.Text.Encoding]::UTF8)
+            }
+
+            # 2. src-tauri/Cargo.toml
+            $tauriCargo = Join-Path $BasePath "src-tauri\Cargo.toml"
+            if (Test-Path $tauriCargo) {
+                $content = Get-Content -Raw -Encoding UTF8 $tauriCargo
+                $content = [regex]::Replace($content, '(?m)^version = "[^"]+"', "version = `"$detectedVer`"", 1)
+                [System.IO.File]::WriteAllText($tauriCargo, $content, [System.Text.Encoding]::UTF8)
+            }
+
+            # 3. src-tauri/tauri.conf.json
+            $tauriConf = Join-Path $BasePath "src-tauri\tauri.conf.json"
+            if (Test-Path $tauriConf) {
+                $content = Get-Content -Raw -Encoding UTF8 $tauriConf
+                $content = [regex]::Replace($content, '"version":\s*"[^"]+"', "`"version`": `"$detectedVer`"", 1)
+                [System.IO.File]::WriteAllText($tauriConf, $content, [System.Text.Encoding]::UTF8)
+            }
+
+            # 4. ui/package.json
+            $uiPkg = Join-Path $BasePath "ui\package.json"
+            if (Test-Path $uiPkg) {
+                $content = Get-Content -Raw -Encoding UTF8 $uiPkg
+                $content = [regex]::Replace($content, '"version":\s*"[^"]+"', "`"version`": `"$detectedVer`"", 1)
+                [System.IO.File]::WriteAllText($uiPkg, $content, [System.Text.Encoding]::UTF8)
+            }
+        }
+    }
+
+    Sync-BranchVersion -BasePath $PSScriptRoot
 
     $showMenu = $Interactive
     if ($PSBoundParameters.Count -eq 0) {
