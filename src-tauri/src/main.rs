@@ -93,6 +93,14 @@ fn obfuscate_content(
         save_mappings_auto(p, &all_mappings, password.as_deref()).map_err(|e| e.to_string())?;
     }
 
+    log::info!(
+        "Studio: Texto ofuscado con éxito (formato: '{}', tokens reemplazados: {}, tiempo: {:.1} ms, bóveda: '{}')",
+        format_str,
+        report.replacements_applied,
+        report.elapsed_ms,
+        vault_path.as_deref().unwrap_or("ninguna")
+    );
+
     Ok(ObfuscateResponse {
         obfuscated_text: obfuscated,
         report,
@@ -126,6 +134,14 @@ fn deobfuscate_content(
 
     let format = parse_format(&format_str);
     let (deobfuscated, report) = engine.deobfuscate_text(&text, format).map_err(|e| e.to_string())?;
+
+    log::info!(
+        "Studio: Texto desofuscado (formato: '{}', tokens restaurados: {}, tiempo: {:.1} ms, bóveda: '{}')",
+        format_str,
+        report.replacements_applied,
+        report.elapsed_ms,
+        vault_path.as_deref().unwrap_or("memoria")
+    );
 
     Ok(DeobfuscateResponse {
         deobfuscated_text: deobfuscated,
@@ -406,6 +422,15 @@ fn process_file_command(
         let _ = export_office_to_md_with_pandoc(Path::new(&output_path));
     }
 
+    log::info!(
+        "Studio: Archivo procesado (origen: '{}' -> destino: '{}', reversa: {}, tokens modificados: {}, export_md: {})",
+        input_path,
+        output_path,
+        reverse,
+        report.replacements_applied,
+        export_md.unwrap_or(false)
+    );
+
     Ok(report)
 }
 
@@ -510,6 +535,12 @@ fn scan_file_command(
         detector_type: m.detector_type.to_string(),
         omitted: m.omitted,
     }).collect();
+
+    log::info!(
+        "Escáner: Archivo individual analizado '{}' -> {} tokens detectados",
+        path,
+        total
+    );
 
     Ok(ScanAuditResponse {
         files_scanned: 1,
@@ -789,34 +820,42 @@ fn list_all_vaults() -> Result<Vec<lexishield::models::VaultFileInfo>, String> {
 #[tauri::command]
 fn create_vault_file(name: String, password: Option<String>) -> Result<String, String> {
     let path = lexishield::vault::create_vault(&name, password.as_deref()).map_err(|e| e.to_string())?;
+    log::info!("Bóvedas: Creada nueva bóveda '{}' ({})", name, path.display());
     Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 fn rename_vault_file(old_name: String, new_name: String) -> Result<String, String> {
     let path = lexishield::vault::rename_vault(&old_name, &new_name).map_err(|e| e.to_string())?;
+    log::info!("Bóvedas: Bóveda renombrada de '{}' a '{}'", old_name, new_name);
     Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 fn delete_vault_file(name: String) -> Result<(), String> {
-    lexishield::vault::delete_vault(&name).map_err(|e| e.to_string())
+    lexishield::vault::delete_vault(&name).map_err(|e| e.to_string())?;
+    log::info!("Bóvedas: Bóveda eliminada '{}'", name);
+    Ok(())
 }
 
 #[tauri::command]
 fn export_vault_file(name: String, dest_path: String) -> Result<(), String> {
-    lexishield::vault::export_vault(&name, Path::new(&dest_path)).map_err(|e| e.to_string())
+    lexishield::vault::export_vault(&name, Path::new(&dest_path)).map_err(|e| e.to_string())?;
+    log::info!("Bóvedas: Bóveda '{}' exportada a '{}'", name, dest_path);
+    Ok(())
 }
 
 #[tauri::command]
 fn import_vault_file(src_path: String, name: Option<String>) -> Result<String, String> {
     let path = lexishield::vault::import_vault(Path::new(&src_path), name.as_deref()).map_err(|e| e.to_string())?;
+    log::info!("Bóvedas: Bóveda importada desde '{}' como '{}'", src_path, path.display());
     Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 fn restore_vault_backup_file(name: String) -> Result<String, String> {
     let path = lexishield::vault::restore_vault_backup(&name).map_err(|e| e.to_string())?;
+    log::info!("Bóvedas: Copia de seguridad restaurada para bóveda '{}'", name);
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -885,6 +924,15 @@ fn update_mapping_pair(
             break;
         }
     }
+    log::info!(
+        "Pares: Actualizado par de tokens en bóveda '{}' ('{}' -> '{}', detector: '{}', omitido: {})",
+        vault_path,
+        original,
+        pseudonym,
+        det_type,
+        omitted
+    );
+
     if !found {
         mappings.push(Mapping {
             original,
@@ -919,8 +967,16 @@ fn delete_mapping_pairs(
     }
 
     let mut mappings = load_mappings_auto(p, password.as_deref()).map_err(|e| e.to_string())?;
+    let count_before = mappings.len();
     mappings.retain(|m| !originals.contains(&m.original));
+    let deleted_count = count_before - mappings.len();
     save_mappings_auto(p, &mappings, password.as_deref()).map_err(|e| e.to_string())?;
+
+    log::info!(
+        "Pares: Eliminados {} tokens de la bóveda '{}'",
+        deleted_count,
+        vault_path
+    );
 
     Ok(mappings
         .into_iter()
@@ -939,7 +995,9 @@ fn delete_mapping_pairs(
 
 #[tauri::command]
 fn clear_system_clipboard() -> Result<(), String> {
-    lexishield::clipboard::clear_clipboard()
+    lexishield::clipboard::clear_clipboard()?;
+    log::info!("Portapapeles: Portapapeles del sistema vaciado por el usuario");
+    Ok(())
 }
 
 #[tauri::command]
@@ -949,7 +1007,9 @@ fn get_app_settings() -> Result<lexishield::config::LexiConfig, String> {
 
 #[tauri::command]
 fn save_app_settings(config: lexishield::config::LexiConfig) -> Result<(), String> {
-    lexishield::config::save_user_config(&config).map_err(|e| e.to_string())
+    lexishield::config::save_user_config(&config).map_err(|e| e.to_string())?;
+    log::info!("Configuración: Ajustes guardados correctamente en ~/.lexishield/config.toml");
+    Ok(())
 }
 
 #[tauri::command]
