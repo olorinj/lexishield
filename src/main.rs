@@ -25,7 +25,7 @@ fn parse_path(s: &str) -> Result<PathBuf, String> {
 #[derive(Parser)]
 #[command(name = "lexishield")]
 #[command(about = "Motor de anonimización y ofuscación semántica de alto rendimiento", long_about = None)]
-#[command(version = "2.0.0")]
+#[command(version)]
 struct Cli {
     /// Activa el nivel de log Debug para más detalles (Telemetría en stderr).
     #[arg(short, long, global = true)]

@@ -2,6 +2,58 @@
 set -e
 
 # ==============================================================================
+# SINCRONIZACIÓN DE VERSIÓN DESDE RAMA GIT
+# ==============================================================================
+sync_branch_version() {
+    local base_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if ! command -v git &>/dev/null; then
+        return 0
+    fi
+
+    local branch
+    branch=$(git -C "$base_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
+        return 0
+    fi
+
+    local clean_name="${branch#feature/}"
+    clean_name="${clean_name#bugfix/}"
+    clean_name="${clean_name#release/}"
+    clean_name="${clean_name#hotfix/}"
+
+    local detected_ver=""
+    if [[ "$clean_name" =~ ^v?([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)$ ]]; then
+        detected_ver="${BASH_REMATCH[1]}"
+    fi
+
+    if [ -n "$detected_ver" ]; then
+        echo -e "\e[36m[Sincronización] Rama activa: '$branch' -> Versión de compilación: '$detected_ver'\e[0m"
+
+        # 1. Cargo.toml raíz
+        if [ -f "$base_dir/Cargo.toml" ]; then
+            sed -i -E "0,/^version = \"[^\"]+\"/s//version = \"$detected_ver\"/" "$base_dir/Cargo.toml"
+        fi
+
+        # 2. src-tauri/Cargo.toml
+        if [ -f "$base_dir/src-tauri/Cargo.toml" ]; then
+            sed -i -E "0,/^version = \"[^\"]+\"/s//version = \"$detected_ver\"/" "$base_dir/src-tauri/Cargo.toml"
+        fi
+
+        # 3. src-tauri/tauri.conf.json
+        if [ -f "$base_dir/src-tauri/tauri.conf.json" ]; then
+            sed -i -E "s/\"version\": \"[^\"]+\"/\"version\": \"$detected_ver\"/" "$base_dir/src-tauri/tauri.conf.json"
+        fi
+
+        # 4. ui/package.json
+        if [ -f "$base_dir/ui/package.json" ]; then
+            sed -i -E "0,/\"version\": \"[^\"]+\"/s//\"version\": \"$detected_ver\"/" "$base_dir/ui/package.json"
+        fi
+    fi
+}
+
+sync_branch_version
+
+# ==============================================================================
 # GESTIÓN DE ENTORNO VAGRANT (HOST)
 # ==============================================================================
 
