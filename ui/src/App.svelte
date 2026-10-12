@@ -46,11 +46,13 @@
   let copyMode = false;
   let copySuffix = "_obfuscated";
   let cleanCache = false;
+  let hasPandoc = false;
+  let exportMarkdown = false;
 
   // Estado del Escáner
   let detectedItems = [];
   let auditSummary = null;
-  let recursiveScan = true;
+  let recursiveScan = false;
   let noGitIgnoreScan = true;
   let isScanningDirectory = false;
   let scanCurrentFile = "";
@@ -133,7 +135,13 @@
     await refreshVaultsList();
     await loadInitialVault();
 
-    // 4. Registrar escuchas de progreso Tauri
+    // 4. Registrar escuchas de progreso Tauri y verificar herramientas
+    try {
+      hasPandoc = await invokeTauri("check_pandoc_available");
+    } catch (e) {
+      hasPandoc = false;
+    }
+
     try {
       debugMode = await invokeTauri("get_debug_mode");
       await listen("scan-progress", (event) => {
@@ -390,7 +398,8 @@
         formatStr: selectedFormat,
         vaultPath: vaultPath || null,
         password: password || null,
-        reverse: false
+        reverse: false,
+        exportMd: hasPandoc && exportMarkdown
       });
       lastReport = rep;
       statusMessage = `✅ Archivo procesado (${rep.replacements_applied} reemplazos). Guardado en: ${outPath}`;
@@ -1093,8 +1102,8 @@
   <!-- CABECERA PRINCIPAL / NAVEGACIÓN -->
   <header class="h-14 border-b border-slate-200 dark:border-white/10 px-4 flex items-center justify-between bg-white/80 dark:bg-brand-surface/60 backdrop-blur-md z-20 shrink-0">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary-600 to-primary-400 flex items-center justify-center shadow-md shadow-primary-500/20 text-slate-950 font-bold text-sm">
-        🛡️
+      <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-md shadow-primary-500/20 bg-slate-900 border border-slate-300 dark:border-white/10 shrink-0">
+        <img src="/icon.png" alt="LexiShield Logo" class="w-full h-full object-contain" />
       </div>
       <div>
         <h1 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
@@ -1229,6 +1238,13 @@
               <input type="checkbox" bind:checked={cleanCache} class="rounded accent-primary-500" />
               <span>Limpiar cachés de sesión</span>
             </label>
+
+            {#if hasPandoc}
+              <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300" title="Requiere Pandoc instalado en el sistema para convertir a Markdown">
+                <input type="checkbox" bind:checked={exportMarkdown} class="rounded accent-primary-500" />
+                <span>Guardar en Markdown (.md)</span>
+              </label>
+            {/if}
           </div>
 
           <div class="flex items-center gap-2">
@@ -1298,7 +1314,7 @@
           <button
             on:click={handleDeobfuscate}
             disabled={loading || !inputText.trim()}
-            class="px-5 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition duration-150 flex items-center gap-2 disabled:opacity-50 shadow-sm"
+            class="px-5 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold rounded-xl border border-slate-300 dark:border-white/15 transition duration-150 flex items-center gap-2 disabled:opacity-50 shadow-sm"
           >
             <span>🔄</span> Desofuscar Original
           </button>
@@ -1743,7 +1759,11 @@
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
               {#each allVaultsList as vault}
-                <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {vault.path === vaultPath ? 'bg-primary-500/5 font-semibold' : ''}">
+                <tr
+                  on:dblclick={() => { if (vault.path !== vaultPath) checkAndLoadVault(vault.path, null); }}
+                  class="hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer {vault.path === vaultPath ? 'bg-primary-500/5 font-semibold' : ''}"
+                  title={vault.path === vaultPath ? "Bóveda actualmente activa" : "Doble clic para activar"}
+                >
                   <td class="p-3 text-slate-900 dark:text-white flex items-center gap-2">
                     <span>{vault.path === vaultPath ? '⭐' : '📁'}</span>
                     <span>{vault.name}</span>
@@ -1757,13 +1777,19 @@
                   <td class="p-3 text-slate-500 truncate max-w-xs" title={vault.path}>{vault.path}</td>
                   <td class="p-3 text-center">
                     <div class="flex items-center justify-center gap-2">
-                      <button
-                        on:click={() => checkAndLoadVault(vault.path, null)}
-                        class="px-2 py-0.5 bg-primary-600/10 hover:bg-primary-600/20 text-primary-700 dark:text-primary-400 rounded border border-primary-500/20 text-[11px] font-bold"
-                        title="Activar como bóveda actual"
-                      >
-                        Activar
-                      </button>
+                      {#if vault.path === vaultPath}
+                        <span class="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1 shadow-sm">
+                          ⭐ Activa
+                        </span>
+                      {:else}
+                        <button
+                          on:click={() => checkAndLoadVault(vault.path, null)}
+                          class="px-2 py-0.5 bg-primary-600/10 hover:bg-primary-600/20 text-primary-700 dark:text-primary-400 rounded border border-primary-500/20 text-[11px] font-bold transition"
+                          title="Activar como bóveda actual"
+                        >
+                          Activar
+                        </button>
+                      {/if}
                       {#if vault.has_backup}
                         <button
                           on:click={() => handleRestoreVaultBak(vault.name)}

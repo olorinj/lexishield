@@ -9,6 +9,7 @@ export default {
           navy: "#031948",
           cyan: "#13e4eb",
           dark: "#0a0f1d",
+          bg: "#0a0f1d",
           surface: "#10192e",
         },
         primary: {
