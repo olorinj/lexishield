@@ -194,3 +194,56 @@ La estabilidad del motor está blindada contra entradas arbitrarias mediante cua
 * **`fuzz_json`**: Fuzzing de mutación sobre el analizador de JSON.
 * **`fuzz_xml`**: Fuzzing de fragmentos XML malformados sobre `quick-xml`.
 * **`fuzz_log`**: Fuzzing de formatos de log delimitaods (Syslog, CEF, Logfmt, KVP).
+
+---
+
+## 🖥️ Arquitectura de la Interfaz Gráfica (LexiShield GUI)
+
+La capa gráfica de LexiShield adopta una arquitectura desacoplada basada en **Tauri v2**, ejecutando un frontend reactivo en **Svelte 4** compilado con **Vite** sobre un WebView nativo del sistema operativo, comunicado mediante canales IPC seguros y asíncronos con el núcleo nativo de Rust.
+
+```mermaid
+flowchart TD
+    subgraph Frontend["Frontend SPA (Svelte 4 + TailwindCSS)"]
+        UI["Vistas (Studio, Scanner, Pairs, Vaults, Watch, Config, Logs)"]
+        State["Estado Reactivo Local (localStorage, Svelte Stores)"]
+        A11y["Componentes Accesibles (Modales, Help Dialogs)"]
+    end
+
+    subgraph IPC["Canal IPC Asíncrono Tauri v2"]
+        Cmds["Comandos Invocables (invokeTauri)"]
+        Events["Emisión de Eventos (scan-progress, watch)"]
+    end
+
+    subgraph Backend["Backend Nativo en Rust (src-tauri & Core)"]
+        TauriCore["Controlador Tauri (main.rs)"]
+        LexiEngine["LexiShield Engine (Ofuscación, Detectores, Parsers)"]
+        ArgonVault["Gestor de Bóvedas (Argon2id + ChaCha20)"]
+        BzipComp["Módulo de Backup (Bzip2 + AES-256)"]
+        ClipMon["Monitor de Portapapeles en Segundo Plano"]
+    end
+
+    UI -->|invoke| Cmds
+    Cmds --> TauriCore
+    TauriCore --> LexiEngine
+    TauriCore --> ArgonVault
+    TauriCore --> BzipComp
+    TauriCore --> ClipMon
+    TauriCore -.->|emit| Events
+    Events -.->|listen| UI
+```
+
+### Principios Arquitectónicos de la GUI:
+
+1. **Desacoplamiento Estricto y Rendimiento:**
+   * La interfaz gráfica no ejecuta lógica criptográfica pesada ni análisis masivo de ficheros en JavaScript; delega el 100% del trabajo computacional en hilos nativos de Rust.
+   * Durante el escaneo de directorios con miles de ficheros, Rust emite eventos ligeros `scan-progress` a través del bus de eventos de Tauri, actualizando contadores y rutas en la interfaz sin bloquear el bucle de eventos visual (60 FPS estables).
+
+2. **Seguridad y Paradigma Zero-Knowledge:**
+   * La contraseña maestra de la bóveda **nunca se persiste en almacenamiento web** (`localStorage` o cookies). Reside temporalmente en la memoria volátil del proceso en ejecución.
+   * La derivación de claves mediante **Argon2id** garantiza resistencia contra volcados de memoria y ataques GPU/ASIC fuera de línea.
+   * Las operaciones de borrado automático de portapapeles eliminan rastros sensibles de la memoria del sistema operativo tras el tiempo configurado.
+
+3. **Compatibilidad Multiplataforma Nativa:**
+   * **Linux:** Soporte nativo para Wayland y X11, con registro de `app_id` y empaquetado `.deb` y `.rpm`.
+   * **Windows:** Binario nativo empaquetado en instaladores `.msi`.
+   * **macOS:** Empaquetado `.dmg` universal.

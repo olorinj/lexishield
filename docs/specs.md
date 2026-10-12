@@ -137,6 +137,13 @@ lexishield scan-file auditoria_2026.docx --format table
 | **Fase 2.4** | *GUI Drag & Drop* | Integración en la interfaz Tauri/Svelte de carga de archivos y previsualización. |
 | **Fase 2.5** | *Test Suite & Benchmarks* | Validación con documentos masivos (>100 MB / >50,000 celdas) y verificación de integridad XML. |
 
+### 5.1 Estado de Implementación de la Interfaz Gráfica (GUI v2.0.0)
+
+| Fase GUI | Alcance | Estado | Descripción |
+| :---: | :--- | :---: | :--- |
+| **Fase 1** | *Ergonomía, Temas & Packaging* | **COMPLETADA** | Modo Oscuro/Claro con paleta de alto contraste, diseño accesible de pestañas activas, iconos nativos de ventana y sistema en Linux/Windows/macOS, y optimización del script de compilación para descartar dependencias innecesarias en el staging. |
+| **Fase 2** | *Onboarding, Tokens & Telemetría* | **COMPLETADA** | Explicador de requisitos criptográficos (*Zero-Knowledge Onboarding*), ayuda contextual con `❔ Ayuda` y tarjetas de primer uso descartables en todas las pestañas, terminología estandarizada a tokens, integración con Pandoc y desofuscación 1:1, modales con métricas de resultados, modo Watch con notificación de 0 tokens y preview de portapapeles, y telemetría estructurada sin advertencias. |
+
 ---
 
 ## 6. Consideraciones de Seguridad y Calidad
