@@ -105,6 +105,13 @@
   let autoClearTimer = null;
   let clipboardEvents = [];
 
+  // Estado de Ayuda Contextual y Onboarding
+  let activeHelpTab = null; // "studio" | "scanner" | "pairs" | "vaults" | "watch" | "config" | "logs" | "password_why"
+  let dismissedTips = JSON.parse(localStorage.getItem("dismissed_tips") || "{}");
+
+  // Estado de Notificación / Modal de Acción Completada
+  let actionResultModal = null; // { title: string, message: string, details?: Array<{label: string, value: string}>, type?: "success" | "info" }
+
   // Estado de Depuración y Logs
   let debugMode = false;
   let showLogsModal = false;
@@ -158,19 +165,44 @@
     } catch (err) {
       console.warn("No se pudieron registrar eventos de Tauri:", err);
     }
+    window.addEventListener("keydown", handleKeydown);
   });
 
   onDestroy(() => {
+    window.removeEventListener("keydown", handleKeydown);
     if (scanPollTimer) clearInterval(scanPollTimer);
     if (watchPollInterval) clearInterval(watchPollInterval);
     if (logPollingInterval) clearInterval(logPollingInterval);
     if (autoClearTimer) clearTimeout(autoClearTimer);
   });
 
+  function handleKeydown(e) {
+    if (e.key === "Escape") {
+      if (activeHelpTab) {
+        closeHelp();
+      } else if (actionResultModal) {
+        actionResultModal = null;
+      }
+    }
+  }
+
   function toggleTheme() {
     darkMode = !darkMode;
     localStorage.setItem("theme", darkMode ? "dark" : "light");
     updateThemeClass();
+  }
+
+  function openHelp(tabKey) {
+    activeHelpTab = tabKey;
+  }
+
+  function closeHelp() {
+    activeHelpTab = null;
+  }
+
+  function dismissTip(tabKey) {
+    dismissedTips[tabKey] = true;
+    localStorage.setItem("dismissed_tips", JSON.stringify(dismissedTips));
   }
 
   function updateThemeClass() {
@@ -337,7 +369,18 @@
       outputText = res.obfuscated_text;
       lastReport = res.report;
       vaultMappings = res.mappings || [];
-      statusMessage = `✅ Ofuscación exitosa: ${res.report.replacements_applied} reemplazos aplicados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      statusMessage = `✅ Ofuscación exitosa: ${res.report.replacements_applied} tokens reemplazados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      actionResultModal = {
+        title: "Ofuscación Finalizada con Éxito",
+        type: "success",
+        message: `El texto ha sido transformado para proteger tus datos confidenciales antes de enviarlo a la IA o compartirlo con terceros.`,
+        details: [
+          { label: "Tokens Reemplazados", value: `${res.report.replacements_applied}` },
+          { label: "Tiempo de Procesamiento", value: `${res.report.elapsed_ms.toFixed(2)} ms` },
+          { label: "Formato Aplicado", value: selectedFormat.toUpperCase() },
+          { label: "Bóveda Destino", value: vaultPath ? vaultPath.split('/').pop() : "Predeterminada" }
+        ]
+      };
       refreshVaultsList();
     } catch (err) {
       statusMessage = "Error al ofuscar: " + err;
@@ -362,7 +405,16 @@
       });
       outputText = res.deobfuscated_text;
       lastReport = res.report;
-      statusMessage = `✅ Desofuscación exitosa: ${res.report.replacements_applied} reemplazos restaurados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      statusMessage = `✅ Desofuscación exitosa: ${res.report.replacements_applied} tokens restaurados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      actionResultModal = {
+        title: "Desofuscación Finalizada",
+        type: "success",
+        message: "Las respuestas de la IA han sido desofuscadas reconstruyendo los valores originales mediante tu bóveda local.",
+        details: [
+          { label: "Tokens Restaurados", value: `${res.report.replacements_applied}` },
+          { label: "Tiempo de Proceso", value: `${res.report.elapsed_ms.toFixed(2)} ms` }
+        ]
+      };
     } catch (err) {
       statusMessage = "Error al desofuscar: " + err;
     } finally {
@@ -402,7 +454,19 @@
         exportMd: hasPandoc && exportMarkdown
       });
       lastReport = rep;
-      statusMessage = `✅ Archivo procesado (${rep.replacements_applied} reemplazos). Guardado en: ${outPath}`;
+      statusMessage = `✅ Archivo procesado (${rep.replacements_applied} tokens reemplazados). Guardado en: ${outPath}`;
+      actionResultModal = {
+        title: "Archivo Ofuscado con Éxito",
+        type: "success",
+        message: `El archivo ha sido procesado y guardado con los tokens confidenciales protegidos.`,
+        details: [
+          { label: "Archivo Origen", value: selected.split('/').pop() },
+          { label: "Archivo Guardado", value: outPath.split('/').pop() },
+          { label: "Tokens Reemplazados", value: `${rep.replacements_applied}` },
+          { label: "Tiempo", value: `${rep.elapsed_ms.toFixed(2)} ms` },
+          { label: "Exportado a Markdown", value: (hasPandoc && exportMarkdown) ? "Sí (.md)" : "No" }
+        ]
+      };
       refreshVaultsList();
     } catch (err) {
       statusMessage = "Error al procesar archivo: " + err;
@@ -430,7 +494,17 @@
       });
       detectedItems = res.items || [];
       auditSummary = res;
-      statusMessage = `🔍 Archivo escaneado: ${res.total_entities} entidades detectadas en 1 archivo.`;
+      statusMessage = `🔍 Archivo escaneado: ${res.total_entities} tokens detectados en 1 archivo.`;
+      actionResultModal = {
+        title: "Escaneo de Archivo Finalizado",
+        type: "info",
+        message: `El análisis del archivo ha finalizado satisfactoriamente sin modificar su contenido original.`,
+        details: [
+          { label: "Archivo Inspeccionado", value: selected.split('/').pop() },
+          { label: "Tokens Confidenciales", value: `${res.total_entities}` },
+          { label: "Falsos Positivos Omitidos", value: `${(res.items || []).filter(i => i.omitted).length}` }
+        ]
+      };
     } catch (err) {
       statusMessage = "Error al escanear archivo: " + err;
     } finally {
@@ -466,7 +540,18 @@
       });
       // detectedItems ya se va llenando dinámicamente con los eventos 'scan-progress'
       auditSummary = res;
-      statusMessage = `🔍 Directorio escaneado: ${res.files_scanned} analizados, ${res.files_ignored} omitidos, ${res.total_entities} entidades detectadas.`;
+      statusMessage = `🔍 Directorio escaneado: ${res.files_scanned} analizados, ${res.files_ignored} omitidos, ${res.total_entities} tokens detectados.`;
+      actionResultModal = {
+        title: "Escaneo de Directorio Finalizado",
+        type: "info",
+        message: `El recorrido del directorio ha concluido con éxito. Puedes revisar o activar tokens en la tabla inferior.`,
+        details: [
+          { label: "Directorio", value: selected.split('/').pop() },
+          { label: "Archivos Analizados", value: `${res.files_scanned}` },
+          { label: "Archivos Omitidos", value: `${res.files_ignored}` },
+          { label: "Tokens Confidenciales", value: `${res.total_entities}` }
+        ]
+      };
     } catch (err) {
       statusMessage = "Error al escanear carpeta: " + err;
     } finally {
@@ -962,6 +1047,21 @@
 
               triggerClipboardNotification(`Portapapeles ofuscado (${detectedTokens.length} tokens detectados)`);
               scheduleAutoClearIfNeeded();
+            } else {
+              // Texto copiado sin tokens confidenciales reconocidos
+              clipboardEvents = [
+                {
+                  id: Date.now() + Math.random(),
+                  timestamp: new Date().toLocaleTimeString(),
+                  direction: "obfuscate",
+                  originalText: text,
+                  transformedText: text,
+                  tokens: [],
+                  count: 0
+                },
+                ...clipboardEvents.slice(0, 49)
+              ];
+              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos");
             }
           } else {
             const res = await invokeTauri("deobfuscate_content", {
@@ -991,6 +1091,21 @@
 
               triggerClipboardNotification(`Portapapeles desofuscado (${detectedTokens.length} tokens restaurados)`);
               scheduleAutoClearIfNeeded();
+            } else {
+              // Texto copiado sin tokens seudónimos para revertir
+              clipboardEvents = [
+                {
+                  id: Date.now() + Math.random(),
+                  timestamp: new Date().toLocaleTimeString(),
+                  direction: "deobfuscate",
+                  originalText: text,
+                  transformedText: text,
+                  tokens: [],
+                  count: 0
+                },
+                ...clipboardEvents.slice(0, 49)
+              ];
+              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos");
             }
           }
         }
@@ -1249,6 +1364,13 @@
 
           <div class="flex items-center gap-2">
             <button
+              on:click={() => openHelp('studio')}
+              class="px-2.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1"
+              title="Ver guía de uso de Studio"
+            >
+              <span>❔</span> Ayuda
+            </button>
+            <button
               on:click={openFileToProcess}
               disabled={loading}
               class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
@@ -1263,6 +1385,21 @@
             </button>
           </div>
         </div>
+
+        {#if !dismissedTips.studio}
+          <div in:slide={{ duration: 150 }} class="p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
+            <div class="flex items-center gap-3">
+              <span class="text-lg">✨</span>
+              <p class="text-slate-700 dark:text-slate-300">
+                <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Ofusca texto para usarlo en motores de Inteligencia Artificial (p. ej. asistentes en la nube o LLMs locales) u ocúltalo de quien no deba conocer datos confidenciales (IPs, emails, nombres, claves). Al recibir la respuesta de la IA, usa <em>Desofuscar Original</em> para restaurar los valores reales.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
+              <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
+            </div>
+          </div>
+        {/if}
 
         <!-- Paneles de Entrada y Salida -->
         <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
@@ -1345,6 +1482,14 @@
           </div>
           
           <div class="flex items-center gap-3">
+            <button
+              on:click={() => openHelp('scanner')}
+              class="px-2.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 text-xs font-bold transition flex items-center gap-1 shadow-sm"
+              title="Ver guía de uso del Escáner"
+            >
+              <span>❔</span> Ayuda
+            </button>
+
             <label class="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
               <input type="checkbox" bind:checked={recursiveScan} class="rounded accent-primary-500" />
               <span>Recursivo (subdirectorios)</span>
@@ -1366,6 +1511,21 @@
             </button>
           </div>
         </div>
+
+        {#if !dismissedTips.scanner}
+          <div in:slide={{ duration: 150 }} class="mb-4 p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
+            <div class="flex items-center gap-3">
+              <span class="text-lg">🔍</span>
+              <p class="text-slate-700 dark:text-slate-300">
+                <strong class="text-primary-600 dark:text-primary-400">¿Cómo funciona el Escáner?</strong> Inspecciona archivos o carpetas completas en busca de tokens confidenciales (DNI, tarjetas, IPv4, emails, GUIDs) sin modificar el disco. Puedes omitir falsos positivos desmarcando casillas antes de registrar los hallazgos en tu bóveda.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button on:click={() => openHelp('scanner')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
+              <button on:click={() => dismissTip('scanner')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
+            </div>
+          </div>
+        {/if}
 
         {#if isScanningDirectory}
           <div in:fade={{ duration: 150 }} class="mb-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -1527,17 +1687,38 @@
       </div>
 
     {:else if activeTab === "pairs"}
-      <!-- VISTA PARES DE OFUSCACIÓN -->
+      <!-- VISTA PARES DE TOKENS -->
       <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-0 shadow-lg">
+        {#if !dismissedTips.pairs}
+          <div transition:slide class="mb-4 p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
+            <div class="flex items-start gap-2.5">
+              <span class="text-base">💡</span>
+              <div>
+                <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Gestión de Pares de Tokens</p>
+                <p>Cada par asocia un token confidencial (nombre, DNI, IBAN, correo o secreto) con su seudónimo generado. Puedes añadir pares manuales o editar los existentes. Toda modificación se sincroniza inmediatamente con el archivo cifrado de la bóveda.</p>
+              </div>
+            </div>
+            <button on:click={() => dismissTip('pairs')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
+          </div>
+        {/if}
+
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
             <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>📑</span> Pares de Ofuscación ({filteredPairs.length})
+              <span>📑</span> Pares de Tokens ({filteredPairs.length})
             </h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Gestiona, edita o elimina pares de seudónimos en la bóveda activa.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Gestiona, edita o añade correspondencias de tokens confidenciales y sus sustitutos en la bóveda activa.</p>
           </div>
 
           <div class="flex items-center gap-2">
+            <button
+              on:click={() => openHelp('pairs')}
+              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
+              title="Ver guía sobre gestión de tokens"
+            >
+              <span>❔</span> Ayuda
+            </button>
+
             <!-- Selector de Bóveda -->
             <select
               bind:value={pairsSelectedVault}
@@ -1709,6 +1890,19 @@
     {:else if activeTab === "vaults"}
       <!-- VISTA GESTOR DE BÓVEDAS Y BACKUPS -->
       <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-0 shadow-lg">
+        {#if !dismissedTips.vaults}
+          <div transition:slide class="mb-4 p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
+            <div class="flex items-start gap-2.5">
+              <span class="text-base">💡</span>
+              <div>
+                <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Gestor de Bóvedas Lexi</p>
+                <p>Las bóvedas (<code class="font-mono text-primary-600 dark:text-primary-400">.lexi</code>) son contenedores criptográficos aislados. Cada cliente, proyecto o entorno puede tener su propia bóveda independiente protegida con contraseña Argon2id. También puedes crear backups compactados en formato Bzip2.</p>
+              </div>
+            </div>
+            <button on:click={() => dismissTip('vaults')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
+          </div>
+        {/if}
+
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
             <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1718,6 +1912,20 @@
           </div>
 
           <div class="flex items-center gap-2">
+            <button
+              on:click={() => openHelp('vaults')}
+              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
+              title="Ver guía sobre bóvedas criptográficas"
+            >
+              <span>❔</span> Ayuda
+            </button>
+            <button
+              on:click={() => openHelp('password_why')}
+              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 transition"
+              title="¿Por qué es obligatoria la contraseña en las bóvedas?"
+            >
+              <span>🔐</span> ¿Por qué contraseña?
+            </button>
             <button
               on:click={() => (showCreateVaultModal = true)}
               class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1"
@@ -1840,6 +2048,19 @@
       <!-- VISTA PORTAPAPELES (WATCH) -->
       <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col justify-between shadow-lg">
         <div>
+          {#if !dismissedTips.watch}
+            <div transition:slide class="mb-4 p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
+              <div class="flex items-start gap-2.5">
+                <span class="text-base">💡</span>
+                <div>
+                  <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Monitorización del Portapapeles (Watch Mode)</p>
+                  <p>Al activar la escucha, cada vez que copies texto con Ctrl+C (o Cmd+C), LexiShield interceptará los tokens sensibles, los ofuscará en segundo plano con tu bóveda y colocará el texto seguro listo para pegar en IAs o chats. Si copias una respuesta de una IA, puedes poner la dirección en "Desofuscar" para recuperar los valores reales al instante.</p>
+                </div>
+              </div>
+              <button on:click={() => dismissTip('watch')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
+            </div>
+          {/if}
+
           <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10 mb-6">
             <div>
               <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1848,12 +2069,21 @@
               <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Captura texto copiado al portapapeles y aplica transformaciones automáticas instantáneas.</p>
             </div>
             
-            <button
-              on:click={handleClearClipboard}
-              class="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-            >
-              <span>🧹</span> Vaciar Portapapeles
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                on:click={() => openHelp('watch')}
+                class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
+                title="Ver guía de monitorización de portapapeles"
+              >
+                <span>❔</span> Ayuda
+              </button>
+              <button
+                on:click={handleClearClipboard}
+                class="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+              >
+                <span>🧹</span> Vaciar Portapapeles
+              </button>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1919,6 +2149,17 @@
                     <span class="text-[11px] font-medium text-slate-500">{ev.tokens.length} entidades reconocidas</span>
                   </div>
 
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono pt-1">
+                    <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
+                      <span class="block text-[10px] text-slate-400 font-sans uppercase font-bold mb-1">Texto Capturado:</span>
+                      <p class="truncate text-slate-700 dark:text-slate-300 select-all" title={ev.originalText}>{ev.originalText}</p>
+                    </div>
+                    <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
+                      <span class="block text-[10px] text-primary-500 font-sans uppercase font-bold mb-1">Resultado en Portapapeles:</span>
+                      <p class="truncate text-primary-700 dark:text-primary-300 select-all" title={ev.transformedText}>{ev.transformedText}</p>
+                    </div>
+                  </div>
+
                   {#if ev.tokens.length > 0}
                     <div class="flex flex-wrap gap-1.5 pt-1">
                       {#each ev.tokens as tok}
@@ -1931,7 +2172,7 @@
                       {/each}
                     </div>
                   {:else}
-                    <p class="text-xs text-slate-400 italic">Transformación aplicada sin nuevos patrones de entidades.</p>
+                    <p class="text-[11px] text-slate-400 italic">0 tokens confidenciales detectados (texto íntegro mantenido).</p>
                   {/if}
                 </div>
               {:else}
@@ -1960,11 +2201,34 @@
       <!-- VISTA CONFIGURACIÓN -->
       <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col justify-between shadow-lg overflow-auto">
         <div class="space-y-6">
-          <div class="pb-4 border-b border-slate-200 dark:border-white/10">
-            <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>⚙️</span> Configuración General de LexiShield
-            </h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Personaliza la ergonomía de la interfaz, comportamiento del portapapeles y persistencia.</p>
+          {#if !dismissedTips.config}
+            <div transition:slide class="mb-4 p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
+              <div class="flex items-start gap-2.5">
+                <span class="text-base">💡</span>
+                <div>
+                  <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Preferencias del Sistema</p>
+                  <p>Ajusta qué pestañas se muestran en la barra de navegación, qué vista se abre al arrancar LexiShield, y las opciones de borrado automático seguro del portapapeles en el archivo de configuración estándar <code class="font-mono text-primary-600 dark:text-primary-400">~/.lexishield/config.toml</code>.</p>
+                </div>
+              </div>
+              <button on:click={() => dismissTip('config')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
+            </div>
+          {/if}
+
+          <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10">
+            <div>
+              <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>⚙️</span> Configuración General de LexiShield
+              </h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Personaliza la ergonomía de la interfaz, comportamiento del portapapeles y persistencia.</p>
+            </div>
+
+            <button
+              on:click={() => openHelp('config')}
+              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
+              title="Ver guía de configuración"
+            >
+              <span>❔</span> Ayuda
+            </button>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1981,7 +2245,7 @@
                 >
                   <option value="studio">✨ Studio</option>
                   <option value="scanner">🔍 Escáner</option>
-                  <option value="pairs">📑 Pares de Ofuscación</option>
+                  <option value="pairs">📑 Pares de Tokens</option>
                   <option value="vaults">🗄️ Bóvedas Lexi</option>
                   <option value="watch">📋 Portapapeles</option>
                 </select>
@@ -1999,7 +2263,7 @@
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_pairs} class="rounded accent-primary-500" />
-                  <span>Pares de Ofuscación</span>
+                  <span>Pares de Tokens</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_vaults} class="rounded accent-primary-500" />
@@ -2142,7 +2406,16 @@
 
         <form on:submit|preventDefault={handleUnlockVaultSubmit} class="space-y-4">
           <div>
-            <label for="unlock-pwd-input" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Contraseña de Desbloqueo:</label>
+            <div class="flex items-center justify-between mb-1">
+              <label for="unlock-pwd-input" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Contraseña de Desbloqueo:</label>
+              <button
+                type="button"
+                on:click={() => openHelp('password_why')}
+                class="text-[11px] text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+              >
+                <span>🔐</span> ¿Por qué contraseña?
+              </button>
+            </div>
             <input
               id="unlock-pwd-input"
               type="password"
@@ -2192,7 +2465,16 @@
 
         <form on:submit|preventDefault={handleInitVaultSubmit} class="space-y-4">
           <div>
-            <label for="init-vault-pwd" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Contraseña de Cifrado (Obligatoria):</label>
+            <div class="flex items-center justify-between mb-1">
+              <label for="init-vault-pwd" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Contraseña de Cifrado (Obligatoria):</label>
+              <button
+                type="button"
+                on:click={() => openHelp('password_why')}
+                class="text-[11px] text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+              >
+                <span>🔐</span> ¿Por qué contraseña?
+              </button>
+            </div>
             <input
               id="init-vault-pwd"
               type="password"
@@ -2430,6 +2712,13 @@
           
           <div class="flex items-center gap-2">
             <button
+              on:click={() => openHelp('logs')}
+              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
+              title="Ver ayuda sobre logs y diagnóstico"
+            >
+              <span>❔</span> Ayuda
+            </button>
+            <button
               on:click={toggleDebugMode}
               class="text-xs px-3 py-1.5 rounded-xl border font-semibold transition {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400' : 'bg-slate-100 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300'}"
             >
@@ -2474,6 +2763,261 @@
           {:else}
             <div class="p-8 text-center text-slate-500">No hay registros de depuración capturados.</div>
           {/each}
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- MODAL DE AYUDA CONTEXTUAL Y GUÍA DE USUARIO -->
+  {#if activeHelpTab}
+    <div
+      class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+      on:click|self={closeHelp}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <!-- Cabecera del modal de ayuda -->
+        <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
+          <div class="flex items-center gap-2.5">
+            <span class="text-xl">📘</span>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Manual y Ayuda Contextual de LexiShield</h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Conceptos clave, recomendaciones de seguridad y flujos de trabajo.</p>
+            </div>
+          </div>
+          <button on:click={closeHelp} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg px-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">✕</button>
+        </div>
+
+        <!-- Selector de Tema de Ayuda -->
+        <div class="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b border-slate-200 dark:border-white/5 bg-slate-100/50 dark:bg-black/20 text-xs">
+          <button
+            on:click={() => (activeHelpTab = "studio")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'studio' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            ✨ Studio (IA)
+          </button>
+          <button
+            on:click={() => (activeHelpTab = "scanner")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'scanner' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            🔍 Escáner
+          </button>
+          <button
+            on:click={() => (activeHelpTab = "pairs")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'pairs' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            📑 Pares de Tokens
+          </button>
+          <button
+            on:click={() => (activeHelpTab = "vaults")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'vaults' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            🗄️ Bóvedas Lexi
+          </button>
+          <button
+            on:click={() => (activeHelpTab = "watch")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'watch' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            📋 Portapapeles
+          </button>
+          <button
+            on:click={() => (activeHelpTab = "config")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'config' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            ⚙️ Configuración
+          </button>
+          <button
+            on:click={() => (activeHelpTab = "password_why")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'password_why' ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/40' : 'text-amber-600/80 dark:text-amber-400/80 hover:text-amber-600 dark:hover:text-amber-300'}"
+          >
+            🔐 ¿Por qué Contraseña?
+          </button>
+          <button
+            on:click={() => (activeHelpTab = "logs")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'logs' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            🐞 Logs
+          </button>
+        </div>
+
+        <!-- Contenido Específico del Tema -->
+        <div class="flex-1 p-6 overflow-auto text-xs text-slate-700 dark:text-slate-300 space-y-4 select-text leading-relaxed">
+          {#if activeHelpTab === "studio"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>✨</span> Cómo ofuscar texto para usar en Inteligencia Artificial o proteger secretos
+              </h4>
+              <p>El objetivo principal del Studio es permitirte interactuar de forma segura con modelos de lenguaje (como ChatGPT, Claude, Gemini o IAs locales), o compartir documentos con personas que no deben conocer información confidencial (nombres de clientes, DNI, IBAN, contraseñas, direcciones IP o números de tarjeta).</p>
+              
+              <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
+                <p class="font-bold text-slate-900 dark:text-white">Flujo de Trabajo Recomendado:</p>
+                <ol class="list-decimal list-inside space-y-1.5 pl-1">
+                  <li><strong>Pega el texto confidencial</strong> en el panel de entrada (o abre un archivo con <em>Abrir Archivo</em>).</li>
+                  <li><strong>Selecciona el formato:</strong> Si es código estructurado, elige JSON, XML o Logs para garantizar que no se alteren comillas ni delimitadores clave.</li>
+                  <li><strong>Pulsa "Ofuscar":</strong> LexiShield reemplazará cada token confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
+                  <li><strong>Usa el texto en la IA:</strong> Copia el resultado ofuscado y envíalo con total tranquilidad a cualquier modelo de IA.</li>
+                  <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en el Studio y pulsa <strong>"Desofuscar"</strong> para recuperar al 100% los valores reales.</li>
+                </ol>
+              </div>
+
+              <div class="p-3 bg-primary-500/10 border border-primary-500/20 rounded-xl space-y-1">
+                <p class="font-bold text-primary-700 dark:text-primary-300">📄 Conversión a Markdown con Pandoc:</p>
+                <p>Si activas la casilla "Exportar Markdown con Pandoc", LexiShield convertirá documentos estructurados (.docx, .html, .rst) a Markdown nativo (.md), conservando encabezados, listas y tablas perfectas para ser interpretadas por modelos de IA con el menor consumo de tokens.</p>
+              </div>
+            </div>
+
+          {:else if activeHelpTab === "scanner"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>🔍</span> Escáner y Auditoría Preventiva de Fugas
+              </h4>
+              <p>El Escáner analiza proactivamente archivos individuales o proyectos enteros sin modificarlos, informándote de cuántos tokens sensibles están expuestos antes de publicar código o compartir repositorios.</p>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="p-3 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-1">
+                  <p class="font-bold text-slate-900 dark:text-white">Escaneo con .gitignore:</p>
+                  <p>Por defecto, el motor respeta los archivos <code class="font-mono">.gitignore</code> y omite carpetas masivas como <code class="font-mono">node_modules</code>, <code class="font-mono">target</code>, <code class="font-mono">.git</code> o archivos binarios.</p>
+                </div>
+                <div class="p-3 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-1">
+                  <p class="font-bold text-slate-900 dark:text-white">Telemetría en Vivo:</p>
+                  <p>Durante escaneos de grandes directorios, verás el contador de archivos procesados, entidades encontradas y el archivo que se está examinando en ese instante.</p>
+                </div>
+              </div>
+            </div>
+
+          {:else if activeHelpTab === "pairs"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>📑</span> Gestión de Pares de Tokens (Biyectividad 1:1)
+              </h4>
+              <p>Cada vez que LexiShield detecta o sustituye un token sensible, crea una correspondencia biyectiva en la bóveda activa. Esto garantiza que la misma entidad confidencial siempre reciba exactamente el mismo seudónimo en todos tus documentos.</p>
+              
+              <div class="space-y-2">
+                <p><strong>Operaciones Principales:</strong></p>
+                <ul class="list-disc list-inside space-y-1 pl-1">
+                  <li><strong>Añadir Par:</strong> Permite precargar asociaciones personalizadas (ej. tu nombre con un seudónimo elegido por ti).</li>
+                  <li><strong>Omitir Token:</strong> Si una palabra clave o término técnico no debe sustituirse nunca, selecciónalo y pulsa "Omitir".</li>
+                  <li><strong>Restaurar .bak:</strong> Si cometes un error masivo, puedes recuperar la última copia automática de seguridad de la bóveda con un solo clic.</li>
+                </ul>
+              </div>
+            </div>
+
+          {:else if activeHelpTab === "vaults"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>🗄️</span> Gestión de Bóvedas Lexi y Copias Bzip2
+              </h4>
+              <p>Las bóvedas (<code class="font-mono">.lexi</code>) son archivos binarios herméticos donde residen tus tokens y correspondencias. Puedes crear múltiples bóvedas para separar tus clientes, proyectos o entornos personales.</p>
+              
+              <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
+                <p class="font-bold text-slate-900 dark:text-white">Copias de Seguridad Comprimidas con Bzip2:</p>
+                <p>La herramienta de backup empaqueta toda tu carpeta <code class="font-mono">~/.lexishield/</code> (incluyendo reglas TOML personalizadas y todas las bóvedas) en un único archivo comprimido con el estándar Bzip2 y opcionalmente protegido con cifrado AES-256 para almacenamiento seguro fuera de línea.</p>
+              </div>
+            </div>
+
+          {:else if activeHelpTab === "watch"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>📋</span> Monitorización Activa del Portapapeles (Watch Mode)
+              </h4>
+              <p>El modo Watch convierte a LexiShield en un guardián silencioso de tu portapapeles. Mientras trabajas, cada vez que copias texto confidencial, el sistema lo transforma automáticamente sin que tengas que abrir y cerrar la aplicación.</p>
+              
+              <div class="space-y-2">
+                <p><strong>Características de Ergonomía y Seguridad:</strong></p>
+                <ul class="list-disc list-inside space-y-1 pl-1">
+                  <li><strong>Notificación Transparente:</strong> Cuando copias texto sin secretos, se informa claramente de <em>"0 tokens reconocidos"</em> para que sepas que el texto no fue modificado innecesariamente.</li>
+                  <li><strong>Vista Previa Inmediata:</strong> El historial muestra en tiempo real tanto el texto capturado como el texto transformado colocado en el portapapeles.</li>
+                  <li><strong>Vaciado Seguro:</strong> Puedes pulsar <em>"Vaciar Portapapeles"</em> o activar en Configuración el borrado automático tras N segundos para que ningún secreto permanezca en la memoria del sistema operativo.</li>
+                </ul>
+              </div>
+            </div>
+
+          {:else if activeHelpTab === "config"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>⚙️</span> Configuración y Ergonomía
+              </h4>
+              <p>LexiShield se adapta a tu flujo de trabajo. Puedes personalizar qué pestañas se muestran en la barra superior si solo usas el Studio o el Escáner, elegir tu pestaña predeterminada al abrir el programa y conmutar la barra de comandos CLI equivalentes en vivo.</p>
+              <p class="text-[11px] text-slate-400">Todos los ajustes se guardan siguiendo las mejores prácticas de SO en <code class="font-mono">~/.lexishield/config.toml</code> con capacidad de restablecimiento automático en cualquier momento.</p>
+            </div>
+
+          {:else if activeHelpTab === "password_why"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <span>🔐</span> ¿Por qué LexiShield exige contraseña en sus bóvedas?
+              </h4>
+              <div class="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-slate-800 dark:text-slate-200">
+                <p class="font-bold text-slate-900 dark:text-white">Principio Fundamental: Arquitectura de Cero Conocimiento (Zero-Knowledge)</p>
+                <p>LexiShield fue diseñado para proteger secretos de nivel empresarial y datos personales de máxima confidencialidad. Una contraseña es obligatoria por tres motivos arquitectónicos innegociables:</p>
+                <ul class="list-disc list-inside space-y-1.5 pl-1 text-[11px]">
+                  <li><strong>Imposibilidad de Ataques Físicos o Forenses:</strong> Si alguien te roba el equipo o accede a tu disco duro, sin la contraseña maestra es matemáticamente imposible reconstruir la relación entre los seudónimos y los nombres/IPs/secretos reales.</li>
+                  <li><strong>Criptografía Argon2id + ChaCha20-Poly1305:</strong> La clave de descifrado no se guarda en ningún fichero ni en memoria persistente; se deriva mediante Argon2id con parámetros intensivos en memoria RAM para neutralizar intentos de fuerza bruta con tarjetas gráficas (GPUs) y clústeres ASIC.</li>
+                  <li><strong>Aislamiento Estricto por Proyecto o Cliente:</strong> Al asignar contraseñas distintas a diferentes bóvedas (<code class="font-mono">.lexi</code>), garantizas que cada cliente o entorno mantenga una muralla criptográfica impenetrable.</li>
+                </ul>
+              </div>
+            </div>
+
+          {:else if activeHelpTab === "logs"}
+            <div class="space-y-3">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>🐞</span> Diagnóstico y Registros de Telemetría
+              </h4>
+              <p>La consola de logs registra cada evento del motor nativo en Rust (invocaciones a Tauri, lecturas y escrituras de bóvedas, detecciones y transformaciones). Puedes activar el <strong>Modo DEBUG</strong> para trazas detalladas o filtrar por nivel (INFO, WARN, ERROR).</p>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Pie del modal de ayuda -->
+        <div class="p-4 border-t border-slate-200 dark:border-white/10 flex items-center justify-end bg-slate-50 dark:bg-slate-950/60">
+          <button
+            on:click={closeHelp}
+            class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-primary-500/20"
+          >
+            Entendido / Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- MODAL DE CONFIRMACIÓN Y DETALLE DE ACCIÓN COMPLETADA -->
+  {#if actionResultModal}
+    <div
+      class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+      on:click|self={() => (actionResultModal = null)}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 flex flex-col shadow-2xl space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl {actionResultModal.type === 'info' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'} flex items-center justify-center text-xl shrink-0">
+            {actionResultModal.type === 'info' ? 'ℹ️' : '✅'}
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white">{actionResultModal.title}</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{actionResultModal.message}</p>
+          </div>
+        </div>
+
+        {#if actionResultModal.details && actionResultModal.details.length > 0}
+          <div class="p-3 bg-slate-50 dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/5 space-y-2 text-xs font-mono">
+            {#each actionResultModal.details as det}
+              <div class="flex items-center justify-between gap-4 py-1 border-b border-slate-200/60 dark:border-white/5 last:border-b-0">
+                <span class="text-slate-500 dark:text-slate-400 font-sans text-[11px]">{det.label}:</span>
+                <span class="text-slate-900 dark:text-white font-bold truncate select-all text-right" title={det.value}>{det.value}</span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
+        <div class="flex items-center justify-end pt-2">
+          <button
+            on:click={() => (actionResultModal = null)}
+            class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-primary-500/20"
+          >
+            Aceptar
+          </button>
         </div>
       </div>
     </div>
