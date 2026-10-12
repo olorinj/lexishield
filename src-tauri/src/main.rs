@@ -331,12 +331,47 @@ fn parse_format(f: &str) -> FormatType {
 }
 
 #[tauri::command]
+fn check_pandoc_available() -> bool {
+    std::process::Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn export_office_to_md_with_pandoc(doc_path: &Path) -> Result<std::path::PathBuf, String> {
+    let parent = doc_path.parent().unwrap_or(Path::new("."));
+    let stem = doc_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("documento");
+    let md_path = parent.join(format!("{stem}.md"));
+    let media_dir = parent.join(stem);
+
+    let status = std::process::Command::new("pandoc")
+        .arg(doc_path)
+        .arg("-o")
+        .arg(&md_path)
+        .arg("--wrap=none")
+        .arg("-s")
+        .arg(format!("--extract-media={}", media_dir.display()))
+        .status()
+        .map_err(|e| format!("Error al ejecutar pandoc: {e}"))?;
+
+    if !status.success() {
+        return Err(format!("Pandoc terminó con código de salida: {:?}", status.code()));
+    }
+    Ok(md_path)
+}
+
+#[tauri::command]
 fn process_file_command(
     input_path: String,
     output_path: String,
     vault_path: Option<String>,
     password: Option<String>,
     reverse: bool,
+    export_md: Option<bool>,
 ) -> Result<ObfuscationReport, String> {
     let config = load_config_with_rules(None, None);
     let mut engine = ObfuscatorEngine::new(config);
@@ -366,6 +401,10 @@ fn process_file_command(
             reverse,
         )
         .map_err(|e| e.to_string())?;
+
+    if export_md.unwrap_or(false) {
+        let _ = export_office_to_md_with_pandoc(Path::new(&output_path));
+    }
 
     Ok(report)
 }
@@ -975,7 +1014,8 @@ fn main() {
             set_debug_mode_command,
             get_debug_logs,
             clear_debug_logs,
-            clear_scan_cache_command
+            clear_scan_cache_command,
+            check_pandoc_available
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
