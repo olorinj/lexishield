@@ -1,9 +1,15 @@
+# Compilación y artefactos
 /target
+dist/
+ui/dist/
+src-tauri/target/
+.svelte-kit/
+
+# Máquinas virtuales Vagrant
 .vagrant/
 .vagrant.d/
-dist/
 
-# Ignorar el enlace simbólico global de agentes
+# Enlace simbólico global de agentes
 .agents
 
 # Fuzzing
@@ -11,5 +17,33 @@ fuzz/target/
 fuzz/corpus/
 fuzz/artifacts/
 fuzz/coverage/
+
+# Dependencias Node.js
 node_modules/
-src-tauri/target/
+
+# Archivos temporales y copias de seguridad de editores/scripts
+*.bak
+*.tmp
+*.orig
+*~
+*.swp
+*.swo
+
+# Archivos de entorno y logs locales
+*.log
+.env
+.env.*
+!.env.example
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Entornos de desarrollo e IDEs
+.vscode/
+.idea/
+
+# Bóvedas de prueba generadas localmente
+*.lexi
+*.lexi.bak
