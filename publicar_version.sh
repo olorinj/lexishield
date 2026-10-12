@@ -31,12 +31,14 @@ mostrar_ayuda() {
     echo ""
     echo -e "${COLOR_CYAN}OPCIONES:${COLOR_RESET}"
     echo "  -h, --help        Muestra esta pantalla de ayuda y sale."
+    echo "  -f, --force       Fuerza la recreación de la etiqueta si ya existe (local o remota)."
     echo "  -y, --yes         Modo desatendido: confirma automáticamente sin pausar."
     echo "  -d, --dry-run     Modo simulación: verifica el estado pero no realiza git push."
     echo ""
     echo -e "${COLOR_CYAN}EJEMPLOS:${COLOR_RESET}"
     echo "  ./publicar_version.sh v2.0.0"
     echo "  ./publicar_version.sh 2.0.0"
+    echo "  ./publicar_version.sh --force v2.0.0"
     echo "  ./publicar_version.sh --dry-run v2.0.0"
     echo ""
 }
@@ -45,6 +47,7 @@ mostrar_ayuda() {
 VERSION=""
 AUTO_CONFIRM=false
 DRY_RUN=false
+FORCE=false
 
 # Procesar argumentos
 while [[ $# -gt 0 ]]; do
@@ -52,6 +55,10 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             mostrar_ayuda
             exit 0
+            ;;
+        -f|--force)
+            FORCE=true
+            shift
             ;;
         -y|--yes)
             AUTO_CONFIRM=true
@@ -108,11 +115,43 @@ if [[ -n $(git status -s) ]]; then
     exit 1
 fi
 
-# Verificar si el tag ya existe
+# Verificar si el tag ya existe local o remotamente
+TAG_EXISTS=false
 if git rev-parse "$VERSION" >/dev/null 2>&1; then
-    echo -e "${COLOR_RED}\n[!] Error: La etiqueta '${VERSION}' ya existe en el repositorio local.${COLOR_RESET}"
-    echo "Usa otra versión o elimina la etiqueta existente si fue un error."
-    exit 1
+    TAG_EXISTS=true
+fi
+
+if [[ "$TAG_EXISTS" = true ]]; then
+    echo -e "${COLOR_YELLOW}\n[i] La etiqueta '${VERSION}' ya existe en el repositorio local.${COLOR_RESET}"
+    
+    RECREAR=false
+    if [[ "$FORCE" = true ]]; then
+        RECREAR=true
+    else
+        echo -ne "${COLOR_YELLOW}¿Deseas eliminar la versión anterior (local y en GitHub) y recrearla con el commit actual? [s/N]: ${COLOR_RESET}"
+        read -r RESP_TAG
+        if [[ "$RESP_TAG" =~ ^[sSyY]$ ]]; then
+            RECREAR=true
+        fi
+    fi
+
+    if [[ "$RECREAR" = true ]]; then
+        if [[ "$DRY_RUN" = true ]]; then
+            echo -e "${COLOR_GRAY}[Dry-Run] Se eliminaría la etiqueta local y remota '${VERSION}' para recrearla.${COLOR_RESET}"
+        else
+            echo -e "${COLOR_GRAY}> Eliminando etiqueta local '${VERSION}'...${COLOR_RESET}"
+            git tag -d "$VERSION"
+            echo -e "${COLOR_GRAY}> Eliminando etiqueta remota en GitHub (si existe)...${COLOR_RESET}"
+            git push origin --delete "$VERSION" 2>/dev/null || true
+            if command -v gh >/dev/null 2>&1; then
+                gh release delete "$VERSION" -y 2>/dev/null || true
+            fi
+        fi
+    else
+        echo -e "${COLOR_RED}\nOperación cancelada. La etiqueta '${VERSION}' ya existe.${COLOR_RESET}"
+        echo "Usa otra versión o ejecuta './publicar_version.sh --force ${VERSION}' para sobrescribirla."
+        exit 1
+    fi
 fi
 
 # Contar commits pendientes de subir

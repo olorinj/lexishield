@@ -6,6 +6,9 @@ param(
     [Alias("h")]
     [switch]$Help,
 
+    [Alias("f")]
+    [switch]$Force,
+
     [Alias("y")]
     [switch]$Yes,
 
@@ -29,16 +32,18 @@ function Mostrar-Ayuda {
     Write-Host "  4. Sube la rama y la etiqueta a GitHub, activando el flujo automatizado de"
     Write-Host "     GitHub Actions para compilar los instaladores nativos (.msi, .deb, .rpm, .dmg)."
     Write-Host "`nUSO:" -ForegroundColor Cyan
-    Write-Host "  .\publicar_version.ps1 [-Version] <VERSION> [-DryRun] [-Yes] [-Help]"
+    Write-Host "  .\publicar_version.ps1 [-Version] <VERSION> [-Force] [-DryRun] [-Yes] [-Help]"
     Write-Host "`nARGUMENTOS:" -ForegroundColor Cyan
     Write-Host "  -Version <STRING>   Version oficial a publicar (ej: v2.0.0 o 2.0.0)."
     Write-Host "`nOPCIONES:" -ForegroundColor Cyan
     Write-Host "  -Help, -h           Muestra esta pantalla de ayuda y sale."
+    Write-Host "  -Force, -f          Fuerza la recreacion de la etiqueta si ya existe (local o remota)."
     Write-Host "  -Yes, -y            Modo desatendido: confirma automaticamente sin pausar."
     Write-Host "  -DryRun, -d         Modo simulacion: verifica el estado pero no realiza git push."
     Write-Host "`nEJEMPLOS:" -ForegroundColor Cyan
     Write-Host "  .\publicar_version.ps1 v2.0.0"
     Write-Host "  .\publicar_version.ps1 -Version 2.0.0"
+    Write-Host "  .\publicar_version.ps1 -Version v2.0.0 -Force"
     Write-Host "  .\publicar_version.ps1 -Version v2.0.0 -DryRun`n"
 }
 
@@ -79,9 +84,34 @@ if (-not [string]::IsNullOrWhiteSpace($gitStatus)) {
 # Comprobar si el tag ya existe
 git rev-parse "$Version" 2>$null
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "`n[!] Error: La etiqueta "$Version" ya existe en el repositorio local." -ForegroundColor Red
-    Write-Host "Usa otra version o elimina la etiqueta existente si fue un error."
-    exit 1
+    Write-Host "`n[i] La etiqueta "$Version" ya existe en el repositorio local." -ForegroundColor Yellow
+    $recrear = $false
+    if ($Force) {
+        $recrear = $true
+    } else {
+        $respTag = Read-Host "¿Deseas eliminar la version anterior (local y en GitHub) y recrearla con el commit actual? (s/N)"
+        if ($respTag -match "^[sSyY]$") {
+            $recrear = $true
+        }
+    }
+
+    if ($recrear) {
+        if ($DryRun) {
+            Write-Host "[Dry-Run] Se eliminaria la etiqueta local y remota "$Version" para recrearla." -ForegroundColor DarkGray
+        } else {
+            Write-Host "> Eliminando etiqueta local "$Version"..." -ForegroundColor DarkGray
+            git tag -d "$Version"
+            Write-Host "> Eliminando etiqueta remota en GitHub (si existe)..." -ForegroundColor DarkGray
+            git push origin --delete "$Version" 2>$null
+            if (Get-Command "gh" -ErrorAction SilentlyContinue) {
+                gh release delete "$Version" -y 2>$null
+            }
+        }
+    } else {
+        Write-Host "`nOperacion cancelada. La etiqueta "$Version" ya existe." -ForegroundColor Red
+        Write-Host "Usa otra version o ejecuta .\publicar_version.ps1 -Version $Version -Force para sobrescribirla."
+        exit 1
+    }
 }
 
 # Commits pendientes
