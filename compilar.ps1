@@ -1,4 +1,4 @@
-param (
+﻿param (
     [Alias("w", "win")]
     [switch]$Windows,
 
@@ -218,6 +218,9 @@ try {
             Write-Host "`n[ERROR] Fallo al iniciar builder-windows." -ForegroundColor Red
             exit $LASTEXITCODE
         }
+
+        Write-Host "Maximizando limites de memoria de la sesion WinRM..." -ForegroundColor Gray
+        vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -Command `"Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB -Value 8192 -Force`"" 2>$null
 
         Write-Host "Ejecutando proceso de compilacion dentro de builder-windows..." -ForegroundColor Cyan
         vagrant winrm builder-windows -c "powershell -ExecutionPolicy Bypass -File C:\vagrant\compilar-win.ps1 $argsWinStr"
