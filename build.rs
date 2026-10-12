@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=DISABLE_WINRES");
-    if std::env::var("DISABLE_WINRES").is_ok() {
+    println!("cargo:rerun-if-env-changed=SKIP_WIN_RESOURCE");
+    if std::env::var("DISABLE_WINRES").is_ok() || std::env::var("SKIP_WIN_RESOURCE").is_ok() {
         return;
     }
 

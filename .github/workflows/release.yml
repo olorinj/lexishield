@@ -43,6 +43,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
+      - name: Compilar binario CLI
+        shell: bash
+        run: |
+          mkdir -p dist-cli
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            cargo build --release --bin lexishield
+            cp target/release/lexishield.exe dist-cli/lexishield-windows-amd64.exe
+          elif [ "${{ matrix.platform }}" = "ubuntu-22.04" ]; then
+            cargo build --release --bin lexishield
+            cp target/release/lexishield dist-cli/lexishield-linux-amd64
+            chmod +x dist-cli/lexishield-linux-amd64
+          elif [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            cargo build --release --bin lexishield ${{ matrix.args }}
+            if [[ "${{ matrix.args }}" =~ "aarch64" ]]; then
+              cp target/aarch64-apple-darwin/release/lexishield dist-cli/lexishield-darwin-arm64
+              chmod +x dist-cli/lexishield-darwin-arm64
+            else
+              cp target/x86_64-apple-darwin/release/lexishield dist-cli/lexishield-darwin-amd64
+              chmod +x dist-cli/lexishield-darwin-amd64
+            fi
+          fi
+
       - name: Instalar dependencias web y compilar frontend
         run: |
           npm install
@@ -53,12 +75,25 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISABLE_WINRES: "1"
+          SKIP_WIN_RESOURCE: "1"
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "LexiShield ${{ github.ref_name }}"
-          releaseBody: "Esta es la nueva versión de LexiShield. Selecciona el instalador (.msi, .deb, .AppImage, .dmg) que corresponda a tu sistema operativo."
+          releaseBody: "Esta es la nueva versión de LexiShield. Contiene los instaladores de interfaz gráfica (.msi, .deb, .AppImage, .dmg) y los binarios de consola (CLI) independientes."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
           projectPath: "src-tauri"
+
+      - name: Subir binarios CLI a GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -d dist-cli ] && [ "$(ls -A dist-cli)" ]; then
+            echo "Subiendo binarios CLI a la release de GitHub..."
+            gh release upload "${{ github.ref_name }}" dist-cli/* --clobber
+          fi
+
 
