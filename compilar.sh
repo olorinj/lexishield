@@ -363,7 +363,9 @@ if [ "$compilar_gui" = true ]; then
         echo -e "\e[90mCopiando frontend a disco local (/tmp) para evitar I/O lento en vboxsf...\e[0m"
         local_ui="/tmp/lexi_ui"
         rm -rf "$local_ui"
-        cp -r ui "$local_ui"
+        mkdir -p "$local_ui"
+        # Copiar codigo fuente excluyendo node_modules y dist para evitar problemas de symlinks en vboxsf y acelerar la copia
+        tar -C ui --exclude='node_modules' --exclude='dist' -cf - . | tar -C "$local_ui" -xf -
         
         echo -e "\e[90mInstalando dependencias de UI y construyendo bundle frontend...\e[0m"
         (cd "$local_ui" && npm install && npm run build)
@@ -379,8 +381,10 @@ if [ "$compilar_gui" = true ]; then
         echo -e "\e[90mPreparando Tauri (omitiendo beforeBuildCommand)...\e[0m"
         tauri_conf="src-tauri/tauri.conf.json"
         tauri_conf_bak="src-tauri/tauri.conf.json.bak"
-        cp "$tauri_conf" "$tauri_conf_bak"
-        sed -i 's/"beforeBuildCommand"[[:space:]]*:[[:space:]]*"[^"]*"/"beforeBuildCommand": ""/g' "$tauri_conf"
+        if [ -f "$tauri_conf" ]; then
+            cp "$tauri_conf" "$tauri_conf_bak"
+            sed -i 's/"beforeBuildCommand"[[:space:]]*:[[:space:]]*"[^"]*"/"beforeBuildCommand": ""/g' "$tauri_conf"
+        fi
         
         # Tauri CLI relies on the local package.json, so we must run it via npx or global tauri
         # Since we just installed in /tmp, we should run it from there or ensure it works from shared
@@ -388,12 +392,16 @@ if [ "$compilar_gui" = true ]; then
         npx --yes @tauri-apps/cli build --bundles deb,rpm
         if [ $? -ne 0 ]; then
             echo -e "\e[31m[ERROR] La compilacion de Tauri fallo.\e[0m"
-            mv -f "$tauri_conf_bak" "$tauri_conf"
+            if [ -f "$tauri_conf_bak" ]; then
+                mv -f "$tauri_conf_bak" "$tauri_conf"
+            fi
             exit 1
         fi
         
-        # Restaurar tauri.conf.json
-        mv -f "$tauri_conf_bak" "$tauri_conf"
+        # Restaurar tauri.conf.json si existia el respaldo
+        if [ -f "$tauri_conf_bak" ]; then
+            mv -f "$tauri_conf_bak" "$tauri_conf"
+        fi
         
         mkdir -p dist
         # Buscar en CARGO_TARGET_DIR (usado en Vagrant) o en src-tauri/target

@@ -1102,8 +1102,8 @@
   <!-- CABECERA PRINCIPAL / NAVEGACIÓN -->
   <header class="h-14 border-b border-slate-200 dark:border-white/10 px-4 flex items-center justify-between bg-white/80 dark:bg-brand-surface/60 backdrop-blur-md z-20 shrink-0">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-md shadow-primary-500/20 bg-slate-900 border border-slate-300 dark:border-white/10 shrink-0">
-        <img src="/icon.png" alt="LexiShield Logo" class="w-full h-full object-contain" />
+      <div class="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center p-0.5 bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm shrink-0">
+        <img src="/icon.png" alt="LexiShield Logo" class="w-full h-full object-contain filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)]" />
       </div>
       <div>
         <h1 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
@@ -1114,11 +1114,11 @@
     </div>
 
     <!-- PESTAÑAS PRINCIPALES -->
-    <nav class="flex items-center gap-1 bg-slate-200/80 dark:bg-black/30 p-1 rounded-xl border border-slate-300 dark:border-white/5 text-xs font-semibold">
+    <nav class="flex items-center gap-1 bg-slate-200/90 dark:bg-slate-950/80 p-1 rounded-xl border border-slate-300 dark:border-white/10 text-xs font-semibold shadow-inner">
       {#if appConfig.gui.tabs.show_studio}
         <button
           on:click={() => (activeTab = "studio")}
-          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'studio' ? 'bg-white dark:bg-brand-surface text-slate-950 dark:text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'studio' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
         >
           <span>✨</span> Studio
         </button>
@@ -1127,7 +1127,7 @@
       {#if appConfig.gui.tabs.show_scanner}
         <button
           on:click={() => (activeTab = "scanner")}
-          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'scanner' ? 'bg-white dark:bg-brand-surface text-slate-950 dark:text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'scanner' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
         >
           <span>🔍</span> Escáner
         </button>
@@ -1136,7 +1136,7 @@
       {#if appConfig.gui.tabs.show_pairs}
         <button
           on:click={() => { activeTab = "pairs"; loadPairsForVault(vaultPath); }}
-          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'pairs' ? 'bg-white dark:bg-brand-surface text-slate-950 dark:text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'pairs' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
         >
           <span>📑</span> Pares ({vaultMappings.length})
         </button>
@@ -1145,7 +1145,7 @@
       {#if appConfig.gui.tabs.show_vaults}
         <button
           on:click={() => { activeTab = "vaults"; refreshVaultsList(); }}
-          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'vaults' ? 'bg-white dark:bg-brand-surface text-slate-950 dark:text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'vaults' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
         >
           <span>🗄️</span> Bóvedas Lexi
         </button>
@@ -1154,7 +1154,7 @@
       {#if appConfig.gui.tabs.show_watch}
         <button
           on:click={() => (activeTab = "watch")}
-          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'watch' ? 'bg-white dark:bg-brand-surface text-slate-950 dark:text-white shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'watch' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
         >
           <span>📋</span> Portapapeles
         </button>
@@ -1220,12 +1220,12 @@
           <div class="flex items-center gap-3">
             <label class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <span>📐 Formato:</span>
-              <select bind:value={selectedFormat} class="bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-white focus:ring-1 focus:ring-primary-500">
-                <option value="auto">Auto (Detección inteligente)</option>
-                <option value="json">JSON Estructurado</option>
-                <option value="xml">XML / HTML</option>
-                <option value="log">Log Delimitado / KVP</option>
-                <option value="text">Texto Plano</option>
+              <select bind:value={selectedFormat} class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-primary-500 font-medium">
+                <option value="auto" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Auto (Detección inteligente)</option>
+                <option value="json" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">JSON Estructurado</option>
+                <option value="xml" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">XML / HTML</option>
+                <option value="log" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Log Delimitado / KVP</option>
+                <option value="text" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Texto Plano</option>
               </select>
             </label>
 
