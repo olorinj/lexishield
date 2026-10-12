@@ -1,6 +1,7 @@
 # Compilación y artefactos
 /target
 dist/
+dist-cli/
 ui/dist/
 src-tauri/target/
 .svelte-kit/
