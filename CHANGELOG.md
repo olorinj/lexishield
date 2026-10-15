@@ -20,6 +20,12 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - Garantiza que campos `keywords` en JSONs arbitrarios de negocio o marketing continúen siendo escaneados y ofuscados sin omisiones indebidas.
 - **🔄 Versionado Dinámico Basado en Ramas Git**:
   - Sincronización automática de versiones en compilaciones locales ([`compilar.sh`](file:///home/olorinj/DEV/rust/lexishield/compilar.sh) y [`compilar.ps1`](file:///home/olorinj/DEV/rust/lexishield/compilar.ps1)) asociadas al nombre de la rama activa (ej. `v2.0.1`).
+- **🗔 Ergonomía de Escritorio y Bandeja del Sistema (System Tray)**:
+  - Soporte nativo para minimizar y residir en la bandeja del sistema (junto al reloj de Windows), permitiendo ocultar y restaurar la ventana al hacer clic en el icono o cerrar/minimizar la aplicación.
+  - Soporte integral de Arrastrar y Soltar (*Drag & Drop*) para analizar archivos o directorios completos arrastrándolos directamente sobre la vista del Escáner o sobre Studio.
+  - Nuevo panel interactivo en el Escáner para pegar y auditar texto al vuelo con botón de puente rápido hacia Studio (*"Enviar a Studio"*).
+  - Activada por defecto la opción *"Guardar en copia sufijada"* (`copyMode = true`) en Studio para evitar sobreescritura accidental de archivos de origen.
+  - El botón *"Limpiar"* de Studio restablece ahora de forma atómica tanto la entrada original como el resultado procesado.
 
 ### Mejorado
 - **📦 Actualización de Infraestructura CI/CD en GitHub Actions**:
