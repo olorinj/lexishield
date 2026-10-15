@@ -55,7 +55,39 @@ impl JsonAdapter {
         }
     }
 
-    /// Comprueba si una clave JSON está protegida y sus valores NUNCA deben ofuscarse.
+    /// Comprueba si una cadena representa un literal hexadecimal (ej: "0x80000000000000", "0x2aeea762").
+    pub fn is_hex_literal(val: &str) -> bool {
+        let s = val.trim();
+        if let Some(rest) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+            !rest.is_empty() && rest.chars().all(|c| c.is_ascii_hexdigit())
+        } else {
+            false
+        }
+    }
+
+    /// Comprueba si la ruta de claves pertenece al contexto de eventos de sistema o seguridad (SIEM, Windows EventLog, Wazuh, Sysmon).
+    pub fn is_security_event_path(path: &[String]) -> bool {
+        path.iter().any(|segment| {
+            let s = segment.to_lowercase();
+            matches!(
+                s.as_str(),
+                "eventdata"
+                    | "event_data"
+                    | "win"
+                    | "system"
+                    | "security"
+                    | "audit"
+                    | "wazuh"
+                    | "agent"
+                    | "manager"
+                    | "sysmon"
+                    | "winlog"
+                    | "data"
+            )
+        })
+    }
+
+    /// Comprueba si una clave JSON está protegida en cualquier contexto.
     pub fn is_ignored_key(key: &str) -> bool {
         let key_lower = key.to_lowercase();
         matches!(
@@ -73,6 +105,31 @@ impl JsonAdapter {
                 | "version"
                 | "id"
         )
+    }
+
+    /// Comprueba si una ruta y su valor representan un campo técnico protegido en logs de seguridad.
+    ///
+    /// Evita falsos positivos en JSONs de negocio (ej. `{"keywords": "CEO secreto"}` NO se ignora,
+    /// pero `{"eventdata": {"keywords": "0x80000000000000"}}` SÍ se ignora).
+    pub fn is_protected_json_path(path: &[String], value_str: &str) -> bool {
+        let current_key = path.last().map_or("", String::as_str);
+        let key_lower = current_key.to_lowercase();
+        let in_security_context = Self::is_security_event_path(path);
+        let is_hex = Self::is_hex_literal(value_str);
+
+        match key_lower.as_str() {
+            // keywords y logonid en logs de eventos o máscaras hex (ej: 0x80000000000000, 0x2aeea762)
+            "keywords" | "targetlogonid" | "subjectlogonid" | "logonid" => {
+                in_security_context || is_hex
+            }
+
+            // Identificadores técnicos de eventos y procesos
+            "eventid" | "processid" | "threadid" | "opcode" | "level" | "task" | "version" => {
+                in_security_context || is_hex || value_str.chars().all(|c| c.is_ascii_digit())
+            }
+
+            _ => false,
+        }
     }
 
     /// Extrae entidades estructuradas y respetando el perfil semántico de Wazuh/SIEM.
@@ -129,14 +186,15 @@ impl JsonAdapter {
 
                 let current_key = path.last().map_or("", String::as_str);
                 let current_key_lower = current_key.to_lowercase();
+                let in_security = Self::is_security_event_path(path);
                 let full_path_lower = path
                     .iter()
                     .map(|segment| segment.to_lowercase())
                     .collect::<Vec<_>>()
                     .join(".");
 
-                // 1. Claves que NUNCA deben ofuscarse
-                if Self::is_ignored_key(current_key) {
+                // 1. Claves y rutas que NUNCA deben ofuscarse
+                if Self::is_protected_json_path(path, s_trim) {
                     mappings.push(Mapping::new(s_trim, "=", DetectorType::GenericToken));
                     return;
                 }
@@ -153,10 +211,12 @@ impl JsonAdapter {
                 }
 
                 // 3. Claves forzadas: Hostnames / Servidores
-                if (full_path_lower.ends_with("agent.name")
-                    || full_path_lower.ends_with("manager.name")
-                    || current_key_lower == "workstationname"
-                    || current_key_lower == "computer")
+                let is_agent_or_manager = full_path_lower.ends_with("agent.name")
+                    || full_path_lower.ends_with("manager.name");
+                let is_workstation_or_computer = current_key_lower == "workstationname"
+                    || (current_key_lower == "computer" && in_security);
+
+                if (is_agent_or_manager || is_workstation_or_computer)
                     && !mappings.iter().any(|m| m.original == s_trim)
                 {
                     // Si contiene un FQDN con dominio (ej: HOST05.acme.local)
@@ -174,7 +234,8 @@ impl JsonAdapter {
                 }
 
                 // 4. Claves forzadas: Dominios Windows NetBIOS
-                if current_key_lower == "targetdomainname"
+                if (current_key_lower == "targetdomainname"
+                    || (current_key_lower == "domain" && in_security))
                     && !mappings.iter().any(|m| m.original == s_trim)
                 {
                     let pseudo = format!("DOMAIN_{:04X}", rand::random::<u16>());
@@ -183,7 +244,7 @@ impl JsonAdapter {
                 }
 
                 // 5. Claves forzadas: Nombres de usuario Windows
-                if current_key_lower == "targetusername"
+                if (current_key_lower == "targetusername" || current_key_lower == "subjectusername")
                     && !mappings.iter().any(|m| m.original == s_trim)
                 {
                     let pseudo = format!("user_{:04x}", rand::random::<u16>());
@@ -192,10 +253,10 @@ impl JsonAdapter {
                 }
 
                 // 6. Claves forzadas: SIDs Windows
-                if current_key_lower == "targetusersid"
+                if (current_key_lower == "targetusersid" || current_key_lower == "subjectusersid")
                     && !mappings.iter().any(|m| m.original == s_trim)
                 {
-                    if s_trim == "S-1-0-0" {
+                    if crate::stopwords::is_protected_sid(s_trim) {
                         mappings.push(Mapping::new(s_trim, "=", DetectorType::WindowsSid));
                     } else {
                         let pseudo = sid_detector.generate_pseudonym(s_trim);
@@ -314,9 +375,8 @@ impl JsonAdapter {
                 }
             }
             Value::String(s) => {
-                let current_key = path.last().map_or("", String::as_str);
-                // Si la clave actual es una clave protegida (ej: keywords, targetLogonId), omitir
-                if Self::is_ignored_key(current_key) {
+                // Si la ruta y valor corresponden a un campo técnico protegido en logs de seguridad, omitir
+                if Self::is_protected_json_path(path, s) {
                     return;
                 }
 
@@ -446,5 +506,93 @@ mod tests {
             parsed_orig, parsed_restored,
             "La desofuscación debe restaurar exactamente el JSON original"
         );
+    }
+
+    #[test]
+    fn test_generic_siem_event_obfuscation_and_preservation() {
+        let json_input = r#"{
+  "winlog": {
+    "event_data": {
+      "targetUserName": "administrador",
+      "targetDomainName": "CORP",
+      "workstationName": "PC-FINANZAS",
+      "targetUserSid": "S-1-5-21-123456789-987654321-123456789-500",
+      "targetLogonId": "0x3f12a9",
+      "keywords": "0x80000000000000",
+      "nullSid": "S-1-0-0"
+    }
+  }
+}"#;
+
+        let config = LexiConfig::default();
+        let mut engine = ObfuscatorEngine::new(config);
+
+        let mappings = engine
+            .scan_and_register_mappings(json_input)
+            .expect("Scan falló");
+        assert!(!mappings.is_empty());
+
+        let (obfuscated, report) = engine
+            .obfuscate_text(json_input, FormatType::Json)
+            .expect("Ofuscación falló");
+
+        assert!(report.replacements_applied > 0);
+
+        // Claves protegidas no deben ofuscarse
+        assert!(obfuscated.contains("0x80000000000000"));
+        assert!(obfuscated.contains("0x3f12a9"));
+        assert!(obfuscated.contains("S-1-0-0"));
+
+        // Campos forzados deben ofuscarse
+        assert!(!obfuscated.contains("\"administrador\""));
+        assert!(!obfuscated.contains("\"CORP\""));
+        assert!(!obfuscated.contains("\"PC-FINANZAS\""));
+        assert!(!obfuscated.contains("S-1-5-21-123456789-987654321-123456789-500"));
+
+        // Desofuscación 100% reversible
+        let (restored, _) = engine
+            .deobfuscate_text(&obfuscated, FormatType::Json)
+            .expect("Desofuscación falló");
+
+        let parsed_orig: serde_json::Value = serde_json::from_str(json_input).unwrap();
+        let parsed_restored: serde_json::Value = serde_json::from_str(&restored).unwrap();
+        assert_eq!(parsed_orig, parsed_restored);
+    }
+
+    #[test]
+    fn test_business_json_keywords_not_skipped() {
+        let json_input = r#"{
+  "article": {
+    "title": "Informe trimestral",
+    "keywords": "servidor 192.168.1.50 confidencial"
+  }
+}"#;
+
+        let config = LexiConfig::default();
+        let mut engine = ObfuscatorEngine::new(config);
+
+        let mappings = engine
+            .scan_and_register_mappings(json_input)
+            .expect("Scan falló");
+        assert!(!mappings.is_empty(), "Debe detectar la IP en keywords");
+
+        let (obfuscated, report) = engine
+            .obfuscate_text(json_input, FormatType::Json)
+            .expect("Ofuscación falló");
+
+        assert!(report.replacements_applied > 0);
+        assert!(
+            !obfuscated.contains("192.168.1.50"),
+            "La IP en keywords de un JSON de negocio sí debe ofuscarse"
+        );
+
+        // Desofuscación 100% reversible
+        let (restored, _) = engine
+            .deobfuscate_text(&obfuscated, FormatType::Json)
+            .expect("Desofuscación falló");
+
+        let parsed_orig: serde_json::Value = serde_json::from_str(json_input).unwrap();
+        let parsed_restored: serde_json::Value = serde_json::from_str(&restored).unwrap();
+        assert_eq!(parsed_orig, parsed_restored);
     }
 }

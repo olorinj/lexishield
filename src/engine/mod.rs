@@ -66,8 +66,9 @@ impl ObfuscatorEngine {
         }
 
         // Cargar mapeos contextuales en el manager primero para que sirvan de salvaguarda o prioridad
+        let mut newly_added = Vec::new();
         if !contextual_mappings.is_empty() {
-            let _ = self.manager.load_mappings(contextual_mappings.clone());
+            newly_added = self.manager.load_mappings(contextual_mappings)?;
         }
 
         let mut detected = self.detectors.scan_text(
@@ -79,9 +80,6 @@ impl ObfuscatorEngine {
                 None => None,
             },
         );
-
-        // Fusionar con los contextuales previamente extraídos
-        detected.extend(contextual_mappings);
 
         // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
         for m in &mut detected {
@@ -99,7 +97,8 @@ impl ObfuscatorEngine {
             }
         }
 
-        let newly_added = self.manager.load_mappings(detected)?;
+        let more_added = self.manager.load_mappings(detected)?;
+        newly_added.extend(more_added);
         Ok(newly_added)
     }
 
