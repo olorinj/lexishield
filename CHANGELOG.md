@@ -5,6 +5,28 @@ Todos los cambios notables de este proyecto se documentarán en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-10-15
+*Actualización de compatibilidad CI/CD y motor contextual estructurado para eventos de seguridad y SIEM (Wazuh / Windows EventLog / Sysmon).*
+
+### Añadido
+- **🛡️ Adaptador JSON Jerárquico y Perfil SIEM / Wazuh / Windows Events (`json_adapter.rs`)**:
+  - Detección e inspección semántica mediante rutas jerárquicas (JSON Path) para eventos de seguridad.
+  - Clasificación forzada y generación de pseudónimos para equipos y servidores (`agent.name`, `manager.name`, `workstationName`, `system.computer`).
+  - Mapeo automático de identidades Windows: usuarios (`targetUserName`, `subjectUserName`), dominios NetBIOS (`targetDomainName`, `domain`) y SIDs de cuentas (`targetUserSid`, `subjectUserSid`).
+  - Anonimización adaptativa de cabeceras de correo `InternetMessageId` (RFC 5322), preservando el sufijo del dominio base corporativo (`*.service-*.example.com`).
+  - Lista de protección universal de SIDs estándar de Windows (`S-1-0-0`, `S-1-1-0`, `S-1-5-18`, etc.) que jamás son ofuscados.
+- **🔒 Prevención Inteligente de Falsos Positivos y Falsos Negativos**:
+  - Protección de claves y máscaras técnicas hexadecimales (`keywords`, `targetLogonId`, `subjectLogonId`, `eventId`, etc.) condicionada al contexto del árbol JSON o formato de flag (`0x...`).
+  - Garantiza que campos `keywords` en JSONs arbitrarios de negocio o marketing continúen siendo escaneados y ofuscados sin omisiones indebidas.
+- **🔄 Versionado Dinámico Basado en Ramas Git**:
+  - Sincronización automática de versiones en compilaciones locales ([`compilar.sh`](file:///home/olorinj/DEV/rust/lexishield/compilar.sh) y [`compilar.ps1`](file:///home/olorinj/DEV/rust/lexishield/compilar.ps1)) asociadas al nombre de la rama activa (ej. `v2.0.1`).
+
+### Mejorado
+- **📦 Actualización de Infraestructura CI/CD en GitHub Actions**:
+  - Actualización de `actions/checkout` y `actions/setup-node` a **v5** en todos los flujos de integración continua (`ci.yml`, `release.yml`, `release-cli.yml`, `ci-release-builds.yml`), eliminando advertencias de obsolescencia y adaptándose a entornos Node.js 24.
+- **🧪 Cobertura de Pruebas Unitarias y de Integración**:
+  - Nuevas pruebas de ciclo completo para eventos de alerta Wazuh, eventos genéricos de Windows / Sysmon (`winlog.event_data`) y verificación de comportamiento en documentos de negocio, con validación de reversibilidad biyectiva al 100%.
+
 ## [2.0.0] - 2026-10-12
 *Lanzamiento oficial de LexiShield 2.0.0: Interfaz gráfica de escritorio nativa (Tauri v2 + Svelte), arquitectura Zero-Knowledge y distribución multiplataforma unificada (CLI + GUI).*
 
