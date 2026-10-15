@@ -32,8 +32,13 @@
         auto_clear_enabled: false,
         auto_clear_seconds: 5,
       },
+      file_selection_mode: "ambos",
     },
   };
+
+  $: fileSelectionMode = appConfig?.gui?.file_selection_mode || "ambos";
+  $: allowDragDrop = fileSelectionMode === "ambos" || fileSelectionMode === "arrastrar";
+  $: showFileButtons = fileSelectionMode === "ambos" || fileSelectionMode === "botones";
 
   // Estado del Studio
   let inputText = "";
@@ -178,6 +183,10 @@
     try {
       const webview = getCurrentWebview();
       unlistenDragDrop = await webview.onDragDropEvent(async (event) => {
+        if (!allowDragDrop) {
+          isDragging = false;
+          return;
+        }
         if (event.payload.type === "enter" || event.payload.type === "over") {
           isDragging = true;
         } else if (event.payload.type === "leave") {
@@ -247,6 +256,9 @@
     try {
       const cfg = await invokeTauri("get_app_settings");
       if (cfg && cfg.gui) {
+        if (!["ambos", "arrastrar", "botones"].includes(cfg.gui.file_selection_mode)) {
+          cfg.gui.file_selection_mode = "ambos";
+        }
         appConfig = cfg;
         if (cfg.gui.default_tab && cfg.gui.tabs[`show_${cfg.gui.default_tab}`] !== false) {
           activeTab = cfg.gui.default_tab;
@@ -259,6 +271,9 @@
 
   async function saveSettings() {
     try {
+      if (!["ambos", "arrastrar", "botones"].includes(appConfig?.gui?.file_selection_mode)) {
+        appConfig.gui.file_selection_mode = "ambos";
+      }
       await invokeTauri("save_app_settings", { config: appConfig });
       statusMessage = "✅ Configuración guardada en ~/.lexishield/config.toml";
     } catch (e) {
@@ -1518,13 +1533,15 @@
             >
               <span>❔</span> Ayuda
             </button>
-            <button
-              on:click={openFileToProcess}
-              disabled={loading}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <span>📄</span> Procesar Archivo...
-            </button>
+            {#if showFileButtons}
+              <button
+                on:click={openFileToProcess}
+                disabled={loading}
+                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <span>📄</span> Procesar Archivo...
+              </button>
+            {/if}
             <button
               on:click={openVaultFile}
               class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5"
@@ -1665,20 +1682,22 @@
             >
               <span>📋</span> Analizar Texto
             </button>
-            <button
-              on:click={openFileToAudit}
-              disabled={loading}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-            >
-              <span>📄</span> Escanear Fichero
-            </button>
-            <button
-              on:click={openDirectoryToAudit}
-              disabled={loading}
-              class="px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-xl border border-primary-500/30 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-            >
-              <span>📁</span> Escanear Carpeta
-            </button>
+            {#if showFileButtons}
+              <button
+                on:click={openFileToAudit}
+                disabled={loading}
+                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              >
+                <span>📄</span> Escanear Fichero
+              </button>
+              <button
+                on:click={openDirectoryToAudit}
+                disabled={loading}
+                class="px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-xl border border-primary-500/30 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              >
+                <span>📁</span> Escanear Carpeta
+              </button>
+            {/if}
           </div>
         </div>
 
@@ -1749,16 +1768,24 @@
           <div class="mb-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl flex flex-col items-center justify-center text-center gap-2 bg-slate-50/50 dark:bg-slate-900/30 transition hover:border-primary-500/50">
             <span class="text-4xl mb-1">📂</span>
             <p class="text-xs font-bold text-slate-800 dark:text-slate-200">
-              Arrastra y suelta aquí cualquier archivo o carpeta
+              {#if allowDragDrop && showFileButtons}
+                Arrastra y suelta aquí cualquier archivo o carpeta
+              {:else if allowDragDrop}
+                Arrastra y suelta aquí cualquier archivo o carpeta (Modo Drag & Drop)
+              {:else}
+                Selecciona un archivo o carpeta para auditar
+              {/if}
             </p>
             <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-md">
               LexiShield detectará automáticamente si es un archivo individual o un directorio para iniciar la auditoría de tokens confidenciales.
             </p>
             <div class="flex items-center gap-2 mt-2">
-              <button on:click={openFileToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar archivo</button>
-              <span class="text-slate-400 text-xs">•</span>
-              <button on:click={openDirectoryToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar carpeta</button>
-              <span class="text-slate-400 text-xs">•</span>
+              {#if showFileButtons}
+                <button on:click={openFileToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar archivo</button>
+                <span class="text-slate-400 text-xs">•</span>
+                <button on:click={openDirectoryToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar carpeta</button>
+                <span class="text-slate-400 text-xs">•</span>
+              {/if}
               <button on:click={() => (showTextScanPanel = true)} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Pegar texto</button>
             </div>
           </div>
@@ -2566,6 +2593,27 @@
                 </label>
               </div>
             </div>
+
+            <!-- Selección de Archivos y Carpetas -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Selección de Archivos y Carpetas</span>
+              
+              <div>
+                <label for="config-file-selection-mode-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Método de ingesta preferido:</label>
+                <select
+                  id="config-file-selection-mode-select"
+                  bind:value={appConfig.gui.file_selection_mode}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value="ambos">✨ Ambos (Arrastrar y Soltar + Botones)</option>
+                  <option value="arrastrar">🖱️ Solo Arrastrar y Soltar (Drag & Drop)</option>
+                  <option value="botones">🔘 Solo Botones de Selección</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                  Configura cómo interactuar con archivos en Studio y Escáner. Exige que al menos una opción permanezca activa en todo momento.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3279,7 +3327,7 @@
   {/if}
 
   <!-- OVERLAY VISUAL DE ARRASTRE DE ARCHIVOS O CARPETAS (DRAG & DROP) -->
-  {#if isDragging}
+  {#if isDragging && allowDragDrop}
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-8 pointer-events-none transition animate-in fade-in duration-200">
       <div class="bg-white dark:bg-slate-900 border-2 border-dashed border-primary-500 rounded-3xl p-10 flex flex-col items-center gap-4 shadow-2xl text-center max-w-md">
         <span class="text-6xl animate-bounce">📂</span>
