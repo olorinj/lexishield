@@ -39,8 +39,13 @@
       privacy_blur: false,
       auto_lock_minutes: 0,
       theme: "system",
+      accent_color: "cyan",
     },
   };
+
+  let inputGutterEl;
+  let outputGutterEl;
+  let copiedOutputFlash = false;
 
   $: fileSelectionMode = appConfig?.gui?.file_selection_mode || "ambos";
   $: allowDragDrop = fileSelectionMode === "ambos" || fileSelectionMode === "arrastrar";
@@ -53,6 +58,71 @@
       : appConfig?.gui?.font_size === "large"
       ? "text-sm"
       : "text-xs";
+
+  $: inputLinesCount = inputText ? inputText.split("\n").length : 1;
+  $: outputLinesCount = outputText ? outputText.split("\n").length : 1;
+  $: inputCharCount = inputText.length;
+  $: outputCharCount = outputText.length;
+  $: inputSizeKB = (new TextEncoder().encode(inputText).length / 1024).toFixed(1) + " KB";
+  $: outputSizeKB = (new TextEncoder().encode(outputText).length / 1024).toFixed(1) + " KB";
+  $: inputGutterText = Array.from({ length: Math.min(inputLinesCount, 5000) }, (_, i) => i + 1).join("\n");
+  $: outputGutterText = Array.from({ length: Math.min(outputLinesCount, 5000) }, (_, i) => i + 1).join("\n");
+
+  $: detectedInputFormat = (() => {
+    if (selectedFormat && selectedFormat !== "auto") return selectedFormat.toUpperCase();
+    const trimmed = inputText.trim();
+    if (!trimmed) return "AUTO";
+    if (trimmed.startsWith("{") && (trimmed.includes('"wazuh"') || trimmed.includes('"rule"') || trimmed.includes('"agent"'))) return "JSON WAZUH";
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) return "JSON";
+    if (trimmed.startsWith("<") && trimmed.endsWith(">")) return "XML / HTML";
+    if (/^(?:\w{3}\s+\d+|\d{4}-\d{2}-\d{2})/.test(trimmed) || trimmed.includes("INFO") || trimmed.includes("ERROR") || trimmed.includes("WARN")) return "LOG / SYSLOG";
+    return "TEXTO PLANO";
+  })();
+
+  function getDetectorCategory(detectorType) {
+    const dt = (detectorType || "").toLowerCase();
+    if (dt.includes("ip") || dt.includes("mac") || dt.includes("domain") || dt.includes("url") || dt.includes("host") || dt.includes("red")) {
+      return { name: "Red", icon: "🌐", color: "bg-blue-500", text: "text-blue-500", border: "border-blue-500/30", bgBadge: "bg-blue-500/10" };
+    }
+    if (dt.includes("dni") || dt.includes("nie") || dt.includes("user") || dt.includes("usuario") || dt.includes("nombre") || dt.includes("ident")) {
+      return { name: "Identidad", icon: "🪪", color: "bg-purple-500", text: "text-purple-500", border: "border-purple-500/30", bgBadge: "bg-purple-500/10" };
+    }
+    if (dt.includes("path") || dt.includes("ruta") || dt.includes("file") || dt.includes("sistema") || dt.includes("sys") || dt.includes("process")) {
+      return { name: "Sistemas", icon: "🖥️", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-500/30", bgBadge: "bg-emerald-500/10" };
+    }
+    return { name: "Contacto / Claves", icon: "💳", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-500/30", bgBadge: "bg-amber-500/10" };
+  }
+
+  $: categoryStats = (() => {
+    if (!detectedItems || detectedItems.length === 0) return null;
+    const counts = { Red: 0, Identidad: 0, Sistemas: 0, "Contacto / Claves": 0 };
+    for (const item of detectedItems) {
+      const cat = getDetectorCategory(item.detector_type);
+      counts[cat.name] = (counts[cat.name] || 0) + 1;
+    }
+    const total = detectedItems.length;
+    return {
+      total,
+      red: { count: counts.Red, pct: ((counts.Red / total) * 100).toFixed(1) },
+      identidad: { count: counts.Identidad, pct: ((counts.Identidad / total) * 100).toFixed(1) },
+      sistemas: { count: counts.Sistemas, pct: ((counts.Sistemas / total) * 100).toFixed(1) },
+      claves: { count: counts["Contacto / Claves"], pct: ((counts["Contacto / Claves"] / total) * 100).toFixed(1) },
+    };
+  })();
+
+  async function copyOutputWithFeedback() {
+    if (!outputText) return;
+    try {
+      await navigator.clipboard.writeText(outputText);
+      copiedOutputFlash = true;
+      statusMessage = "📋 Copiado al portapapeles.";
+      setTimeout(() => {
+        copiedOutputFlash = false;
+      }, 2000);
+    } catch (e) {
+      statusMessage = "❌ Error al copiar: " + e;
+    }
+  }
 
   // Estado del Studio
   let inputText = "";
@@ -160,6 +230,7 @@
       darkMode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     }
     updateThemeClass();
+    applyAccentFromConfig();
 
     // 2. Cargar configuración
     await loadSettings();
@@ -277,6 +348,11 @@
     updateThemeClass();
   }
 
+  function applyAccentFromConfig() {
+    const c = appConfig?.gui?.accent_color || "cyan";
+    document.documentElement.setAttribute("data-accent", c);
+  }
+
   function toggleTheme() {
     darkMode = !darkMode;
     appConfig.gui.theme = darkMode ? "dark" : "light";
@@ -325,8 +401,12 @@
         if (!["system", "dark", "light"].includes(cfg.gui.theme)) {
           cfg.gui.theme = "system";
         }
+        if (!["cyan", "emerald", "cobalt", "purple", "amber"].includes(cfg.gui.accent_color)) {
+          cfg.gui.accent_color = "cyan";
+        }
         appConfig = cfg;
         applyThemeFromConfig();
+        applyAccentFromConfig();
         if (cfg.gui.default_tab && cfg.gui.tabs[`show_${cfg.gui.default_tab}`] !== false) {
           activeTab = cfg.gui.default_tab;
         }
@@ -349,6 +429,9 @@
       }
       if (!["system", "dark", "light"].includes(appConfig?.gui?.theme)) {
         appConfig.gui.theme = "system";
+      }
+      if (!["cyan", "emerald", "cobalt", "purple", "amber"].includes(appConfig?.gui?.accent_color)) {
+        appConfig.gui.accent_color = "cyan";
       }
       await invokeTauri("save_app_settings", { config: appConfig });
       statusMessage = "✅ Configuración guardada en ~/.lexishield/config.toml";
@@ -1657,37 +1740,60 @@
         <!-- Paneles de Entrada y Salida -->
         <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
           <!-- Entrada -->
-          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2">
-              <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <span>📥</span> Entrada Original
-              </span>
-              <button
-                on:click={() => {
-                  inputText = "";
-                  outputText = "";
-                  statusMessage = "Área de trabajo de Studio limpiada.";
-                }}
-                class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition"
-                title="Limpiar tanto la entrada original como el resultado procesado"
-              >
-                Limpiar
-              </button>
+          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm frosted-card">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>📥</span> Entrada Original
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20" title="Formato sintáctico detectado">
+                  {detectedInputFormat}
+                </span>
+              </div>
+              <div class="flex items-center gap-2.5">
+                <span class="text-[10px] font-mono text-slate-400">
+                  {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
+                </span>
+                <button
+                  on:click={() => {
+                    inputText = "";
+                    outputText = "";
+                    statusMessage = "Área de trabajo de Studio limpiada.";
+                  }}
+                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition"
+                  title="Limpiar tanto la entrada original como el resultado procesado"
+                >
+                  Limpiar
+                </button>
+              </div>
             </div>
-            <textarea
-              bind:value={inputText}
-              placeholder="Pega aquí el contenido a ofuscar o desofuscar (JSON, Logs, XML, código)..."
-              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text {privacyBlur ? 'privacy-blurred' : ''}"
-            ></textarea>
+            <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
+              <pre
+                bind:this={inputGutterEl}
+                class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
+                aria-hidden="true"
+              >{inputGutterText}</pre>
+              <textarea
+                bind:value={inputText}
+                on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
+                placeholder="Pega aquí el contenido a ofuscar o desofuscar (JSON, Logs, XML, código)..."
+                class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''}"
+              ></textarea>
+            </div>
           </div>
 
           <!-- Salida -->
-          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2">
-              <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <span>📤</span> Resultado Procesado
-              </span>
+          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm frosted-card">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
               <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>📤</span> Resultado Procesado
+                </span>
+              </div>
+              <div class="flex items-center gap-2.5">
+                <span class="text-[10px] font-mono text-slate-400">
+                  {outputLinesCount} lín · {outputCharCount} car · {outputSizeKB}
+                </span>
                 <button
                   on:click={() => { outputText = ""; }}
                   disabled={!outputText}
@@ -1697,20 +1803,32 @@
                   Limpiar
                 </button>
                 <button
-                  on:click={() => { navigator.clipboard.writeText(outputText); statusMessage = "📋 Copiado al portapapeles."; }}
+                  on:click={copyOutputWithFeedback}
                   disabled={!outputText}
-                  class="text-primary-600 dark:text-primary-400 hover:underline text-xs font-semibold disabled:opacity-40 transition"
+                  class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedOutputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
                 >
-                  Copiar
+                  {#if copiedOutputFlash}
+                    <span>✓</span> ¡Copiado!
+                  {:else}
+                    <span>📋</span> Copiar
+                  {/if}
                 </button>
               </div>
             </div>
-            <textarea
-              bind:value={outputText}
-              readonly
-              placeholder="El resultado sanitizado o desofuscado aparecerá aquí..."
-              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text"
-            ></textarea>
+            <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60">
+              <pre
+                bind:this={outputGutterEl}
+                class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
+                aria-hidden="true"
+              >{outputGutterText}</pre>
+              <textarea
+                bind:value={outputText}
+                readonly
+                on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
+                placeholder="El resultado sanitizado o desofuscado aparecerá aquí..."
+                class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre"
+              ></textarea>
+            </div>
           </div>
         </div>
 
@@ -1923,6 +2041,51 @@
         {/if}
 
         {#if detectedItems.length > 0}
+          <!-- Barra de Distribución Categórica de Entidades (Estilo GitHub Language Bar) -->
+          {#if categoryStats}
+            <div class="mb-3 p-3 bg-white dark:bg-brand-surface/80 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm frosted-card">
+              <div class="flex items-center justify-between text-xs mb-2 font-medium flex-wrap gap-2">
+                <span class="text-slate-600 dark:text-slate-400 font-semibold">Distribución de Entidades Detectadas ({categoryStats.total}):</span>
+                <div class="flex items-center gap-3 text-[11px] font-mono flex-wrap">
+                  {#if categoryStats.red.count > 0}
+                    <span class="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                      <span class="w-2 h-2 rounded-full bg-blue-500"></span> 🌐 Red ({categoryStats.red.count} · {categoryStats.red.pct}%)
+                    </span>
+                  {/if}
+                  {#if categoryStats.identidad.count > 0}
+                    <span class="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
+                      <span class="w-2 h-2 rounded-full bg-purple-500"></span> 🪪 Identidad ({categoryStats.identidad.count} · {categoryStats.identidad.pct}%)
+                    </span>
+                  {/if}
+                  {#if categoryStats.sistemas.count > 0}
+                    <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 🖥️ Sistemas ({categoryStats.sistemas.count} · {categoryStats.sistemas.pct}%)
+                    </span>
+                  {/if}
+                  {#if categoryStats.claves.count > 0}
+                    <span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                      <span class="w-2 h-2 rounded-full bg-amber-500"></span> 💳 Contacto/Claves ({categoryStats.claves.count} · {categoryStats.claves.pct}%)
+                    </span>
+                  {/if}
+                </div>
+              </div>
+              <div class="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden flex">
+                {#if categoryStats.red.count > 0}
+                  <div style="width: {categoryStats.red.pct}%" class="bg-blue-500 transition-all duration-300" title="Red: {categoryStats.red.count} ({categoryStats.red.pct}%)"></div>
+                {/if}
+                {#if categoryStats.identidad.count > 0}
+                  <div style="width: {categoryStats.identidad.pct}%" class="bg-purple-500 transition-all duration-300" title="Identidad: {categoryStats.identidad.count} ({categoryStats.identidad.pct}%)"></div>
+                {/if}
+                {#if categoryStats.sistemas.count > 0}
+                  <div style="width: {categoryStats.sistemas.pct}%" class="bg-emerald-500 transition-all duration-300" title="Sistemas: {categoryStats.sistemas.count} ({categoryStats.sistemas.pct}%)"></div>
+                {/if}
+                {#if categoryStats.claves.count > 0}
+                  <div style="width: {categoryStats.claves.pct}%" class="bg-amber-500 transition-all duration-300" title="Contacto/Claves: {categoryStats.claves.count} ({categoryStats.claves.pct}%)"></div>
+                {/if}
+              </div>
+            </div>
+          {/if}
+
           <!-- Barra de Acciones del Escáner (Simetría CLI/GUI) -->
           <div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-xs">
             <div class="flex items-center gap-2">
@@ -1987,6 +2150,7 @@
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
               {#each detectedItems as item (item.original)}
+                {@const cat = getDetectorCategory(item.detector_type)}
                 <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-50' : ''}">
                   <td class="p-3 text-center">
                     <input
@@ -2008,8 +2172,8 @@
                     {/if}
                   </td>
                   <td class="p-3">
-                    <span class="px-2 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 text-[11px] border border-primary-500/20">
-                      {item.detector_type}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded {cat.bgBadge} {cat.text} text-[11px] font-semibold border {cat.border}">
+                      <span>{cat.icon}</span> {item.detector_type}
                     </span>
                   </td>
                   <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
@@ -2749,6 +2913,34 @@
                 </div>
 
                 <div>
+                  <span class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Color de Acento de la Interfaz:</span>
+                  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {#each [
+                      { id: 'cyan', label: 'Cian Neón', color: 'bg-cyan-500', desc: 'Defecto' },
+                      { id: 'emerald', label: 'Esmeralda', color: 'bg-emerald-500', desc: 'Ciber' },
+                      { id: 'cobalt', label: 'Cobalto', color: 'bg-blue-600', desc: 'SOC' },
+                      { id: 'purple', label: 'Amatista', color: 'bg-purple-600', desc: 'Auditoría' },
+                      { id: 'amber', label: 'Ámbar', color: 'bg-amber-500', desc: 'Retro' }
+                    ] as palette}
+                      <button
+                        type="button"
+                        on:click={() => {
+                          appConfig.gui.accent_color = palette.id;
+                          applyAccentFromConfig();
+                        }}
+                        class="flex flex-col items-center gap-1 p-2 rounded-xl border text-center transition {appConfig.gui.accent_color === palette.id ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500' : 'border-slate-200 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5'}"
+                      >
+                        <span class="w-6 h-6 rounded-full {palette.color} shadow-sm border-2 border-white dark:border-slate-900 flex items-center justify-center text-white text-[10px] font-bold">
+                          {#if appConfig.gui.accent_color === palette.id}✓{/if}
+                        </span>
+                        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">{palette.label}</span>
+                        <span class="text-[10px] text-slate-400">{palette.desc}</span>
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+
+                <div>
                   <label for="config-font-size-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tamaño de letra en editores y tablas:</label>
                   <select
                     id="config-font-size-select"
@@ -2837,17 +3029,50 @@
     </div>
   {/if}
 
-  <!-- BARRA DE ESTADO INFERIOR -->
-  <footer class="h-7 bg-slate-200 dark:bg-brand-surface border-t border-slate-300 dark:border-white/5 px-4 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 shrink-0 select-text">
-    <div class="flex items-center gap-2 truncate">
-      <span class="truncate">{statusMessage}</span>
+  <!-- BARRA DE ESTADO INFERIOR MODULAR TIPO IDE -->
+  <footer class="h-7 bg-slate-200/90 dark:bg-slate-950 border-t border-slate-300 dark:border-white/10 px-3 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 shrink-0 select-none">
+    <!-- Izquierda: Estado general / Mensaje activo -->
+    <div class="flex items-center gap-2 truncate flex-1 mr-4">
+      <span class="truncate select-text">{statusMessage}</span>
     </div>
-    <div class="flex items-center gap-3 shrink-0 font-mono text-[10px]">
+
+    <!-- Derecha: Cápsulas modulares tipo VS Code / JetBrains -->
+    <div class="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
+      <!-- Bóveda activa -->
+      <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Bóveda de seudónimos activa">
+        <span class="w-1.5 h-1.5 rounded-full {isVaultUnlocked ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
+        <span class="font-semibold text-slate-700 dark:text-slate-300">{vaultPath ? vaultPath.split('/').pop() : 'default.lexi'}</span>
+      </div>
+
+      <!-- Arquitectura Zero-Knowledge -->
+      <div class="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Cifrado local sin servidores externos">
+        <span>🛡️</span> Zero-Knowledge
+      </div>
+
+      <!-- Formato de entrada detectado -->
+      <div class="hidden md:flex items-center gap-1 px-2 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-300 border border-primary-500/20" title="Formato sintáctico detectado">
+        <span>⚡</span> {detectedInputFormat}
+      </div>
+
+      <!-- Rendimiento / Telemetría del último reporte -->
       {#if lastReport}
-        <span>Reemplazos: {lastReport.replacements_applied}</span>
-        <span>Tiempo: {lastReport.elapsed_ms.toFixed(1)}ms</span>
+        <div class="hidden lg:flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Rendimiento del último procesamiento">
+          <span>⚡</span> {lastReport.elapsed_ms.toFixed(1)}ms · {lastReport.replacements_applied} repl.
+        </div>
       {/if}
-      <span>Bóveda: {vaultPath ? vaultPath.split('/').pop() : 'default.lexi'}</span>
+
+      <!-- Modo de Privacidad -->
+      <div class="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Modo de privacidad visual (desenfoque)">
+        <span>{privacyBlur ? '🕶️ Protegido' : '👁️ Normal'}</span>
+      </div>
+
+      <!-- Codificación y Versión -->
+      <div class="px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5 text-slate-500 dark:text-slate-400">
+        UTF-8
+      </div>
+      <div class="px-2 py-0.5 rounded bg-primary-600/15 text-primary-700 dark:text-primary-400 font-semibold border border-primary-500/20">
+        v2.0.1
+      </div>
     </div>
   </footer>
 
@@ -3507,8 +3732,10 @@
   <!-- OVERLAY VISUAL DE ARRASTRE DE ARCHIVOS O CARPETAS (DRAG & DROP) -->
   {#if isDragging && allowDragDrop}
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-8 pointer-events-none transition animate-in fade-in duration-200">
-      <div class="bg-white dark:bg-slate-900 border-2 border-dashed border-primary-500 rounded-3xl p-10 flex flex-col items-center gap-4 shadow-2xl text-center max-w-md">
-        <span class="text-6xl animate-bounce">📂</span>
+      <div class="bg-white/90 dark:bg-slate-900/95 border-2 border-dashed border-primary-500 rounded-3xl p-10 flex flex-col items-center gap-4 shadow-2xl text-center max-w-md frosted-card pulse-glow">
+        <div class="w-20 h-20 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center text-5xl animate-bounce">
+          📂
+        </div>
         <h3 class="text-base font-bold text-slate-900 dark:text-white">
           {#if activeTab === "studio"}
             Suelta tu archivo aquí para procesarlo en Studio

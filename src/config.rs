@@ -385,6 +385,8 @@ pub struct GuiConfig {
     pub auto_lock_minutes: u32,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_accent_color")]
+    pub accent_color: String,
 }
 
 fn default_default_tab() -> String {
@@ -405,6 +407,10 @@ fn default_font_size() -> String {
 
 fn default_theme() -> String {
     "system".to_string()
+}
+
+fn default_accent_color() -> String {
+    "cyan".to_string()
 }
 
 impl GuiConfig {
@@ -432,6 +438,7 @@ impl Default for GuiConfig {
             privacy_blur: false,
             auto_lock_minutes: 0,
             theme: default_theme(),
+            accent_color: default_accent_color(),
         }
     }
 }
