@@ -206,8 +206,19 @@ impl DomainDetector {
             .collect()
     }
 
-    /// Genera un dominio RFC 2606 seguro (.example.com).
-    pub fn generate_pseudonym(&self, _original: &str) -> String {
+    /// Genera un dominio RFC 2606 seguro (.example.com), preservando el sufijo .service-*.example.com si ya está presente.
+    pub fn generate_pseudonym(&self, original: &str) -> String {
+        let orig_lower = original.to_lowercase();
+        // Si el dominio ya termina en .service-[a-f0-9]+.example.com, anonimizar los prefijos y preservar el sufijo
+        if let Some(pos) = orig_lower.find(".service-") {
+            let suffix = &original[pos..];
+            if suffix.ends_with(".example.com") {
+                let mut rng = rand::thread_rng();
+                let rnd_prefix: u32 = rng.gen_range(0x1000..0xFFFF);
+                return format!("sub-{rnd_prefix:04x}{suffix}");
+            }
+        }
+
         let mut rng = rand::thread_rng();
         let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
         format!("service-{id:08x}.example.com")
