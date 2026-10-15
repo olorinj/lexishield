@@ -643,18 +643,13 @@
         vault_used: pairsSelectedVault || "Sesión"
       };
 
-      statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados.`;
-      showTextScanPanel = false; // Ocultar el panel de entrada para mostrar directamente la tabla de hallazgos
-      actionResultModal = {
-        title: "Análisis de Texto Finalizado",
-        type: "info",
-        message: `Se han identificado los tokens confidenciales del fragmento copiado.`,
-        details: [
-          { label: "Origen", value: "Texto pegado en Escáner" },
-          { label: "Tokens Detectados", value: `${res.total_entities}` },
-          { label: "Longitud de Caracteres", value: `${textToAudit.length}` }
-        ]
-      };
+      if (res.total_entities === 0) {
+        statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el fragmento.";
+        showTextScanPanel = true;
+      } else {
+        statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados y listados abajo.`;
+        showTextScanPanel = false;
+      }
     } catch (err) {
       statusMessage = "Error al analizar texto: " + err;
       actionResultModal = {
@@ -666,6 +661,14 @@
     } finally {
       loading = false;
     }
+  }
+
+  function clearScanResults() {
+    detectedItems = [];
+    auditSummary = null;
+    selectedScanOriginals = [];
+    textToAudit = "";
+    statusMessage = "Escáner reiniciado. Listo para un nuevo análisis.";
   }
 
   function sendPastedTextToStudio() {
@@ -1716,6 +1719,13 @@
               <div class="flex items-center gap-2">
                 {#if textToAudit.trim()}
                   <button
+                    on:click={() => (textToAudit = "")}
+                    class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition flex items-center gap-1"
+                    title="Limpiar el texto introducido"
+                  >
+                    <span>🗑️</span> Limpiar
+                  </button>
+                  <button
                     on:click={sendPastedTextToStudio}
                     class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1"
                     title="Transferir este texto a Studio para ofuscarlo directamente"
@@ -1820,6 +1830,14 @@
             </div>
 
             <div class="flex items-center gap-2">
+              <button
+                type="button"
+                on:click={clearScanResults}
+                class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition flex items-center gap-1"
+                title="Limpiar los resultados y reiniciar el escáner"
+              >
+                <span>🗑️</span> Limpiar Resultados
+              </button>
               <button
                 type="button"
                 on:click={handleSaveScanToVault}

@@ -19,16 +19,38 @@ impl JsonAdapter {
         Self
     }
 
-    /// Comprueba si el texto de entrada es un JSON sintácticamente válido.
+    /// Parsea una cadena JSON que puede contener un único objeto, un array o un flujo de múltiples objetos (NDJSON / JSON Lines).
+    pub fn parse_json_stream(text: &str) -> Vec<Value> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Vec::new();
+        }
+        let stream = serde_json::Deserializer::from_str(trimmed).into_iter::<Value>();
+        let mut results = Vec::new();
+        for item in stream {
+            match item {
+                Ok(v) => results.push(v),
+                Err(_) => return Vec::new(),
+            }
+        }
+        results
+    }
+
+    /// Comprueba si el texto de entrada es un JSON o un flujo de múltiples alertas JSON (NDJSON) sintácticamente válido.
     pub fn is_valid_json(text: &str) -> bool {
         let trimmed = text.trim();
-        if (trimmed.starts_with('{') && trimmed.ends_with('}'))
-            || (trimmed.starts_with('[') && trimmed.ends_with(']'))
-        {
-            serde_json::from_str::<Value>(trimmed).is_ok()
-        } else {
-            false
+        if trimmed.is_empty() {
+            return false;
         }
+        if ((trimmed.starts_with('{') && trimmed.ends_with('}'))
+            || (trimmed.starts_with('[') && trimmed.ends_with(']')))
+            && serde_json::from_str::<Value>(trimmed).is_ok()
+        {
+            return true;
+        }
+        // Comprobar si es un flujo de múltiples objetos JSON (NDJSON / stream)
+        let stream = Self::parse_json_stream(trimmed);
+        !stream.is_empty()
     }
 
     /// Detecta si el JSON corresponde a una alerta o evento de Wazuh/SIEM.
@@ -319,6 +341,24 @@ impl JsonAdapter {
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
     ) -> Result<(String, usize), ObfuscationError> {
+        let stream = Self::parse_json_stream(text);
+        if stream.len() > 1 {
+            let mut total_replacements = 0;
+            let mut lines = Vec::with_capacity(stream.len());
+            for mut item in stream {
+                let mut path_stack = Vec::new();
+                self.traverse_and_replace(
+                    &mut item,
+                    &mut path_stack,
+                    replacement_map,
+                    strict_word_boundaries,
+                    &mut total_replacements,
+                );
+                lines.push(serde_json::to_string(&item).map_err(ObfuscationError::JsonError)?);
+            }
+            return Ok((lines.join("\n"), total_replacements));
+        }
+
         let mut parsed: Value = serde_json::from_str(text).map_err(ObfuscationError::JsonError)?;
 
         let mut total_replacements = 0;
@@ -394,6 +434,7 @@ impl JsonAdapter {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::config::LexiConfig;
     use crate::engine::ObfuscatorEngine;
     use crate::models::FormatType;
@@ -594,5 +635,52 @@ mod tests {
         let parsed_orig: serde_json::Value = serde_json::from_str(json_input).unwrap();
         let parsed_restored: serde_json::Value = serde_json::from_str(&restored).unwrap();
         assert_eq!(parsed_orig, parsed_restored);
+    }
+
+    #[test]
+    fn test_multiple_wazuh_alerts_ndjson() {
+        let ndjson_input = "{\"_index\":\"wazuh-alerts-4.x\",\"agent\":{\"name\":\"AGENT_ALPHA\",\"ip\":\"10.0.0.5\"},\"data\":{\"win\":{\"eventdata\":{\"targetUserName\":\"admin_john\"}}}}\n{\"_index\":\"wazuh-alerts-4.x\",\"agent\":{\"name\":\"AGENT_BETA\",\"ip\":\"10.0.0.6\"},\"data\":{\"win\":{\"eventdata\":{\"targetUserName\":\"admin_sarah\"}}}}";
+
+        let config = LexiConfig::default();
+        let mut engine = ObfuscatorEngine::new(config);
+
+        let mappings = engine
+            .scan_and_register_mappings(ndjson_input)
+            .expect("Scan de stream NDJSON falló");
+
+        assert!(
+            mappings.len() >= 4,
+            "Debe extraer mappings de ambas alertas (hostnames, IPs y usuarios), encontrados: {}",
+            mappings.len()
+        );
+
+        let (obfuscated, report) = engine
+            .obfuscate_text(ndjson_input, FormatType::Json)
+            .expect("Ofuscación NDJSON falló");
+
+        assert!(report.replacements_applied >= 4);
+        assert!(!obfuscated.contains("AGENT_ALPHA"));
+        assert!(!obfuscated.contains("AGENT_BETA"));
+        assert!(!obfuscated.contains("10.0.0.5"));
+        assert!(!obfuscated.contains("10.0.0.6"));
+        assert!(!obfuscated.contains("admin_john"));
+        assert!(!obfuscated.contains("admin_sarah"));
+
+        // Verificar que cada línea sigue siendo un JSON independiente válido
+        let stream = JsonAdapter::parse_json_stream(&obfuscated);
+        assert_eq!(
+            stream.len(),
+            2,
+            "El resultado debe tener exactamente 2 objetos JSON en el flujo"
+        );
+
+        // Desofuscación 100% reversible
+        let (restored, _) = engine
+            .deobfuscate_text(&obfuscated, FormatType::Json)
+            .expect("Desofuscación NDJSON falló");
+
+        let stream_restored = JsonAdapter::parse_json_stream(&restored);
+        let stream_original = JsonAdapter::parse_json_stream(ndjson_input);
+        assert_eq!(stream_original, stream_restored);
     }
 }
