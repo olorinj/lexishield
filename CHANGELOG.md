@@ -27,6 +27,7 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - Activada por defecto la opción *"Guardar en copia sufijada"* (`copyMode = true`) en Studio para evitar sobreescritura accidental de archivos de origen.
   - El botón *"Limpiar"* de Studio restablece ahora de forma atómica tanto la entrada original como el resultado procesado.
   - Botón *"Limpiar"* en el panel de texto del Escáner y botón *"Limpiar Resultados"* en la barra de acciones para reiniciar la vista sin perder el contexto.
+  - Configuración personalizada del método de ingesta de archivos y carpetas en Opciones (`file_selection_mode`: `"ambos"`, `"arrastrar"`, `"botones"`), exigiendo que al menos uno de los métodos permanezca siempre habilitado.
 - **📄 Soporte Nativo de Flujos Multi-Alerta NDJSON (*JSON Lines*)**:
   - Detección, procesamiento y desofuscación integral de flujos con múltiples objetos JSON consecutivos (formato estándar de logs Wazuh `/var/ossec/logs/alerts/alerts.json`), extrayendo mapeos contextuales de todo el flujo y reconstruyendo el formato línea por línea con validación sintáctica completa.
   - Flujo de trabajo ágil en el Escáner: notificaciones no bloqueantes en línea y mantenimiento del panel de texto abierto si se obtienen cero detecciones.

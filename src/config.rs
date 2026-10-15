@@ -371,10 +371,27 @@ pub struct GuiConfig {
     pub tabs: GuiTabsConfig,
     #[serde(default)]
     pub clipboard: GuiClipboardConfig,
+    #[serde(default = "default_file_selection_mode")]
+    pub file_selection_mode: String,
 }
 
 fn default_default_tab() -> String {
     "studio".to_string()
+}
+
+fn default_file_selection_mode() -> String {
+    "ambos".to_string()
+}
+
+impl GuiConfig {
+    /// Devuelve el modo de selección asegurando que al menos una opción esté siempre activa ("ambos", "arrastrar" o "botones").
+    pub fn validated_file_selection_mode(&self) -> &str {
+        match self.file_selection_mode.as_str() {
+            "arrastrar" => "arrastrar",
+            "botones" => "botones",
+            _ => "ambos",
+        }
+    }
 }
 
 impl Default for GuiConfig {
@@ -384,6 +401,7 @@ impl Default for GuiConfig {
             show_cli_dock: true,
             tabs: GuiTabsConfig::default(),
             clipboard: GuiClipboardConfig::default(),
+            file_selection_mode: default_file_selection_mode(),
         }
     }
 }
