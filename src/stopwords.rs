@@ -316,6 +316,30 @@ pub fn is_protected_word(word: &str) -> bool {
     PROTECTED_WORDS.contains(lower.as_str())
 }
 
+/// SIDs universales y conocidos de Windows que nunca deben ofuscarse.
+pub static PROTECTED_SIDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    let sids = [
+        "S-1-0-0",  // Null Authority / Nobody
+        "S-1-1-0",  // World / Everyone
+        "S-1-2-0",  // Local
+        "S-1-3-0",  // Creator Owner
+        "S-1-3-1",  // Creator Group
+        "S-1-5-18", // Local System
+        "S-1-5-19", // NT Authority / Local Service
+        "S-1-5-20", // NT Authority / Network Service
+    ];
+    let mut set = HashSet::with_capacity(sids.len() * 2);
+    for sid in sids {
+        set.insert(sid);
+    }
+    set
+});
+
+/// Determina si un SID es un identificador estándar de Windows protegido.
+pub fn is_protected_sid(sid: &str) -> bool {
+    PROTECTED_SIDS.contains(sid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

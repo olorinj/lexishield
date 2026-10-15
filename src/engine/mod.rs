@@ -44,14 +44,44 @@ impl ObfuscatorEngine {
     pub fn scan_and_register_mappings_with_cb(
         &mut self,
         content: &str,
-        on_found: Option<&mut dyn FnMut(&Mapping)>,
+        mut on_found: Option<&mut dyn FnMut(&Mapping)>,
     ) -> Result<Vec<Mapping>, ObfuscationError> {
+        let mut contextual_mappings = Vec::new();
+
+        // Si el contenido es JSON válido, extraer primero los mapeos guiados por clave/ruta
+        if crate::format_adapters::json_adapter::JsonAdapter::is_valid_json(content)
+            && let Ok(json_val) = serde_json::from_str::<serde_json::Value>(content)
+        {
+            let extracted = self.format_orchestrator.json.extract_contextual_mappings(
+                &json_val,
+                &self.detectors.hostname,
+                &self.detectors.sid,
+            );
+            for m in extracted {
+                if let Some(ref mut cb) = on_found {
+                    cb(&m);
+                }
+                contextual_mappings.push(m);
+            }
+        }
+
+        // Cargar mapeos contextuales en el manager primero para que sirvan de salvaguarda o prioridad
+        if !contextual_mappings.is_empty() {
+            let _ = self.manager.load_mappings(contextual_mappings.clone());
+        }
+
         let mut detected = self.detectors.scan_text(
             content,
             &self.config.detector_priority_order,
             self.config.min_token_length(),
-            on_found,
+            match &mut on_found {
+                Some(f) => Some(&mut **f),
+                None => None,
+            },
         );
+
+        // Fusionar con los contextuales previamente extraídos
+        detected.extend(contextual_mappings);
 
         // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
         for m in &mut detected {
