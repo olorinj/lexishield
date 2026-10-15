@@ -28,6 +28,9 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - El botón *"Limpiar"* de Studio restablece ahora de forma atómica tanto la entrada original como el resultado procesado.
   - Botón *"Limpiar"* en el panel de texto del Escáner y botón *"Limpiar Resultados"* en la barra de acciones para reiniciar la vista sin perder el contexto.
   - Configuración personalizada del método de ingesta de archivos y carpetas en Opciones (`file_selection_mode`: `"ambos"`, `"arrastrar"`, `"botones"`), exigiendo que al menos uno de los métodos permanezca siempre habilitado.
+  - **Modo Privacidad en Pantalla (*Privacy Blur*)**: botón rápido de ocultación en cabecera para compartir pantalla en videollamadas desenfocando los valores confidenciales originales, con revelado temporal al pasar el cursor.
+  - **Personalización Completa de Ergonomía**: selector de tamaño de fuente (`small`, `medium`, `large`), tema visual persistente (`system`, `dark`, `light`), control de minimizado a bandeja al pulsar `[X]` (`close_to_tray`) y sufijo personalizable para copias procesadas (`output_suffix`).
+  - **Auto-Bloqueo de Bóveda por Inactividad**: temporizador configurable (1, 5, 15 o 30 minutos) que descarga de forma segura de la memoria RAM la contraseña y los mapeos ante la inactividad del usuario.
 - **📄 Soporte Nativo de Flujos Multi-Alerta NDJSON (*JSON Lines*)**:
   - Detección, procesamiento y desofuscación integral de flujos con múltiples objetos JSON consecutivos (formato estándar de logs Wazuh `/var/ossec/logs/alerts/alerts.json`), extrayendo mapeos contextuales de todo el flujo y reconstruyendo el formato línea por línea con validación sintáctica completa.
   - Flujo de trabajo ágil en el Escáner: notificaciones no bloqueantes en línea y mantenimiento del panel de texto abierto si se obtienen cero detecciones.

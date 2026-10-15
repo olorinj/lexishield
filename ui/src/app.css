@@ -27,5 +27,15 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #475569;
   }
+
+  .privacy-blurred {
+    filter: blur(5px);
+    transition: filter 0.15s ease-in-out;
+    user-select: none;
+  }
+  .privacy-blurred:hover {
+    filter: none;
+    user-select: all;
+  }
 }
 

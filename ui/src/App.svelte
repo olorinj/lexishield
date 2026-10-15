@@ -33,12 +33,26 @@
         auto_clear_seconds: 5,
       },
       file_selection_mode: "ambos",
+      close_to_tray: true,
+      output_suffix: "_obfuscated",
+      font_size: "medium",
+      privacy_blur: false,
+      auto_lock_minutes: 0,
+      theme: "system",
     },
   };
 
   $: fileSelectionMode = appConfig?.gui?.file_selection_mode || "ambos";
   $: allowDragDrop = fileSelectionMode === "ambos" || fileSelectionMode === "arrastrar";
   $: showFileButtons = fileSelectionMode === "ambos" || fileSelectionMode === "botones";
+  $: copySuffix = appConfig?.gui?.output_suffix || "_obfuscated";
+  $: privacyBlur = appConfig?.gui?.privacy_blur || false;
+  $: editorFontSizeClass =
+    appConfig?.gui?.font_size === "small"
+      ? "text-[11px]"
+      : appConfig?.gui?.font_size === "large"
+      ? "text-sm"
+      : "text-xs";
 
   // Estado del Studio
   let inputText = "";
@@ -53,7 +67,6 @@
 
   // Opciones de Ofuscación
   let copyMode = true; // Por defecto guardar en copia sufijada
-  let copySuffix = "_obfuscated";
   let cleanCache = false;
   let hasPandoc = false;
   let exportMarkdown = false;
@@ -204,16 +217,43 @@
     }
 
     window.addEventListener("keydown", handleKeydown);
+    window.addEventListener("keydown", resetInactivityTimer);
+    window.addEventListener("mousemove", resetInactivityTimer);
+    window.addEventListener("click", resetInactivityTimer);
   });
 
   onDestroy(() => {
     window.removeEventListener("keydown", handleKeydown);
+    window.removeEventListener("keydown", resetInactivityTimer);
+    window.removeEventListener("mousemove", resetInactivityTimer);
+    window.removeEventListener("click", resetInactivityTimer);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
     if (unlistenDragDrop) unlistenDragDrop();
     if (scanPollTimer) clearInterval(scanPollTimer);
     if (watchPollInterval) clearInterval(watchPollInterval);
     if (logPollingInterval) clearInterval(logPollingInterval);
     if (autoClearTimer) clearTimeout(autoClearTimer);
   });
+
+  let inactivityTimer = null;
+
+  function resetInactivityTimer() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    const mins = Number(appConfig?.gui?.auto_lock_minutes) || 0;
+    if (mins > 0 && isVaultUnlocked) {
+      inactivityTimer = setTimeout(lockSessionByInactivity, mins * 60 * 1000);
+    }
+  }
+
+  function lockSessionByInactivity() {
+    password = "";
+    isVaultUnlocked = false;
+    inputText = "";
+    outputText = "";
+    textToAudit = "";
+    detectedItems = [];
+    statusMessage = "🔒 Bóveda y sesión bloqueadas automáticamente por inactividad.";
+  }
 
   function handleKeydown(e) {
     if (e.key === "Escape") {
@@ -225,10 +265,24 @@
     }
   }
 
+  function applyThemeFromConfig() {
+    const t = appConfig?.gui?.theme || "system";
+    if (t === "dark") {
+      darkMode = true;
+    } else if (t === "light") {
+      darkMode = false;
+    } else {
+      darkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    updateThemeClass();
+  }
+
   function toggleTheme() {
     darkMode = !darkMode;
-    localStorage.setItem("theme", darkMode ? "dark" : "light");
+    appConfig.gui.theme = darkMode ? "dark" : "light";
+    localStorage.setItem("theme", appConfig.gui.theme);
     updateThemeClass();
+    saveSettings();
   }
 
   function openHelp(tabKey) {
@@ -259,7 +313,20 @@
         if (!["ambos", "arrastrar", "botones"].includes(cfg.gui.file_selection_mode)) {
           cfg.gui.file_selection_mode = "ambos";
         }
+        if (typeof cfg.gui.close_to_tray !== "boolean") {
+          cfg.gui.close_to_tray = true;
+        }
+        if (!cfg.gui.output_suffix) {
+          cfg.gui.output_suffix = "_obfuscated";
+        }
+        if (!["small", "medium", "large"].includes(cfg.gui.font_size)) {
+          cfg.gui.font_size = "medium";
+        }
+        if (!["system", "dark", "light"].includes(cfg.gui.theme)) {
+          cfg.gui.theme = "system";
+        }
         appConfig = cfg;
+        applyThemeFromConfig();
         if (cfg.gui.default_tab && cfg.gui.tabs[`show_${cfg.gui.default_tab}`] !== false) {
           activeTab = cfg.gui.default_tab;
         }
@@ -273,6 +340,15 @@
     try {
       if (!["ambos", "arrastrar", "botones"].includes(appConfig?.gui?.file_selection_mode)) {
         appConfig.gui.file_selection_mode = "ambos";
+      }
+      if (!appConfig?.gui?.output_suffix) {
+        appConfig.gui.output_suffix = "_obfuscated";
+      }
+      if (!["small", "medium", "large"].includes(appConfig?.gui?.font_size)) {
+        appConfig.gui.font_size = "medium";
+      }
+      if (!["system", "dark", "light"].includes(appConfig?.gui?.theme)) {
+        appConfig.gui.theme = "system";
       }
       await invokeTauri("save_app_settings", { config: appConfig });
       statusMessage = "✅ Configuración guardada en ~/.lexishield/config.toml";
@@ -1473,6 +1549,18 @@
         🐞
       </button>
 
+      <!-- Botón Modo Privacidad / Desenfoque de Pantalla -->
+      <button
+        on:click={() => {
+          appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
+          saveSettings();
+        }}
+        class="w-8 h-8 rounded-lg flex items-center justify-center transition border {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+        title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados (Pasa el cursor por encima para verlos)" : "Activar Modo Privacidad (Desenfocar datos originales para compartir pantalla)"}
+      >
+        {privacyBlur ? "🙈" : "👁️"}
+      </button>
+
       <!-- Botón Tema Claro/Oscuro -->
       <button
         on:click={toggleTheme}
@@ -1589,7 +1677,7 @@
             <textarea
               bind:value={inputText}
               placeholder="Pega aquí el contenido a ofuscar o desofuscar (JSON, Logs, XML, código)..."
-              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text"
+              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text {privacyBlur ? 'privacy-blurred' : ''}"
             ></textarea>
           </div>
 
@@ -1621,7 +1709,7 @@
               bind:value={outputText}
               readonly
               placeholder="El resultado sanitizado o desofuscado aparecerá aquí..."
-              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text"
+              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text"
             ></textarea>
           </div>
         </div>
@@ -1729,7 +1817,7 @@
             <textarea
               bind:value={textToAudit}
               placeholder="Pega aquí cualquier fragmento de texto, log o código para extraer y clasificar sus tokens confidenciales..."
-              class="w-full h-28 bg-white dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/10 p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text"
+              class="w-full h-28 bg-white dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/10 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text {privacyBlur ? 'privacy-blurred' : ''}"
             ></textarea>
             <div class="flex items-center justify-between flex-wrap gap-2">
               <span class="text-[11px] text-slate-500 dark:text-slate-400">
@@ -1878,7 +1966,7 @@
         {/if}
 
         <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
-          <table class="w-full text-left text-xs font-mono">
+          <table class="w-full text-left font-mono {editorFontSizeClass}">
             <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
               <tr>
                 <th class="p-3 w-12 text-center">
@@ -1924,7 +2012,7 @@
                       {item.detector_type}
                     </span>
                   </td>
-                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text">{item.original}</td>
+                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
                   <td class="p-3 font-mono select-text {item.omitted ? 'text-slate-400 dark:text-slate-500' : 'text-primary-700 dark:text-primary-400'}">
                     {item.omitted || item.pseudonym === '=' ? '=' : item.pseudonym}
                   </td>
@@ -2611,6 +2699,96 @@
                 </select>
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                   Configura cómo interactuar con archivos en Studio y Escáner. Exige que al menos una opción permanezca activa en todo momento.
+                </p>
+              </div>
+            </div>
+
+            <!-- Escritorio y Salida de Archivos -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Escritorio y Salida de Archivos</span>
+              
+              <div>
+                <label for="config-output-suffix-input" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sufijo para copias procesadas en Studio:</label>
+                <input
+                  id="config-output-suffix-input"
+                  type="text"
+                  bind:value={appConfig.gui.output_suffix}
+                  placeholder="_obfuscated"
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
+                />
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Se añadirá automáticamente antes de la extensión (ej. <code>archivo{appConfig.gui.output_suffix || '_obfuscated'}.json</code>).
+                </p>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" bind:checked={appConfig.gui.close_to_tray} class="rounded accent-primary-500" />
+                  <span>Minimizar a la bandeja del sistema (reloj) al cerrar [X]</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Aspecto, Tipografía y Privacidad -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Aspecto y Accesibilidad</span>
+              
+              <div class="space-y-3">
+                <div>
+                  <label for="config-theme-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tema Visual:</label>
+                  <select
+                    id="config-theme-select"
+                    bind:value={appConfig.gui.theme}
+                    on:change={applyThemeFromConfig}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                  >
+                    <option value="system">🖥️ Seguir tema del sistema</option>
+                    <option value="dark">🌙 Modo Oscuro</option>
+                    <option value="light">☀️ Modo Claro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="config-font-size-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tamaño de letra en editores y tablas:</label>
+                  <select
+                    id="config-font-size-select"
+                    bind:value={appConfig.gui.font_size}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                  >
+                    <option value="small">Compacta (11px) - Máxima densidad</option>
+                    <option value="medium">Estándar (12px) - Equilibrada</option>
+                    <option value="large">Ampliada (14px) - Pantallas 2K/4K</option>
+                  </select>
+                </div>
+
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.privacy_blur} class="rounded accent-primary-500" />
+                    <span>Activar Modo Privacidad (Desenfoque de pantalla) por defecto</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Seguridad y Cero Conocimiento -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Seguridad y Bóvedas</span>
+              
+              <div>
+                <label for="config-auto-lock-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Auto-bloqueo de bóveda por inactividad:</label>
+                <select
+                  id="config-auto-lock-select"
+                  bind:value={appConfig.gui.auto_lock_minutes}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value={0}>🛡️ Desactivado (Mantener desbloqueada)</option>
+                  <option value={1}>⏱️ Bloquear tras 1 minuto sin actividad</option>
+                  <option value={5}>⏱️ Bloquear tras 5 minutos sin actividad</option>
+                  <option value={15}>⏱️ Bloquear tras 15 minutos sin actividad</option>
+                  <option value={30}>⏱️ Bloquear tras 30 minutos sin actividad</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                  Al activarse, LexiShield descarga de la memoria RAM la contraseña y los mapeos si no se detecta actividad del usuario.
                 </p>
               </div>
             </div>

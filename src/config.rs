@@ -373,6 +373,18 @@ pub struct GuiConfig {
     pub clipboard: GuiClipboardConfig,
     #[serde(default = "default_file_selection_mode")]
     pub file_selection_mode: String,
+    #[serde(default = "default_true")]
+    pub close_to_tray: bool,
+    #[serde(default = "default_output_suffix")]
+    pub output_suffix: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: String,
+    #[serde(default)]
+    pub privacy_blur: bool,
+    #[serde(default)]
+    pub auto_lock_minutes: u32,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 }
 
 fn default_default_tab() -> String {
@@ -381,6 +393,18 @@ fn default_default_tab() -> String {
 
 fn default_file_selection_mode() -> String {
     "ambos".to_string()
+}
+
+fn default_output_suffix() -> String {
+    "_obfuscated".to_string()
+}
+
+fn default_font_size() -> String {
+    "medium".to_string()
+}
+
+fn default_theme() -> String {
+    "system".to_string()
 }
 
 impl GuiConfig {
@@ -402,6 +426,12 @@ impl Default for GuiConfig {
             tabs: GuiTabsConfig::default(),
             clipboard: GuiClipboardConfig::default(),
             file_selection_mode: default_file_selection_mode(),
+            close_to_tray: true,
+            output_suffix: default_output_suffix(),
+            font_size: default_font_size(),
+            privacy_blur: false,
+            auto_lock_minutes: 0,
+            theme: default_theme(),
         }
     }
 }
