@@ -49,19 +49,21 @@ impl ObfuscatorEngine {
         let mut contextual_mappings = Vec::new();
 
         // Si el contenido es JSON válido, extraer primero los mapeos guiados por clave/ruta
-        if crate::format_adapters::json_adapter::JsonAdapter::is_valid_json(content)
-            && let Ok(json_val) = serde_json::from_str::<serde_json::Value>(content)
-        {
-            let extracted = self.format_orchestrator.json.extract_contextual_mappings(
-                &json_val,
-                &self.detectors.hostname,
-                &self.detectors.sid,
-            );
-            for m in extracted {
-                if let Some(ref mut cb) = on_found {
-                    cb(&m);
+        if crate::format_adapters::json_adapter::JsonAdapter::is_valid_json(content) {
+            let json_stream =
+                crate::format_adapters::json_adapter::JsonAdapter::parse_json_stream(content);
+            for json_val in &json_stream {
+                let extracted = self.format_orchestrator.json.extract_contextual_mappings(
+                    json_val,
+                    &self.detectors.hostname,
+                    &self.detectors.sid,
+                );
+                for m in extracted {
+                    if let Some(ref mut cb) = on_found {
+                        cb(&m);
+                    }
+                    contextual_mappings.push(m);
                 }
-                contextual_mappings.push(m);
             }
         }
 

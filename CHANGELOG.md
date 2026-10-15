@@ -26,6 +26,10 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - Nuevo panel interactivo en el Escáner para pegar y auditar texto al vuelo con botón de puente rápido hacia Studio (*"Enviar a Studio"*).
   - Activada por defecto la opción *"Guardar en copia sufijada"* (`copyMode = true`) en Studio para evitar sobreescritura accidental de archivos de origen.
   - El botón *"Limpiar"* de Studio restablece ahora de forma atómica tanto la entrada original como el resultado procesado.
+  - Botón *"Limpiar"* en el panel de texto del Escáner y botón *"Limpiar Resultados"* en la barra de acciones para reiniciar la vista sin perder el contexto.
+- **📄 Soporte Nativo de Flujos Multi-Alerta NDJSON (*JSON Lines*)**:
+  - Detección, procesamiento y desofuscación integral de flujos con múltiples objetos JSON consecutivos (formato estándar de logs Wazuh `/var/ossec/logs/alerts/alerts.json`), extrayendo mapeos contextuales de todo el flujo y reconstruyendo el formato línea por línea con validación sintáctica completa.
+  - Flujo de trabajo ágil en el Escáner: notificaciones no bloqueantes en línea y mantenimiento del panel de texto abierto si se obtienen cero detecciones.
 
 ### Mejorado
 - **📦 Actualización de Infraestructura CI/CD en GitHub Actions**:
