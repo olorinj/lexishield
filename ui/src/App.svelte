@@ -644,6 +644,7 @@
       };
 
       statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados.`;
+      showTextScanPanel = false; // Ocultar el panel de entrada para mostrar directamente la tabla de hallazgos
       actionResultModal = {
         title: "Análisis de Texto Finalizado",
         type: "info",
@@ -656,6 +657,12 @@
       };
     } catch (err) {
       statusMessage = "Error al analizar texto: " + err;
+      actionResultModal = {
+        title: "Error al Analizar Texto",
+        type: "info",
+        message: `No se pudo analizar el texto proporcionado: ${err}`,
+        details: []
+      };
     } finally {
       loading = false;
     }
