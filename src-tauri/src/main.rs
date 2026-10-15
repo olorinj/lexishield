@@ -5,7 +5,7 @@ use lexishield::config::load_config_with_rules;
 use lexishield::crypto::{load_mappings_auto, save_mappings_auto};
 use lexishield::engine::ObfuscatorEngine;
 use lexishield::logger::{
-    clear_logs, get_recent_logs, init_logger, is_debug_mode, set_debug_mode, LogEntry,
+    LogEntry, clear_logs, get_recent_logs, init_logger, is_debug_mode, set_debug_mode,
 };
 use lexishield::models::{DetectorType, FormatType, Mapping, ObfuscationReport};
 use serde::{Deserialize, Serialize};
@@ -76,15 +76,22 @@ fn obfuscate_content(
         let p = Path::new(path_str);
         if p.exists() {
             let existing = load_mappings_auto(p, password.as_deref()).map_err(|e| e.to_string())?;
-            engine.manager.load_mappings(existing).map_err(|e| e.to_string())?;
+            engine
+                .manager
+                .load_mappings(existing)
+                .map_err(|e| e.to_string())?;
         }
     }
 
     // Escanear y registrar nuevos mapeos
-    engine.scan_and_register_mappings(&text).map_err(|e| e.to_string())?;
+    engine
+        .scan_and_register_mappings(&text)
+        .map_err(|e| e.to_string())?;
 
     let format = parse_format(&format_str);
-    let (obfuscated, report) = engine.obfuscate_text(&text, format).map_err(|e| e.to_string())?;
+    let (obfuscated, report) = engine
+        .obfuscate_text(&text, format)
+        .map_err(|e| e.to_string())?;
     let all_mappings = engine.manager.get_mappings();
 
     // Guardar en la bóveda si se especificó ruta
@@ -120,20 +127,28 @@ fn deobfuscate_content(
     let mut engine = ObfuscatorEngine::new(config);
 
     if let Some(mappings) = custom_mappings {
-        engine.manager.load_mappings(mappings).map_err(|e| e.to_string())?;
+        engine
+            .manager
+            .load_mappings(mappings)
+            .map_err(|e| e.to_string())?;
     } else if let Some(ref path_str) = vault_path {
         let p = Path::new(path_str);
         if !p.exists() {
             return Err("El archivo de bóveda o mapeos no existe".to_string());
         }
         let loaded = load_mappings_auto(p, password.as_deref()).map_err(|e| e.to_string())?;
-        engine.manager.load_mappings(loaded).map_err(|e| e.to_string())?;
+        engine
+            .manager
+            .load_mappings(loaded)
+            .map_err(|e| e.to_string())?;
     } else {
         return Err("Se requiere una bóveda o lista de mapeos para desofuscar".to_string());
     }
 
     let format = parse_format(&format_str);
-    let (deobfuscated, report) = engine.deobfuscate_text(&text, format).map_err(|e| e.to_string())?;
+    let (deobfuscated, report) = engine
+        .deobfuscate_text(&text, format)
+        .map_err(|e| e.to_string())?;
 
     log::info!(
         "Studio: Texto desofuscado (formato: '{}', tokens restaurados: {}, tiempo: {:.1} ms, bóveda: '{}')",
@@ -150,19 +165,22 @@ fn deobfuscate_content(
 }
 
 #[tauri::command]
-fn scan_content(
-    text: String,
-) -> Result<Vec<DetectedItem>, String> {
+fn scan_content(text: String) -> Result<Vec<DetectedItem>, String> {
     let config = load_config_with_rules(None, None);
     let mut engine = ObfuscatorEngine::new(config);
 
-    let detected = engine.scan_and_register_mappings(&text).map_err(|e| e.to_string())?;
-    let items = detected.into_iter().map(|m| DetectedItem {
-        original: m.original,
-        pseudonym: m.pseudonym,
-        detector_type: m.detector_type.to_string(),
-        omitted: m.omitted,
-    }).collect();
+    let detected = engine
+        .scan_and_register_mappings(&text)
+        .map_err(|e| e.to_string())?;
+    let items = detected
+        .into_iter()
+        .map(|m| DetectedItem {
+            original: m.original,
+            pseudonym: m.pseudonym,
+            detector_type: m.detector_type.to_string(),
+            omitted: m.omitted,
+        })
+        .collect();
 
     Ok(items)
 }
@@ -298,12 +316,15 @@ fn read_vault_file(path: String, password: Option<String>) -> Result<Vec<Detecte
         return Err("El archivo no existe".to_string());
     }
     let mappings = load_mappings_auto(p, password.as_deref()).map_err(|e| e.to_string())?;
-    Ok(mappings.into_iter().map(|m| DetectedItem {
-        original: m.original,
-        pseudonym: m.pseudonym,
-        detector_type: m.detector_type.to_string(),
-        omitted: m.omitted,
-    }).collect())
+    Ok(mappings
+        .into_iter()
+        .map(|m| DetectedItem {
+            original: m.original,
+            pseudonym: m.pseudonym,
+            detector_type: m.detector_type.to_string(),
+            omitted: m.omitted,
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -312,14 +333,18 @@ fn save_vault_file(
     password: Option<String>,
     items: Vec<DetectedItem>,
 ) -> Result<String, String> {
-    let mappings: Vec<Mapping> = items.into_iter().map(|it| {
-        Mapping {
+    let mappings: Vec<Mapping> = items
+        .into_iter()
+        .map(|it| Mapping {
             original: it.original,
             pseudonym: it.pseudonym,
-            detector_type: it.detector_type.parse().unwrap_or(DetectorType::Custom(it.detector_type)),
+            detector_type: it
+                .detector_type
+                .parse()
+                .unwrap_or(DetectorType::Custom(it.detector_type)),
             omitted: it.omitted,
-        }
-    }).collect();
+        })
+        .collect();
 
     let p = Path::new(&path);
     save_mappings_auto(p, &mappings, password.as_deref()).map_err(|e| e.to_string())?;
@@ -375,7 +400,10 @@ fn export_office_to_md_with_pandoc(doc_path: &Path) -> Result<std::path::PathBuf
         .map_err(|e| format!("Error al ejecutar pandoc: {e}"))?;
 
     if !status.success() {
-        return Err(format!("Pandoc terminó con código de salida: {:?}", status.code()));
+        return Err(format!(
+            "Pandoc terminó con código de salida: {:?}",
+            status.code()
+        ));
     }
     Ok(md_path)
 }
@@ -396,12 +424,17 @@ fn process_file_command(
         let p = Path::new(path_str);
         if p.exists() {
             let loaded = load_mappings_auto(p, password.as_deref()).map_err(|e| e.to_string())?;
-            engine.manager.load_mappings(loaded).map_err(|e| e.to_string())?;
+            engine
+                .manager
+                .load_mappings(loaded)
+                .map_err(|e| e.to_string())?;
         }
     }
 
     if !reverse {
-        engine.scan_file(Path::new(&input_path)).map_err(|e| e.to_string())?;
+        engine
+            .scan_file(Path::new(&input_path))
+            .map_err(|e| e.to_string())?;
         if let Some(ref path_str) = vault_path {
             let p = Path::new(path_str);
             let all_mappings = engine.manager.get_mappings();
@@ -437,7 +470,10 @@ fn process_file_command(
 #[tauri::command]
 fn reset_config_command() -> Result<String, String> {
     let path = lexishield::config::reset_config().map_err(|e| e.to_string())?;
-    Ok(format!("Configuración restablecida con éxito en: {}", path.display()))
+    Ok(format!(
+        "Configuración restablecida con éxito en: {}",
+        path.display()
+    ))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -518,23 +554,28 @@ fn scan_file_command(
         }
     };
 
-    let detected = engine.scan_file_with_cb(p, Some(&mut cb)).map_err(|e| e.to_string())?;
+    let detected = engine
+        .scan_file_with_cb(p, Some(&mut cb))
+        .map_err(|e| e.to_string())?;
     let total = detected.len();
 
     scan_cache.record_file(p, current_rules_hash, total);
     let _ = scan_cache.save();
-    
+
     let mut summary = std::collections::HashMap::new();
     for m in &detected {
         *summary.entry(m.detector_type.to_string()).or_insert(0) += 1;
     }
 
-    let items: Vec<DetectedItem> = detected.into_iter().map(|m| DetectedItem {
-        original: m.original,
-        pseudonym: m.pseudonym,
-        detector_type: m.detector_type.to_string(),
-        omitted: m.omitted,
-    }).collect();
+    let items: Vec<DetectedItem> = detected
+        .into_iter()
+        .map(|m| DetectedItem {
+            original: m.original,
+            pseudonym: m.pseudonym,
+            detector_type: m.detector_type.to_string(),
+            omitted: m.omitted,
+        })
+        .collect();
 
     log::info!(
         "Escáner: Archivo individual analizado '{}' -> {} tokens detectados",
@@ -645,7 +686,12 @@ async fn scan_directory_command(
         let mut files_ignored = 0;
         let mut last_emit = std::time::Instant::now();
         let mut accumulated_new_items: Vec<DetectedItem> = Vec::new();
-        let mut emitted_originals: std::collections::HashSet<String> = engine.manager.get_mappings().into_iter().map(|m| m.original).collect();
+        let mut emitted_originals: std::collections::HashSet<String> = engine
+            .manager
+            .get_mappings()
+            .into_iter()
+            .map(|m| m.original)
+            .collect();
 
         for result in builder.build() {
             if SCAN_CANCELLED.load(Ordering::Relaxed) {
@@ -671,7 +717,9 @@ async fn scan_directory_command(
 
                     // Comprobación híbrida en caché de 2 fases (Fast-path metadatos + Hash parcial)
                     let cache_check = scan_cache.check_file(path, current_rules_hash);
-                    if let lexishield::cache::CacheCheckResult::Skip { entities_found: _ } = cache_check {
+                    if let lexishield::cache::CacheCheckResult::Skip { entities_found: _ } =
+                        cache_check
+                    {
                         files_scanned += 1;
                         log::debug!("Caché HIT (Fase 1/2): {} (omitido re-análisis)", path_str);
                         continue;
@@ -685,7 +733,7 @@ async fn scan_directory_command(
 
                     let app_clone = app.clone();
                     let p_str = path_str.clone();
-                    
+
                     let mut cb = |m: &lexishield::models::Mapping| {
                         if !emitted_originals.contains(&m.original) {
                             emitted_originals.insert(m.original.clone());
@@ -695,16 +743,19 @@ async fn scan_directory_command(
                                 detector_type: m.detector_type.to_string(),
                                 omitted: m.omitted,
                             });
-                            
+
                             if last_emit.elapsed().as_millis() >= 250 {
                                 let items_to_send = accumulated_new_items.clone();
                                 accumulated_new_items.clear();
-                                let _ = app_clone.emit("scan-progress", ScanProgressPayload {
-                                    current_file: p_str.clone(),
-                                    files_scanned,
-                                    entities_found: emitted_originals.len(),
-                                    new_items: items_to_send,
-                                });
+                                let _ = app_clone.emit(
+                                    "scan-progress",
+                                    ScanProgressPayload {
+                                        current_file: p_str.clone(),
+                                        files_scanned,
+                                        entities_found: emitted_originals.len(),
+                                        new_items: items_to_send,
+                                    },
+                                );
                                 last_emit = std::time::Instant::now();
                             }
                         }
@@ -714,7 +765,11 @@ async fn scan_directory_command(
                         files_scanned += 1;
                         let entities_now = engine.manager.get_mappings().len();
                         scan_cache.record_file(path, current_rules_hash, entities_now);
-                        log::info!("Analizado: {} (Total entidades: {})", path_str, entities_now);
+                        log::info!(
+                            "Analizado: {} (Total entidades: {})",
+                            path_str,
+                            entities_now
+                        );
                         if let Ok(mut status) = get_current_scan_status().lock() {
                             status.files_scanned = files_scanned;
                             status.entities_found = entities_now;
@@ -819,15 +874,24 @@ fn list_all_vaults() -> Result<Vec<lexishield::models::VaultFileInfo>, String> {
 
 #[tauri::command]
 fn create_vault_file(name: String, password: Option<String>) -> Result<String, String> {
-    let path = lexishield::vault::create_vault(&name, password.as_deref()).map_err(|e| e.to_string())?;
-    log::info!("Bóvedas: Creada nueva bóveda '{}' ({})", name, path.display());
+    let path =
+        lexishield::vault::create_vault(&name, password.as_deref()).map_err(|e| e.to_string())?;
+    log::info!(
+        "Bóvedas: Creada nueva bóveda '{}' ({})",
+        name,
+        path.display()
+    );
     Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 fn rename_vault_file(old_name: String, new_name: String) -> Result<String, String> {
     let path = lexishield::vault::rename_vault(&old_name, &new_name).map_err(|e| e.to_string())?;
-    log::info!("Bóvedas: Bóveda renombrada de '{}' a '{}'", old_name, new_name);
+    log::info!(
+        "Bóvedas: Bóveda renombrada de '{}' a '{}'",
+        old_name,
+        new_name
+    );
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -847,15 +911,23 @@ fn export_vault_file(name: String, dest_path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn import_vault_file(src_path: String, name: Option<String>) -> Result<String, String> {
-    let path = lexishield::vault::import_vault(Path::new(&src_path), name.as_deref()).map_err(|e| e.to_string())?;
-    log::info!("Bóvedas: Bóveda importada desde '{}' como '{}'", src_path, path.display());
+    let path = lexishield::vault::import_vault(Path::new(&src_path), name.as_deref())
+        .map_err(|e| e.to_string())?;
+    log::info!(
+        "Bóvedas: Bóveda importada desde '{}' como '{}'",
+        src_path,
+        path.display()
+    );
     Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 fn restore_vault_backup_file(name: String) -> Result<String, String> {
     let path = lexishield::vault::restore_vault_backup(&name).map_err(|e| e.to_string())?;
-    log::info!("Bóvedas: Copia de seguridad restaurada para bóveda '{}'", name);
+    log::info!(
+        "Bóvedas: Copia de seguridad restaurada para bóveda '{}'",
+        name
+    );
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -869,7 +941,10 @@ fn has_vault_backup_file(name: String) -> Result<bool, String> {
 // -----------------------------------------------------------------------------
 
 #[tauri::command]
-fn create_backup_file(output_path: Option<String>, password: Option<String>) -> Result<String, String> {
+fn create_backup_file(
+    output_path: Option<String>,
+    password: Option<String>,
+) -> Result<String, String> {
     let out_path = if let Some(p) = output_path {
         std::path::PathBuf::from(p)
     } else {
@@ -881,13 +956,15 @@ fn create_backup_file(output_path: Option<String>, password: Option<String>) -> 
         config_dir.join(format!("backup_lexishield_{ts}.tar.bz2"))
     };
 
-    let res = lexishield::backup::create_backup(&out_path, password.as_deref()).map_err(|e| e.to_string())?;
+    let res = lexishield::backup::create_backup(&out_path, password.as_deref())
+        .map_err(|e| e.to_string())?;
     Ok(res.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 fn restore_backup_file(input_path: String, password: Option<String>) -> Result<usize, String> {
-    lexishield::backup::restore_backup(Path::new(&input_path), password.as_deref()).map_err(|e| e.to_string())
+    lexishield::backup::restore_backup(Path::new(&input_path), password.as_deref())
+        .map_err(|e| e.to_string())
 }
 
 // -----------------------------------------------------------------------------
@@ -1034,6 +1111,11 @@ fn clear_debug_logs() -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn is_directory(path: String) -> bool {
+    Path::new(&path).is_dir()
+}
+
 fn main() {
     init_logger();
     tauri::Builder::default()
@@ -1064,7 +1146,71 @@ fn main() {
                     }
                 }
             }
+
+            // Configurar icono en la bandeja del sistema (System Tray junto al reloj)
+            let quit_i = tauri::menu::MenuItem::with_id(app, "tray_quit", "Salir de LexiShield", true, None::<&str>)?;
+            let show_i = tauri::menu::MenuItem::with_id(app, "tray_show", "Mostrar LexiShield", true, None::<&str>)?;
+            let tray_menu = tauri::menu::Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            if let Ok(tray_icon) = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png")) {
+                let _tray = tauri::tray::TrayIconBuilder::new()
+                    .icon(tray_icon)
+                    .tooltip("LexiShield - Motor de Ofuscación Semántica")
+                    .menu(&tray_menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "tray_quit" => {
+                            app.exit(0);
+                        }
+                        "tray_show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let tauri::tray::TrayIconEvent::Click {
+                            button: tauri::tray::MouseButton::Left,
+                            button_state: tauri::tray::MouseButtonState::Up,
+                            ..
+                        } = event
+                        {
+                            let app = tray.app_handle();
+                            if let Some(window) = app.get_webview_window("main") {
+                                if window.is_visible().unwrap_or(false) {
+                                    if window.is_minimized().unwrap_or(false) {
+                                        let _ = window.unminimize();
+                                        let _ = window.set_focus();
+                                    } else {
+                                        let _ = window.hide();
+                                    }
+                                } else {
+                                    let _ = window.show();
+                                    let _ = window.unminimize();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                    })
+                    .build(app)?;
+            }
+
             Ok(())
+        })
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                // Al cerrar, ocultar a la bandeja del sistema en vez de terminar el proceso
+                let _ = window.hide();
+                api.prevent_close();
+            }
+            tauri::WindowEvent::Resized(_) if window.is_minimized().unwrap_or(false) => {
+                // Si la ventana ha sido minimizada, ocultarla a la barra del reloj
+                let _ = window.hide();
+            }
+            _ => {}
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -1104,9 +1250,9 @@ fn main() {
             get_debug_logs,
             clear_debug_logs,
             clear_scan_cache_command,
-            check_pandoc_available
+            check_pandoc_available,
+            is_directory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { fade, slide } from "svelte/transition";
   import { invoke } from "@tauri-apps/api/core";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
   import packageInfo from "../package.json";
@@ -46,18 +47,22 @@
   let vaultMappings = [];
 
   // Opciones de Ofuscación
-  let copyMode = false;
+  let copyMode = true; // Por defecto guardar en copia sufijada
   let copySuffix = "_obfuscated";
   let cleanCache = false;
   let hasPandoc = false;
   let exportMarkdown = false;
 
-  // Estado del Escáner
+  // Estado del Escáner y Drag & Drop
   let detectedItems = [];
   let auditSummary = null;
   let recursiveScan = false;
   let noGitIgnoreScan = true;
   let isScanningDirectory = false;
+  let showTextScanPanel = false;
+  let textToAudit = "";
+  let isDragging = false;
+  let unlistenDragDrop = null;
   let scanCurrentFile = "";
   let scanFilesCount = 0;
   let scanFilesIgnored = 0;
@@ -168,11 +173,33 @@
     } catch (err) {
       console.warn("No se pudieron registrar eventos de Tauri:", err);
     }
+
+    // 5. Escucha de eventos Drag & Drop de Tauri para arrastrar ficheros o carpetas
+    try {
+      const webview = getCurrentWebview();
+      unlistenDragDrop = await webview.onDragDropEvent(async (event) => {
+        if (event.payload.type === "enter" || event.payload.type === "over") {
+          isDragging = true;
+        } else if (event.payload.type === "leave") {
+          isDragging = false;
+        } else if (event.payload.type === "drop") {
+          isDragging = false;
+          const paths = event.payload.paths;
+          if (paths && paths.length > 0) {
+            await handleDroppedPath(paths[0]);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn("Listener de Drag & Drop de Tauri no disponible:", err);
+    }
+
     window.addEventListener("keydown", handleKeydown);
   });
 
   onDestroy(() => {
     window.removeEventListener("keydown", handleKeydown);
+    if (unlistenDragDrop) unlistenDragDrop();
     if (scanPollTimer) clearInterval(scanPollTimer);
     if (watchPollInterval) clearInterval(watchPollInterval);
     if (logPollingInterval) clearInterval(logPollingInterval);
@@ -425,17 +452,9 @@
     }
   }
 
-  async function openFileToProcess() {
+  async function processFilePathInStudio(selected) {
+    if (!selected) return;
     try {
-      const selected = await open({
-        filters: [
-          { name: "Documentos y Logs", extensions: ["txt", "log", "json", "xml", "csv", "tsv", "docx", "xlsx", "pptx", "md", "markdown"] },
-          { name: "Todos los archivos", extensions: ["*"] }
-        ],
-        multiple: false
-      });
-      if (!selected) return;
-
       loading = true;
       let outPath = selected;
       if (copyMode) {
@@ -478,20 +497,33 @@
     }
   }
 
-  // Operaciones del Escáner
-  async function openFileToAudit() {
+  async function openFileToProcess() {
     try {
       const selected = await open({
-        filters: [{ name: "Archivos de texto y logs", extensions: ["*"] }],
+        filters: [
+          { name: "Documentos y Logs", extensions: ["txt", "log", "json", "xml", "csv", "tsv", "docx", "xlsx", "pptx", "md", "markdown"] },
+          { name: "Todos los archivos", extensions: ["*"] }
+        ],
         multiple: false
       });
-      if (!selected) return;
+      if (selected) {
+        await processFilePathInStudio(selected);
+      }
+    } catch (err) {
+      statusMessage = "Error al abrir archivo: " + err;
+    }
+  }
+
+  // Operaciones del Escáner y Drag & Drop
+  async function auditFilePath(filePath) {
+    if (!filePath) return;
+    try {
       loading = true;
       detectedItems = [];
       auditSummary = null;
       activeTab = "scanner";
       const res = await invokeTauri("scan_file_command", {
-        path: selected,
+        path: filePath,
         vaultPath: pairsSelectedVault || vaultPath || null,
         password: password || null
       });
@@ -503,7 +535,7 @@
         type: "info",
         message: `El análisis del archivo ha finalizado satisfactoriamente sin modificar su contenido original.`,
         details: [
-          { label: "Archivo Inspeccionado", value: selected.split('/').pop() },
+          { label: "Archivo Inspeccionado", value: filePath.split('/').pop() },
           { label: "Tokens Confidenciales", value: `${res.total_entities}` },
           { label: "Falsos Positivos Omitidos", value: `${(res.items || []).filter(i => i.omitted).length}` }
         ]
@@ -515,14 +547,23 @@
     }
   }
 
-  async function openDirectoryToAudit() {
+  async function openFileToAudit() {
     try {
       const selected = await open({
-        directory: true,
+        filters: [{ name: "Archivos de texto y logs", extensions: ["*"] }],
         multiple: false
       });
-      if (!selected) return;
+      if (selected) {
+        await auditFilePath(selected);
+      }
+    } catch (err) {
+      statusMessage = "Error al abrir archivo: " + err;
+    }
+  }
 
+  async function auditDirectoryPath(dirPath) {
+    if (!dirPath) return;
+    try {
       loading = true;
       isScanningDirectory = true;
       detectedItems = [];
@@ -532,16 +573,15 @@
       scanFilesCount = 0;
       scanFilesIgnored = 0;
       scanEntitiesCount = 0;
-      statusMessage = "Escaneando carpeta: " + selected;
+      statusMessage = "Escaneando carpeta: " + dirPath;
 
       const res = await invokeTauri("scan_directory_command", {
-        dirPath: selected,
+        dirPath,
         recursive: recursiveScan,
         noGitIgnore: noGitIgnoreScan,
         vaultPath: pairsSelectedVault || vaultPath || null,
         password: password || null
       });
-      // detectedItems ya se va llenando dinámicamente con los eventos 'scan-progress'
       auditSummary = res;
       statusMessage = `🔍 Directorio escaneado: ${res.files_scanned} analizados, ${res.files_ignored} omitidos, ${res.total_entities} tokens detectados.`;
       actionResultModal = {
@@ -549,7 +589,7 @@
         type: "info",
         message: `El recorrido del directorio ha concluido con éxito. Puedes revisar o activar tokens en la tabla inferior.`,
         details: [
-          { label: "Directorio", value: selected.split('/').pop() },
+          { label: "Directorio", value: dirPath.split('/').pop() },
           { label: "Archivos Analizados", value: `${res.files_scanned}` },
           { label: "Archivos Omitidos", value: `${res.files_ignored}` },
           { label: "Tokens Confidenciales", value: `${res.total_entities}` }
@@ -560,6 +600,101 @@
     } finally {
       loading = false;
       isScanningDirectory = false;
+    }
+  }
+
+  async function openDirectoryToAudit() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false
+      });
+      if (selected) {
+        await auditDirectoryPath(selected);
+      }
+    } catch (err) {
+      statusMessage = "Error al abrir carpeta: " + err;
+    }
+  }
+
+  async function scanPastedText() {
+    if (!textToAudit.trim()) return;
+    try {
+      loading = true;
+      detectedItems = [];
+      auditSummary = null;
+      activeTab = "scanner";
+
+      const res = await invokeTauri("scan_content", {
+        content: textToAudit,
+        vaultPath: pairsSelectedVault || vaultPath || null,
+        password: password || null
+      });
+
+      detectedItems = (res.items || []).map(item => ({
+        ...item,
+        file: "[Texto copiado]"
+      }));
+
+      auditSummary = {
+        files_scanned: 1,
+        files_ignored: 0,
+        total_entities: res.total_entities,
+        vault_used: pairsSelectedVault || "Sesión"
+      };
+
+      statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados.`;
+      actionResultModal = {
+        title: "Análisis de Texto Finalizado",
+        type: "info",
+        message: `Se han identificado los tokens confidenciales del fragmento copiado.`,
+        details: [
+          { label: "Origen", value: "Texto pegado en Escáner" },
+          { label: "Tokens Detectados", value: `${res.total_entities}` },
+          { label: "Longitud de Caracteres", value: `${textToAudit.length}` }
+        ]
+      };
+    } catch (err) {
+      statusMessage = "Error al analizar texto: " + err;
+    } finally {
+      loading = false;
+    }
+  }
+
+  function sendPastedTextToStudio() {
+    if (!textToAudit.trim()) return;
+    inputText = textToAudit;
+    activeTab = "studio";
+    statusMessage = "📋 Texto transferido a Studio. Listo para ofuscar o desofuscar.";
+  }
+
+  async function handleDroppedPath(droppedPath) {
+    if (!droppedPath) return;
+    try {
+      const isDir = await invokeTauri("is_directory", { path: droppedPath });
+      if (activeTab === "scanner") {
+        if (isDir) {
+          await auditDirectoryPath(droppedPath);
+        } else {
+          await auditFilePath(droppedPath);
+        }
+      } else if (activeTab === "studio") {
+        if (isDir) {
+          activeTab = "scanner";
+          await auditDirectoryPath(droppedPath);
+        } else {
+          await processFilePathInStudio(droppedPath);
+        }
+      } else {
+        activeTab = "scanner";
+        if (isDir) {
+          await auditDirectoryPath(droppedPath);
+        } else {
+          await auditFilePath(droppedPath);
+        }
+      }
+    } catch (err) {
+      statusMessage = "Error al procesar elemento arrastrado: " + err;
     }
   }
 
@@ -1413,8 +1548,13 @@
                 <span>📥</span> Entrada Original
               </span>
               <button
-                on:click={() => (inputText = "")}
+                on:click={() => {
+                  inputText = "";
+                  outputText = "";
+                  statusMessage = "Área de trabajo de Studio limpiada.";
+                }}
                 class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition"
+                title="Limpiar tanto la entrada original como el resultado procesado"
               >
                 Limpiar
               </button>
@@ -1432,13 +1572,23 @@
               <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <span>📤</span> Resultado Procesado
               </span>
-              <button
-                on:click={() => { navigator.clipboard.writeText(outputText); statusMessage = "📋 Copiado al portapapeles."; }}
-                disabled={!outputText}
-                class="text-primary-600 dark:text-primary-400 hover:underline text-xs font-semibold disabled:opacity-40 transition"
-              >
-                Copiar
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  on:click={() => { outputText = ""; }}
+                  disabled={!outputText}
+                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
+                  title="Limpiar solo el resultado"
+                >
+                  Limpiar
+                </button>
+                <button
+                  on:click={() => { navigator.clipboard.writeText(outputText); statusMessage = "📋 Copiado al portapapeles."; }}
+                  disabled={!outputText}
+                  class="text-primary-600 dark:text-primary-400 hover:underline text-xs font-semibold disabled:opacity-40 transition"
+                >
+                  Copiar
+                </button>
+              </div>
             </div>
             <textarea
               bind:value={outputText}
@@ -1499,6 +1649,13 @@
             </label>
 
             <button
+              on:click={() => (showTextScanPanel = !showTextScanPanel)}
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
+              title="Copiar y pegar texto para auditar tokens confidenciales"
+            >
+              <span>📋</span> Analizar Texto
+            </button>
+            <button
               on:click={openFileToAudit}
               disabled={loading}
               class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
@@ -1520,12 +1677,72 @@
             <div class="flex items-center gap-3">
               <span class="text-lg">🔍</span>
               <p class="text-slate-700 dark:text-slate-300">
-                <strong class="text-primary-600 dark:text-primary-400">¿Cómo funciona el Escáner?</strong> Inspecciona archivos o carpetas completas en busca de tokens confidenciales (DNI, tarjetas, IPv4, emails, GUIDs) sin modificar el disco. Puedes omitir falsos positivos desmarcando casillas antes de registrar los hallazgos en tu bóveda.
+                <strong class="text-primary-600 dark:text-primary-400">¿Cómo funciona el Escáner?</strong> Inspecciona archivos, carpetas o texto copiado en busca de tokens confidenciales (DNI, tarjetas, IPv4, emails, GUIDs) sin modificar el disco. Puedes omitir falsos positivos desmarcando casillas antes de registrar los hallazgos en tu bóveda.
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <button on:click={() => openHelp('scanner')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
               <button on:click={() => dismissTip('scanner')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
+            </div>
+          </div>
+        {/if}
+
+        {#if showTextScanPanel}
+          <div in:slide={{ duration: 150 }} class="mb-4 p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col gap-3 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <span>📋</span> Auditar Fragmento de Texto Copiado o Pegado
+              </span>
+              <button on:click={() => (showTextScanPanel = false)} class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                ✕ Cerrar
+              </button>
+            </div>
+            <textarea
+              bind:value={textToAudit}
+              placeholder="Pega aquí cualquier fragmento de texto, log o código para extraer y clasificar sus tokens confidenciales..."
+              class="w-full h-28 bg-white dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/10 p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text"
+            ></textarea>
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-[11px] text-slate-500 dark:text-slate-400">
+                Se identificarán tokens confidenciales y se cargarán en la tabla inferior sin tocar el disco.
+              </span>
+              <div class="flex items-center gap-2">
+                {#if textToAudit.trim()}
+                  <button
+                    on:click={sendPastedTextToStudio}
+                    class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1"
+                    title="Transferir este texto a Studio para ofuscarlo directamente"
+                  >
+                    <span>➡️</span> Enviar a Studio
+                  </button>
+                {/if}
+                <button
+                  on:click={scanPastedText}
+                  disabled={loading || !textToAudit.trim()}
+                  class="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <span>🔍</span> Analizar Tokens
+                </button>
+              </div>
+            </div>
+          </div>
+        {/if}
+
+        {#if detectedItems.length === 0 && !isScanningDirectory && !showTextScanPanel}
+          <div class="mb-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl flex flex-col items-center justify-center text-center gap-2 bg-slate-50/50 dark:bg-slate-900/30 transition hover:border-primary-500/50">
+            <span class="text-4xl mb-1">📂</span>
+            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">
+              Arrastra y suelta aquí cualquier archivo o carpeta
+            </p>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-md">
+              LexiShield detectará automáticamente si es un archivo individual o un directorio para iniciar la auditoría de tokens confidenciales.
+            </p>
+            <div class="flex items-center gap-2 mt-2">
+              <button on:click={openFileToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar archivo</button>
+              <span class="text-slate-400 text-xs">•</span>
+              <button on:click={openDirectoryToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar carpeta</button>
+              <span class="text-slate-400 text-xs">•</span>
+              <button on:click={() => (showTextScanPanel = true)} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Pegar texto</button>
             </div>
           </div>
         {/if}
@@ -3032,6 +3249,29 @@
             Aceptar
           </button>
         </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- OVERLAY VISUAL DE ARRASTRE DE ARCHIVOS O CARPETAS (DRAG & DROP) -->
+  {#if isDragging}
+    <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-8 pointer-events-none transition animate-in fade-in duration-200">
+      <div class="bg-white dark:bg-slate-900 border-2 border-dashed border-primary-500 rounded-3xl p-10 flex flex-col items-center gap-4 shadow-2xl text-center max-w-md">
+        <span class="text-6xl animate-bounce">📂</span>
+        <h3 class="text-base font-bold text-slate-900 dark:text-white">
+          {#if activeTab === "studio"}
+            Suelta tu archivo aquí para procesarlo en Studio
+          {:else}
+            Suelta tu archivo o carpeta aquí para escanear
+          {/if}
+        </h3>
+        <p class="text-xs text-slate-600 dark:text-slate-300">
+          {#if activeTab === "studio"}
+            Se ofuscarán los tokens confidenciales respetando el formato original y guardando en copia sufijada.
+          {:else}
+            LexiShield auditará los tokens confidenciales sin modificar los archivos originales en disco.
+          {/if}
+        </p>
       </div>
     </div>
   {/if}
