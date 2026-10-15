@@ -164,15 +164,47 @@ fn deobfuscate_content(
     })
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ScanAuditResponse {
+    pub files_scanned: usize,
+    pub files_ignored: usize,
+    pub total_entities: usize,
+    pub items: Vec<DetectedItem>,
+    pub summary_by_type: std::collections::HashMap<String, usize>,
+    pub path_analyzed: String,
+}
+
 #[tauri::command]
-fn scan_content(text: String) -> Result<Vec<DetectedItem>, String> {
+fn scan_content(
+    content: String,
+    vault_path: Option<String>,
+    password: Option<String>,
+) -> Result<ScanAuditResponse, String> {
     let config = load_config_with_rules(None, None);
     let mut engine = ObfuscatorEngine::new(config);
 
+    if let Some(ref vp) = vault_path
+        && !vp.trim().is_empty()
+    {
+        let v_path = Path::new(vp);
+        if v_path.exists()
+            && let Ok(existing) = load_mappings_auto(v_path, password.as_deref())
+        {
+            let _ = engine.manager.load_mappings(existing);
+        }
+    }
+
     let detected = engine
-        .scan_and_register_mappings(&text)
+        .scan_and_register_mappings(&content)
         .map_err(|e| e.to_string())?;
-    let items = detected
+    let total = detected.len();
+
+    let mut summary = std::collections::HashMap::new();
+    for m in &detected {
+        *summary.entry(m.detector_type.to_string()).or_insert(0) += 1;
+    }
+
+    let items: Vec<DetectedItem> = detected
         .into_iter()
         .map(|m| DetectedItem {
             original: m.original,
@@ -182,7 +214,14 @@ fn scan_content(text: String) -> Result<Vec<DetectedItem>, String> {
         })
         .collect();
 
-    Ok(items)
+    Ok(ScanAuditResponse {
+        files_scanned: 1,
+        files_ignored: 0,
+        total_entities: total,
+        items,
+        summary_by_type: summary,
+        path_analyzed: "[Texto copiado]".to_string(),
+    })
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -474,16 +513,6 @@ fn reset_config_command() -> Result<String, String> {
         "Configuración restablecida con éxito en: {}",
         path.display()
     ))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ScanAuditResponse {
-    pub files_scanned: usize,
-    pub files_ignored: usize,
-    pub total_entities: usize,
-    pub items: Vec<DetectedItem>,
-    pub summary_by_type: std::collections::HashMap<String, usize>,
-    pub path_analyzed: String,
 }
 
 #[tauri::command]
