@@ -1231,13 +1231,17 @@ fn main() {
         })
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
-                // Al cerrar, ocultar a la bandeja del sistema en vez de terminar el proceso
-                let _ = window.hide();
-                api.prevent_close();
+                let config = load_config_with_rules(None, None);
+                if config.gui.close_to_tray {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
             }
             tauri::WindowEvent::Resized(_) if window.is_minimized().unwrap_or(false) => {
-                // Si la ventana ha sido minimizada, ocultarla a la barra del reloj
-                let _ = window.hide();
+                let config = load_config_with_rules(None, None);
+                if config.gui.close_to_tray {
+                    let _ = window.hide();
+                }
             }
             _ => {}
         })
