@@ -57,6 +57,7 @@ impl ObfuscatorEngine {
                     json_val,
                     &self.detectors.hostname,
                     &self.detectors.sid,
+                    &self.detectors.domain,
                 );
                 for m in extracted {
                     if let Some(ref mut cb) = on_found {
