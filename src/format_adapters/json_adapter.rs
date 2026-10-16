@@ -4,7 +4,7 @@
 //! todas las claves (keys), tipos numéricos, booleanos, nulos y estructura de objetos/arrays.
 //! Además, implementa reglas contextuales por clave/ruta para logs de seguridad SIEM (Wazuh).
 
-use crate::detectors::network::HostnameDetector;
+use crate::detectors::network::{DomainDetector, HostnameDetector};
 use crate::detectors::windows::WindowsSidDetector;
 use crate::engine::replacer::apply_single_pass_replacements;
 use crate::models::{DetectorType, Mapping, ObfuscationError};
@@ -160,6 +160,7 @@ impl JsonAdapter {
         value: &Value,
         hostname_detector: &HostnameDetector,
         sid_detector: &WindowsSidDetector,
+        domain_detector: &DomainDetector,
     ) -> Vec<Mapping> {
         let mut mappings = Vec::new();
         let mut path_stack = Vec::new();
@@ -168,6 +169,7 @@ impl JsonAdapter {
             &mut path_stack,
             hostname_detector,
             sid_detector,
+            domain_detector,
             &mut mappings,
         );
         mappings
@@ -179,13 +181,21 @@ impl JsonAdapter {
         path: &mut Vec<String>,
         hostname_detector: &HostnameDetector,
         sid_detector: &WindowsSidDetector,
+        domain_detector: &DomainDetector,
         mappings: &mut Vec<Mapping>,
     ) {
         match val {
             Value::Object(map) => {
                 for (k, v) in map {
                     path.push(k.clone());
-                    self.traverse_and_extract(v, path, hostname_detector, sid_detector, mappings);
+                    self.traverse_and_extract(
+                        v,
+                        path,
+                        hostname_detector,
+                        sid_detector,
+                        domain_detector,
+                        mappings,
+                    );
                     path.pop();
                 }
             }
@@ -196,6 +206,7 @@ impl JsonAdapter {
                         path,
                         hostname_detector,
                         sid_detector,
+                        domain_detector,
                         mappings,
                     );
                 }
@@ -246,8 +257,39 @@ impl JsonAdapter {
                         let parts: Vec<&str> = s_trim.splitn(2, '.').collect();
                         let host_part = parts[0];
                         let domain_part = parts[1];
-                        let host_pseudo = hostname_detector.generate_pseudonym(host_part);
-                        format!("{host_pseudo}.{domain_part}")
+
+                        let host_pseudo = if let Some(existing) =
+                            mappings.iter().find(|m| m.original == host_part)
+                        {
+                            existing.pseudonym.clone()
+                        } else {
+                            let hp = hostname_detector.generate_pseudonym(host_part);
+                            mappings.push(Mapping::new(
+                                host_part,
+                                hp.clone(),
+                                DetectorType::Hostname,
+                            ));
+                            hp
+                        };
+
+                        if crate::stopwords::is_known_vendor_domain(domain_part) {
+                            format!("{host_pseudo}.{domain_part}")
+                        } else {
+                            let domain_pseudo = if let Some(existing) =
+                                mappings.iter().find(|m| m.original == domain_part)
+                            {
+                                existing.pseudonym.clone()
+                            } else {
+                                let dp = domain_detector.generate_pseudonym(domain_part);
+                                mappings.push(Mapping::new(
+                                    domain_part,
+                                    dp.clone(),
+                                    DetectorType::DomainFqdn,
+                                ));
+                                dp
+                            };
+                            format!("{host_pseudo}.{domain_pseudo}")
+                        }
                     } else {
                         hostname_detector.generate_pseudonym(s_trim)
                     };
@@ -260,8 +302,16 @@ impl JsonAdapter {
                     || (current_key_lower == "domain" && in_security))
                     && !mappings.iter().any(|m| m.original == s_trim)
                 {
-                    let pseudo = format!("DOMAIN_{:04X}", rand::random::<u16>());
-                    mappings.push(Mapping::new(s_trim, pseudo, DetectorType::DomainFqdn));
+                    let is_standard_sys = matches!(
+                        s_trim.to_uppercase().as_str(),
+                        "NT AUTHORITY" | "BUILTIN" | "WORKGROUP" | "-" | "."
+                    );
+                    if is_standard_sys || crate::stopwords::is_known_vendor_domain(s_trim) {
+                        mappings.push(Mapping::new(s_trim, "=", DetectorType::DomainFqdn));
+                    } else {
+                        let pseudo = format!("DOMAIN_{:04X}", rand::random::<u16>());
+                        mappings.push(Mapping::new(s_trim, pseudo, DetectorType::DomainFqdn));
+                    }
                     return;
                 }
 
@@ -290,9 +340,8 @@ impl JsonAdapter {
         }
     }
 
-    /// Anonimiza un InternetMessageId preservando el dominio base corporativo.
-    /// Ejemplo: <GV4PR07MB75414463CD6E1D812AE9C6E93EB29C2@GV4PR07MB754144.eurprd07.service-2dcc9961.example.com>
-    /// -> <MSGID_A1B2C3D4E5F6@host-anon.eurprd07.service-2dcc9961.example.com>
+    /// Anonimiza un InternetMessageId preservando el dominio base de proveedores conocidos
+    /// y ofuscando completamente los dominios corporativos o de Active Directory.
     pub fn anonymize_internet_message_id(raw_id: &str) -> String {
         let trimmed = raw_id.trim();
         let unwrapped = trimmed.trim_start_matches('<').trim_end_matches('>');
@@ -302,28 +351,34 @@ impl JsonAdapter {
             let rnd_id: u64 = rand::random();
             let new_local = format!("MSGID_{rnd_id:016X}");
 
-            // Preservar la parte del dominio base (ej: *.service-*.example.com o últimos dos/tres segmentos)
-            let domain_parts: Vec<&str> = domain.split('.').collect();
-            let new_domain = if domain_parts.len() >= 3 {
-                let base_len = if domain.contains(".example.com") {
-                    3
+            let new_domain = if crate::stopwords::is_known_vendor_domain(domain) {
+                // Preservar la parte del dominio base del vendor conocido (ej: *.example.com o *.outlook.com)
+                let domain_parts: Vec<&str> = domain.split('.').collect();
+                if domain_parts.len() >= 3 {
+                    let base_len = if domain.contains(".example.com") {
+                        3
+                    } else {
+                        2
+                    };
+                    let split_idx = domain_parts.len().saturating_sub(base_len);
+                    let preserved_base = domain_parts[split_idx..].join(".");
+                    let internal_parts = &domain_parts[..split_idx];
+                    let mut anon_internals = Vec::new();
+                    for (i, _) in internal_parts.iter().enumerate() {
+                        anon_internals.push(format!("sub{i}"));
+                    }
+                    if anon_internals.is_empty() {
+                        preserved_base
+                    } else {
+                        format!("{}.{preserved_base}", anon_internals.join("."))
+                    }
                 } else {
-                    2
-                };
-                let split_idx = domain_parts.len().saturating_sub(base_len);
-                let preserved_base = domain_parts[split_idx..].join(".");
-                let internal_parts = &domain_parts[..split_idx];
-                let mut anon_internals = Vec::new();
-                for (i, _) in internal_parts.iter().enumerate() {
-                    anon_internals.push(format!("sub{i}"));
-                }
-                if anon_internals.is_empty() {
-                    preserved_base
-                } else {
-                    format!("{}.{preserved_base}", anon_internals.join("."))
+                    domain.to_string()
                 }
             } else {
-                domain.to_string()
+                // Si es un dominio corporativo / AD (ej: correo.empresa.local), ofuscarlo al 100%
+                let domain_detector = DomainDetector::new();
+                domain_detector.generate_pseudonym(domain)
             };
 
             let res = format!("{new_local}@{new_domain}");
@@ -682,5 +737,67 @@ mod tests {
         let stream_restored = JsonAdapter::parse_json_stream(&restored);
         let stream_original = JsonAdapter::parse_json_stream(ndjson_input);
         assert_eq!(stream_original, stream_restored);
+    }
+
+    #[test]
+    fn test_ad_domain_and_vendor_preservation() {
+        let json_input = r#"{
+  "agent": {
+    "name": "DC01.corp.acme.local"
+  },
+  "data": {
+    "win": {
+      "system": {
+        "channel": "Security"
+      },
+      "eventdata": {
+        "workstationName": "PC-FINANCE.ad.empresa.lan",
+        "targetDomainName": "CORP",
+        "subjectDomainName": "NT AUTHORITY",
+        "cloudEndpoint": "login.microsoftonline.com",
+        "telemetryServer": "telemetry.wazuh.com",
+        "internetMessageId": "<ABC123XYZ@correo.empresa.local>"
+      }
+    }
+  }
+}"#;
+
+        let config = LexiConfig::default();
+        let mut engine = ObfuscatorEngine::new(config);
+
+        let mappings = engine
+            .scan_and_register_mappings(json_input)
+            .expect("Scan falló");
+        assert!(!mappings.is_empty());
+
+        let (obfuscated, report) = engine
+            .obfuscate_text(json_input, FormatType::Json)
+            .expect("Ofuscación falló");
+
+        assert!(report.replacements_applied > 0);
+
+        // 1. Dominios de Active Directory y corporativos DEBEN estar completamente ofuscados
+        assert!(!obfuscated.contains("DC01.corp.acme.local"));
+        assert!(!obfuscated.contains("corp.acme.local"));
+        assert!(!obfuscated.contains("PC-FINANCE.ad.empresa.lan"));
+        assert!(!obfuscated.contains("ad.empresa.lan"));
+        assert!(!obfuscated.contains(r#""targetDomainName": "CORP""#));
+        assert!(!obfuscated.contains("correo.empresa.local"));
+
+        // 2. Dominios de Microsoft y proveedores conocidos DEBEN mantenerse intactos
+        assert!(obfuscated.contains("login.microsoftonline.com"));
+        assert!(obfuscated.contains("telemetry.wazuh.com"));
+
+        // 3. Dominios del sistema como NT AUTHORITY DEBEN mantenerse intactos
+        assert!(obfuscated.contains("NT AUTHORITY"));
+
+        // 4. Desofuscación 100% determinista y reversible
+        let (restored, _) = engine
+            .deobfuscate_text(&obfuscated, FormatType::Json)
+            .expect("Desofuscación falló");
+
+        let parsed_orig: serde_json::Value = serde_json::from_str(json_input).unwrap();
+        let parsed_restored: serde_json::Value = serde_json::from_str(&restored).unwrap();
+        assert_eq!(parsed_orig, parsed_restored);
     }
 }

@@ -340,6 +340,122 @@ pub fn is_protected_sid(sid: &str) -> bool {
     PROTECTED_SIDS.contains(sid)
 }
 
+/// Dominios de empresas de software conocidas, servicios en la nube e infraestructura pública
+/// que pueden permanecer sin ofuscar porque no contienen información confidencial del cliente.
+pub static KNOWN_VENDOR_DOMAINS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    let domains = [
+        // Microsoft / Windows / Azure / Office / O365
+        "microsoft.com",
+        "microsoftonline.com",
+        "windows.com",
+        "windows.net",
+        "office.com",
+        "office365.com",
+        "outlook.com",
+        "live.com",
+        "azure.com",
+        "msft.net",
+        "trafficmanager.net",
+        "msn.com",
+        "visualstudio.com",
+        "azureedge.net",
+        "sharepoint.com",
+        "onedrive.com",
+        "skype.com",
+        "bing.com",
+        "microsoftstream.com",
+        "lync.com",
+        "yammer.com",
+        // Google / Alphabet
+        "google.com",
+        "googleapis.com",
+        "gstatic.com",
+        "googleusercontent.com",
+        "gmail.com",
+        "gvt1.com",
+        "android.com",
+        "chromium.org",
+        // Amazon / AWS
+        "amazon.com",
+        "amazonaws.com",
+        "cloudfront.net",
+        // Cloudflare / CDNs públicas
+        "cloudflare.com",
+        "cloudflare-dns.com",
+        "fastly.net",
+        "akamai.net",
+        "akamaiedge.net",
+        // GitHub / GitLab
+        "github.com",
+        "githubusercontent.com",
+        "gitlab.com",
+        // Seguridad, SIEM y Sistemas
+        "wazuh.com",
+        "elastic.co",
+        "splunk.com",
+        "crowdstrike.com",
+        "sentinelone.com",
+        "virustotal.com",
+        "debian.org",
+        "ubuntu.com",
+        "redhat.com",
+        "centos.org",
+        "kernel.org",
+        "gnu.org",
+        "apache.org",
+        // Apple
+        "apple.com",
+        "icloud.com",
+        "apple-dns.net",
+        // CA / PKI / NTP públicas
+        "digicert.com",
+        "letsencrypt.org",
+        "verisign.com",
+        "sectigo.com",
+        "entrust.net",
+        "pool.ntp.org",
+    ];
+    let mut set = HashSet::with_capacity(domains.len() * 2);
+    for d in domains {
+        set.insert(d);
+    }
+    set
+});
+
+/// Determina si un dominio pertenece a un proveedor de software / cloud conocido.
+pub fn is_known_vendor_domain(domain: &str) -> bool {
+    let lower = domain.trim().trim_end_matches('.').to_lowercase();
+    if KNOWN_VENDOR_DOMAINS.contains(lower.as_str()) {
+        return true;
+    }
+    // Comprobar si es un subdominio de alguno de los vendors
+    for vendor in KNOWN_VENDOR_DOMAINS.iter() {
+        if lower.ends_with(&format!(".{vendor}")) {
+            return true;
+        }
+    }
+    // Dominios de ejemplo RFC 2606 o ya anonimizados previamente
+    if lower == "example.com" || lower.ends_with(".example.com") {
+        return true;
+    }
+    false
+}
+
+/// Determina si un dominio o FQDN es de Active Directory o red corporativa privada que DEBE ofuscarse.
+#[allow(clippy::case_sensitive_file_extension_comparisons)]
+pub fn is_ad_or_private_domain(domain: &str) -> bool {
+    let lower = domain.trim().trim_end_matches('.').to_lowercase();
+    lower.ends_with(".local")
+        || lower.ends_with(".internal")
+        || lower.ends_with(".corp")
+        || lower.ends_with(".lan")
+        || lower.ends_with(".home")
+        || lower.ends_with(".priv")
+        || lower.ends_with(".ad")
+        || lower.ends_with(".intranet")
+        || !is_known_vendor_domain(&lower)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -354,5 +470,29 @@ mod tests {
         assert!(is_protected_word("https"));
         assert!(!is_protected_word("juan_perez_99"));
         assert!(!is_protected_word("supersecretpassword"));
+    }
+
+    #[test]
+    fn test_known_vendor_and_ad_domains() {
+        assert!(is_known_vendor_domain("microsoft.com"));
+        assert!(is_known_vendor_domain("login.microsoftonline.com"));
+        assert!(is_known_vendor_domain("outlook.office365.com"));
+        assert!(is_known_vendor_domain("wazuh.com"));
+        assert!(is_known_vendor_domain("google.com"));
+        assert!(is_known_vendor_domain("s3.eu-west-1.amazonaws.com"));
+
+        // Dominios corporativos o de Active Directory NO son proveedores de software
+        assert!(!is_known_vendor_domain("acme.local"));
+        assert!(!is_known_vendor_domain("corp.miempresa.com"));
+        assert!(!is_known_vendor_domain("banco.es"));
+        assert!(!is_known_vendor_domain("server01.ad.hospital.org"));
+
+        // Deben ser clasificados como AD / dominios privados para ofuscación obligatoria
+        assert!(is_ad_or_private_domain("acme.local"));
+        assert!(is_ad_or_private_domain("corp.miempresa.com"));
+        assert!(is_ad_or_private_domain("ad.empresa.lan"));
+        assert!(is_ad_or_private_domain("banco.es"));
+        assert!(!is_ad_or_private_domain("microsoft.com"));
+        assert!(!is_ad_or_private_domain("windows.net"));
     }
 }

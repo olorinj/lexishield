@@ -235,13 +235,22 @@ impl DetectorRegistry {
 
                 if !seen_originals.contains(candidate) {
                     seen_originals.insert(candidate.to_string());
-                    let mut pseudonym = self.generate_pseudonym_for(candidate, dtype);
-                    let mut attempts = 0;
-                    while seen_pseudonyms.contains(&pseudonym) && attempts < 100 {
-                        pseudonym = self.generate_pseudonym_for(candidate, dtype);
-                        attempts += 1;
+                    let pseudonym = if matches!(dtype, DetectorType::DomainFqdn)
+                        && crate::stopwords::is_known_vendor_domain(candidate)
+                    {
+                        "=".to_string()
+                    } else {
+                        let mut p = self.generate_pseudonym_for(candidate, dtype);
+                        let mut attempts = 0;
+                        while seen_pseudonyms.contains(&p) && attempts < 100 {
+                            p = self.generate_pseudonym_for(candidate, dtype);
+                            attempts += 1;
+                        }
+                        p
+                    };
+                    if !pseudonym.is_empty() && pseudonym != "=" {
+                        seen_pseudonyms.insert(pseudonym.clone());
                     }
-                    seen_pseudonyms.insert(pseudonym.clone());
                     log::debug!(
                         "Entidad detectada [{dtype}]: '{candidate}' -> Seudónimo: '{pseudonym}'"
                     );
