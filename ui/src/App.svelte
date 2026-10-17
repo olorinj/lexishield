@@ -124,6 +124,21 @@
     }
   }
 
+  let copiedInputFlash = false;
+  async function copyInputWithFeedback() {
+    if (!inputText) return;
+    try {
+      await navigator.clipboard.writeText(inputText);
+      copiedInputFlash = true;
+      statusMessage = "📋 Texto desofuscado copiado al portapapeles.";
+      setTimeout(() => {
+        copiedInputFlash = false;
+      }, 2000);
+    } catch (e) {
+      statusMessage = "❌ Error al copiar: " + e;
+    }
+  }
+
   // Estado del Studio
   let inputText = "";
   let outputText = "";
@@ -134,6 +149,15 @@
   let statusMessage = "Listo. Pega tu texto o selecciona un archivo para procesarlo.";
   let lastReport = null;
   let vaultMappings = [];
+  let studioDirection = "obfuscate"; // "obfuscate" (Desofuscado -> Ofuscado) | "deobfuscate" (Ofuscado -> Desofuscado)
+  let studioDragTarget = "deobfuscated"; // "deobfuscated" | "obfuscated"
+
+  function toggleStudioDirection() {
+    studioDirection = studioDirection === "obfuscate" ? "deobfuscate" : "obfuscate";
+    statusMessage = studioDirection === "obfuscate"
+      ? "Dirección activa: Ofuscar (Desofuscado ➔ Ofuscado)"
+      : "Dirección activa: Desofuscar (Ofuscado ➔ Desofuscado)";
+  }
 
   // Opciones de Ofuscación
   let copyMode = true; // Por defecto guardar en copia sufijada
@@ -273,13 +297,26 @@
         }
         if (event.payload.type === "enter" || event.payload.type === "over") {
           isDragging = true;
+          if (event.payload.position && typeof window !== "undefined") {
+            const clientX = event.payload.position.x / (window.devicePixelRatio || 1);
+            if (activeTab === "studio") {
+              studioDragTarget = clientX < (window.innerWidth / 2) ? "deobfuscated" : "obfuscated";
+            }
+          }
         } else if (event.payload.type === "leave") {
           isDragging = false;
         } else if (event.payload.type === "drop") {
           isDragging = false;
           const paths = event.payload.paths;
           if (paths && paths.length > 0) {
-            await handleDroppedPath(paths[0]);
+            let targetPanel = studioDragTarget;
+            if (event.payload.position && typeof window !== "undefined") {
+              const clientX = event.payload.position.x / (window.devicePixelRatio || 1);
+              if (activeTab === "studio") {
+                targetPanel = clientX < (window.innerWidth / 2) ? "deobfuscated" : "obfuscated";
+              }
+            }
+            await handleDroppedPath(paths[0], targetPanel);
           }
         }
       });
@@ -559,7 +596,7 @@
   // Operaciones del Studio
   async function handleObfuscate() {
     if (!inputText.trim()) {
-      statusMessage = "Por favor ingresa texto para ofuscar.";
+      statusMessage = "Por favor ingresa texto en el panel 'Desofuscado' para ofuscar.";
       return;
     }
     loading = true;
@@ -573,6 +610,7 @@
       outputText = res.obfuscated_text;
       lastReport = res.report;
       vaultMappings = res.mappings || [];
+      studioDirection = "obfuscate";
       statusMessage = `✅ Ofuscación exitosa: ${res.report.replacements_applied} tokens reemplazados en ${res.report.elapsed_ms.toFixed(2)}ms`;
       actionResultModal = {
         title: "Ofuscación Finalizada con Éxito",
@@ -594,21 +632,22 @@
   }
 
   async function handleDeobfuscate() {
-    if (!inputText.trim()) {
-      statusMessage = "Por favor ingresa texto para desofuscar.";
+    if (!outputText.trim()) {
+      statusMessage = "Por favor ingresa texto en el panel 'Ofuscado' para desofuscar.";
       return;
     }
     loading = true;
     try {
       const res = await invokeTauri("deobfuscate_content", {
-        text: inputText,
+        text: outputText,
         formatStr: selectedFormat,
         vaultPath: vaultPath || null,
         password: password || null,
         customMappings: null
       });
-      outputText = res.deobfuscated_text;
+      inputText = res.deobfuscated_text;
       lastReport = res.report;
+      studioDirection = "deobfuscate";
       statusMessage = `✅ Desofuscación exitosa: ${res.report.replacements_applied} tokens restaurados en ${res.report.elapsed_ms.toFixed(2)}ms`;
       actionResultModal = {
         title: "Desofuscación Finalizada",
@@ -626,17 +665,18 @@
     }
   }
 
-  async function processFilePathInStudio(selected) {
+  async function processFilePathInStudio(selected, reverse = false) {
     if (!selected) return;
     try {
       loading = true;
       let outPath = selected;
       if (copyMode) {
         const dotIdx = selected.lastIndexOf(".");
+        const suffix = reverse ? ".desofuscado" : copySuffix;
         if (dotIdx !== -1) {
-          outPath = selected.substring(0, dotIdx) + copySuffix + selected.substring(dotIdx);
+          outPath = selected.substring(0, dotIdx) + suffix + selected.substring(dotIdx);
         } else {
-          outPath = selected + copySuffix;
+          outPath = selected + suffix;
         }
       }
 
@@ -646,32 +686,35 @@
         formatStr: selectedFormat,
         vaultPath: vaultPath || null,
         password: password || null,
-        reverse: false,
+        reverse: reverse,
         exportMd: hasPandoc && exportMarkdown
       });
       lastReport = rep;
-      statusMessage = `✅ Archivo procesado (${rep.replacements_applied} tokens reemplazados). Guardado en: ${outPath}`;
+      const actionName = reverse ? "desofuscado" : "ofuscado";
+      statusMessage = `✅ Archivo ${actionName} (${rep.replacements_applied} tokens procesados). Guardado en: ${outPath}`;
       actionResultModal = {
-        title: "Archivo Ofuscado con Éxito",
+        title: reverse ? "Archivo Desofuscado con Éxito" : "Archivo Ofuscado con Éxito",
         type: "success",
-        message: `El archivo ha sido procesado y guardado con los tokens confidenciales protegidos.`,
+        message: reverse
+          ? `El archivo ha sido desofuscado reconstruyendo los datos originales mediante tu bóveda local.`
+          : `El archivo ha sido procesado y guardado con los tokens confidenciales protegidos.`,
         details: [
           { label: "Archivo Origen", value: selected.split('/').pop() },
           { label: "Archivo Guardado", value: outPath.split('/').pop() },
-          { label: "Tokens Reemplazados", value: `${rep.replacements_applied}` },
+          { label: reverse ? "Tokens Restaurados" : "Tokens Reemplazados", value: `${rep.replacements_applied}` },
           { label: "Tiempo", value: `${rep.elapsed_ms.toFixed(2)} ms` },
           { label: "Exportado a Markdown", value: (hasPandoc && exportMarkdown) ? "Sí (.md)" : "No" }
         ]
       };
       refreshVaultsList();
     } catch (err) {
-      statusMessage = "Error al procesar archivo: " + err;
+      statusMessage = `Error al ${reverse ? "desofuscar" : "ofuscar"} archivo: ` + err;
     } finally {
       loading = false;
     }
   }
 
-  async function openFileToProcess() {
+  async function openFileToProcess(reverse = false) {
     try {
       const selected = await open({
         filters: [
@@ -681,7 +724,7 @@
         multiple: false
       });
       if (selected) {
-        await processFilePathInStudio(selected);
+        await processFilePathInStudio(selected, reverse);
       }
     } catch (err) {
       statusMessage = "Error al abrir archivo: " + err;
@@ -852,7 +895,7 @@
     statusMessage = "📋 Texto transferido a Studio. Listo para ofuscar o desofuscar.";
   }
 
-  async function handleDroppedPath(droppedPath) {
+  async function handleDroppedPath(droppedPath, targetPanel = "deobfuscated") {
     if (!droppedPath) return;
     try {
       const isDir = await invokeTauri("is_directory", { path: droppedPath });
@@ -867,7 +910,8 @@
           activeTab = "scanner";
           await auditDirectoryPath(droppedPath);
         } else {
-          await processFilePathInStudio(droppedPath);
+          const isReverse = (targetPanel === "obfuscated");
+          await processFilePathInStudio(droppedPath, isReverse);
         }
       } else {
         activeTab = "scanner";
@@ -1737,31 +1781,56 @@
           </div>
         {/if}
 
-        <!-- Paneles de Entrada y Salida -->
-        <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
-          <!-- Entrada -->
-          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm frosted-card">
+        <!-- Paneles de Desofuscado y Ofuscado con Puente Central -->
+        <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0 items-stretch relative">
+          <!-- Panel Izquierdo: Desofuscado -->
+          <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'obfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
             <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
               <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>📥</span> Entrada Original
+                <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>📥</span> Desofuscado
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Texto original en claro">
+                  Texto en claro
                 </span>
                 <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20" title="Formato sintáctico detectado">
                   {detectedInputFormat}
                 </span>
               </div>
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10px] font-mono text-slate-400">
                   {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
                 </span>
+                {#if showFileButtons}
+                  <button
+                    on:click={() => openFileToProcess(false)}
+                    disabled={loading}
+                    class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition flex items-center gap-1"
+                    title="Cargar y ofuscar un archivo"
+                  >
+                    <span>📄</span> Ofuscar Fichero...
+                  </button>
+                {/if}
+                <button
+                  on:click={copyInputWithFeedback}
+                  disabled={!inputText}
+                  class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition {copiedInputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
+                  title="Copiar texto desofuscado"
+                >
+                  {#if copiedInputFlash}
+                    <span>✓</span> ¡Copiado!
+                  {:else}
+                    <span>📋</span> Copiar
+                  {/if}
+                </button>
                 <button
                   on:click={() => {
                     inputText = "";
-                    outputText = "";
-                    statusMessage = "Área de trabajo de Studio limpiada.";
+                    if (!outputText) statusMessage = "Área de trabajo de Studio limpiada.";
                   }}
-                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition"
-                  title="Limpiar tanto la entrada original como el resultado procesado"
+                  disabled={!inputText}
+                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
+                  title="Limpiar panel desofuscado"
                 >
                   Limpiar
                 </button>
@@ -1775,37 +1844,88 @@
               >{inputGutterText}</pre>
               <textarea
                 bind:value={inputText}
+                on:input={() => { studioDirection = "obfuscate"; }}
+                on:focus={() => { if (inputText.trim()) studioDirection = "obfuscate"; }}
                 on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                placeholder="Pega aquí el contenido a ofuscar o desofuscar (JSON, Logs, XML, código)..."
+                placeholder="Pega o escribe aquí el contenido en claro (JSON, Logs, XML, código) para OFUSCAR..."
                 class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''}"
               ></textarea>
             </div>
           </div>
 
-          <!-- Salida -->
-          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm frosted-card">
+          <!-- Puente Central Direccional entre Paneles -->
+          <div class="flex md:flex-col items-center justify-center gap-2 py-1 md:py-0 shrink-0">
+            {#if studioDirection === "obfuscate"}
+              <button
+                on:click={handleObfuscate}
+                disabled={loading || !inputText.trim()}
+                class="px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
+                title="Ofuscar contenido (Desofuscado ➔ Ofuscado)"
+              >
+                {#if loading}
+                  <span class="animate-spin">⏳</span>
+                {:else}
+                  <span>🛡️</span>
+                {/if}
+                <span>Ofuscar</span>
+                <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
+              </button>
+            {:else}
+              <button
+                on:click={handleDeobfuscate}
+                disabled={loading || !outputText.trim()}
+                class="px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
+                title="Desofuscar contenido (Desofuscado ⮜ Ofuscado)"
+              >
+                {#if loading}
+                  <span class="animate-spin">⏳</span>
+                {:else}
+                  <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
+                {/if}
+                <span>Desofuscar</span>
+                <span>🔄</span>
+              </button>
+            {/if}
+
+            <button
+              on:click={toggleStudioDirection}
+              class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10 shadow-sm transition"
+              title="Cambiar dirección: {studioDirection === 'obfuscate' ? 'Cambiar a Desofuscar ⮜' : 'Cambiar a Ofuscar ➔'}"
+            >
+              <span>⇄</span>
+            </button>
+          </div>
+
+          <!-- Panel Derecho: Ofuscado -->
+          <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'deobfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
             <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
               <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>📤</span> Resultado Procesado
+                <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🛡️</span> Ofuscado
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" title="Texto con datos protegidos por seudónimos">
+                  Texto protegido
                 </span>
               </div>
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10px] font-mono text-slate-400">
                   {outputLinesCount} lín · {outputCharCount} car · {outputSizeKB}
                 </span>
-                <button
-                  on:click={() => { outputText = ""; }}
-                  disabled={!outputText}
-                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
-                  title="Limpiar solo el resultado"
-                >
-                  Limpiar
-                </button>
+                {#if showFileButtons}
+                  <button
+                    on:click={() => openFileToProcess(true)}
+                    disabled={loading}
+                    class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition flex items-center gap-1"
+                    title="Cargar y desofuscar un archivo con la bóveda"
+                  >
+                    <span>📄</span> Desofuscar Fichero...
+                  </button>
+                {/if}
                 <button
                   on:click={copyOutputWithFeedback}
                   disabled={!outputText}
                   class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedOutputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
+                  title="Copiar texto ofuscado"
                 >
                   {#if copiedOutputFlash}
                     <span>✓</span> ¡Copiado!
@@ -1813,9 +1933,20 @@
                     <span>📋</span> Copiar
                   {/if}
                 </button>
+                <button
+                  on:click={() => {
+                    outputText = "";
+                    if (!inputText) statusMessage = "Área de trabajo de Studio limpiada.";
+                  }}
+                  disabled={!outputText}
+                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
+                  title="Limpiar panel ofuscado"
+                >
+                  Limpiar
+                </button>
               </div>
             </div>
-            <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60">
+            <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
               <pre
                 bind:this={outputGutterEl}
                 class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
@@ -1823,9 +1954,10 @@
               >{outputGutterText}</pre>
               <textarea
                 bind:value={outputText}
-                readonly
+                on:input={() => { studioDirection = "deobfuscate"; }}
+                on:focus={() => { if (outputText.trim()) studioDirection = "deobfuscate"; }}
                 on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                placeholder="El resultado sanitizado o desofuscado aparecerá aquí..."
+                placeholder="Pega o escribe aquí el contenido protegido o la respuesta de la IA para DESOFUSCAR..."
                 class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre"
               ></textarea>
             </div>
@@ -1833,26 +1965,59 @@
         </div>
 
         <!-- Botonera de Acción Principal del Studio -->
-        <div class="flex items-center justify-end gap-3">
-          <button
-            on:click={handleDeobfuscate}
-            disabled={loading || !inputText.trim()}
-            class="px-5 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold rounded-xl border border-slate-300 dark:border-white/15 transition duration-150 flex items-center gap-2 disabled:opacity-50 shadow-sm"
-          >
-            <span>🔄</span> Desofuscar Original
-          </button>
-          <button
-            on:click={handleObfuscate}
-            disabled={loading || !inputText.trim()}
-            class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
-          >
-            {#if loading}
-              <span class="animate-spin">⏳</span>
+        <div class="flex items-center justify-between gap-3 pt-1">
+          <div class="flex items-center gap-2">
+            <button
+              on:click={toggleStudioDirection}
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
+              title="Alternar sentido de procesamiento"
+            >
+              <span>⇄</span>
+              <span>Modo actual: <strong>{studioDirection === 'obfuscate' ? 'Ofuscar (Desofuscado ➔ Ofuscado)' : 'Desofuscar (Ofuscado ➔ Desofuscado)'}</strong></span>
+            </button>
+            <button
+              on:click={() => {
+                inputText = "";
+                outputText = "";
+                statusMessage = "Ambos paneles han sido limpiados.";
+              }}
+              disabled={!inputText && !outputText}
+              class="px-2.5 py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
+              title="Limpiar ambos paneles"
+            >
+              Limpiar todo
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            {#if studioDirection === "obfuscate"}
+              <button
+                on:click={handleObfuscate}
+                disabled={loading || !inputText.trim()}
+                class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
+              >
+                {#if loading}
+                  <span class="animate-spin">⏳</span>
+                {:else}
+                  <span>🛡️</span>
+                {/if}
+                Ofuscar para IA ➔
+              </button>
             {:else}
-              <span>🛡️</span>
+              <button
+                on:click={handleDeobfuscate}
+                disabled={loading || !outputText.trim()}
+                class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
+              >
+                {#if loading}
+                  <span class="animate-spin">⏳</span>
+                {:else}
+                  <span>🔄</span>
+                {/if}
+                ⮜ Desofuscar Original
+              </button>
             {/if}
-            Ofuscar para IA
-          </button>
+          </div>
         </div>
       </div>
 
@@ -3732,25 +3897,55 @@
   <!-- OVERLAY VISUAL DE ARRASTRE DE ARCHIVOS O CARPETAS (DRAG & DROP) -->
   {#if isDragging && allowDragDrop}
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-8 pointer-events-none transition animate-in fade-in duration-200">
-      <div class="bg-white/90 dark:bg-slate-900/95 border-2 border-dashed border-primary-500 rounded-3xl p-10 flex flex-col items-center gap-4 shadow-2xl text-center max-w-md frosted-card pulse-glow">
-        <div class="w-20 h-20 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center text-5xl animate-bounce">
-          📂
+      {#if activeTab === "studio"}
+        <!-- Overlay dividido de Studio: Desofuscado (Ofuscar) y Ofuscado (Desofuscar) -->
+        <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[360px]">
+          <!-- Zona Izquierda: Desofuscado (Ofuscar) -->
+          <div class="rounded-3xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center gap-4 transition-all duration-150 {studioDragTarget === 'deobfuscated' ? 'border-primary-400 bg-primary-500/20 scale-[1.02] shadow-2xl ring-4 ring-primary-500/30' : 'border-slate-500/50 bg-slate-900/60 opacity-75'}">
+            <div class="w-20 h-20 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center text-5xl animate-bounce">
+              📥
+            </div>
+            <h3 class="text-xl font-extrabold text-white">
+              Panel Desofuscado
+            </h3>
+            <div class="px-3 py-1 bg-primary-500 text-slate-950 text-xs font-black rounded-full uppercase tracking-wider">
+              🛡️ Suelta aquí para OFUSCAR
+            </div>
+            <p class="text-xs text-slate-300 max-w-xs">
+              Se protegerán los tokens confidenciales (IPs, emails, nombres, claves) por seudónimos seguros y se guardará la copia procesada.
+            </p>
+          </div>
+
+          <!-- Zona Derecha: Ofuscado (Desofuscar) -->
+          <div class="rounded-3xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center gap-4 transition-all duration-150 {studioDragTarget === 'obfuscated' ? 'border-amber-400 bg-amber-500/20 scale-[1.02] shadow-2xl ring-4 ring-amber-500/30' : 'border-slate-500/50 bg-slate-900/60 opacity-75'}">
+            <div class="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-5xl animate-bounce">
+              📤
+            </div>
+            <h3 class="text-xl font-extrabold text-white">
+              Panel Ofuscado
+            </h3>
+            <div class="px-3 py-1 bg-amber-400 text-slate-950 text-xs font-black rounded-full uppercase tracking-wider">
+              🔄 Suelta aquí para DESOFUSCAR
+            </div>
+            <p class="text-xs text-slate-300 max-w-xs">
+              Se restaurarán los valores reales originales a partir de los seudónimos utilizando tu bóveda local de mapeos.
+            </p>
+          </div>
         </div>
-        <h3 class="text-base font-bold text-slate-900 dark:text-white">
-          {#if activeTab === "studio"}
-            Suelta tu archivo aquí para procesarlo en Studio
-          {:else}
+      {:else}
+        <!-- Overlay del Escáner u otras vistas -->
+        <div class="bg-white/90 dark:bg-slate-900/95 border-2 border-dashed border-primary-500 rounded-3xl p-10 flex flex-col items-center gap-4 shadow-2xl text-center max-w-md frosted-card pulse-glow">
+          <div class="w-20 h-20 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center text-5xl animate-bounce">
+            📂
+          </div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">
             Suelta tu archivo o carpeta aquí para escanear
-          {/if}
-        </h3>
-        <p class="text-xs text-slate-600 dark:text-slate-300">
-          {#if activeTab === "studio"}
-            Se ofuscarán los tokens confidenciales respetando el formato original y guardando en copia sufijada.
-          {:else}
+          </h3>
+          <p class="text-xs text-slate-600 dark:text-slate-300">
             LexiShield auditará los tokens confidenciales sin modificar los archivos originales en disco.
-          {/if}
-        </p>
-      </div>
+          </p>
+        </div>
+      {/if}
     </div>
   {/if}
 
