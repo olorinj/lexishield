@@ -20,6 +20,12 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - Garantiza que campos `keywords` en JSONs arbitrarios de negocio o marketing continúen siendo escaneados y ofuscados sin omisiones indebidas.
 - **🔄 Versionado Dinámico Basado en Ramas Git**:
   - Sincronización automática de versiones en compilaciones locales ([`compilar.sh`](file:///home/olorinj/DEV/rust/lexishield/compilar.sh) y [`compilar.ps1`](file:///home/olorinj/DEV/rust/lexishield/compilar.ps1)) asociadas al nombre de la rama activa (ej. `v2.0.1`).
+- **🔄 Flujo Bidireccional y Paneles Interactivos en Studio (`Desofuscado` y `Ofuscado`)**:
+  - Paneles renombrados a **Desofuscado** (texto en claro / original) y **Ofuscado** (texto protegido / seudónimos), ambos con capacidad de edición directa y telemetría en tiempo real.
+  - Restricción y activación inteligente de acciones: pegar o escribir en *Desofuscado* habilita exclusivamente el modo **Ofuscar** (`Desofuscado ➔ Ofuscado`); pegar o escribir en *Ofuscado* habilita exclusivamente el modo **Desofuscar** (`Ofuscado ➔ Desofuscado`).
+  - Puente central interactivo entre paneles con botón direccional dinámico (`[ 🛡️ Ofuscar ➔ ]` / `[ ⮜ Desofuscar 🔄 ]`) y conmutador manual de dirección `[ ⇄ ]`.
+  - Arrastrar y soltar (*Drag & Drop*) contextual dividido: soltar un archivo sobre el panel *Desofuscado* ejecuta la ofuscación (`reverse: false`); soltar sobre el panel *Ofuscado* ejecuta la desofuscación (`reverse: true`) restaurando los datos con la bóveda.
+  - Botones de archivo directos en la cabecera de cada panel (*"Ofuscar Fichero..."* y *"Desofuscar Fichero..."*).
 - **🗔 Ergonomía de Escritorio y Bandeja del Sistema (System Tray)**:
   - Soporte nativo para minimizar y residir en la bandeja del sistema (junto al reloj de Windows), permitiendo ocultar y restaurar la ventana al hacer clic en el icono o cerrar/minimizar la aplicación.
   - Soporte integral de Arrastrar y Soltar (*Drag & Drop*) para analizar archivos o directorios completos arrastrándolos directamente sobre la vista del Escáner o sobre Studio.
