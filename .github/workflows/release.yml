@@ -1,6 +1,7 @@
 name: "Lanzamiento LexiShield (Multiplataforma)"
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*' # Se ejecuta automáticamente al subir una etiqueta de versión (ej: v1.0.0)
@@ -81,7 +82,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "LexiShield ${{ github.ref_name }}"
           releaseBody: "Esta es la nueva versión de LexiShield. Contiene los instaladores de interfaz gráfica (.msi, .deb, .AppImage, .dmg) y los binarios de consola (CLI) independientes."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
           projectPath: "src-tauri"
