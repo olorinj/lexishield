@@ -2,9 +2,17 @@ name: "Lanzamiento LexiShield (Multiplataforma)"
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Etiqueta de la versión a publicar (ej: v2.0.1)"
+        required: false
+        default: "v2.0.1"
   push:
     tags:
       - 'v*' # Se ejecuta automáticamente al subir una etiqueta de versión (ej: v1.0.0)
+
+permissions:
+  contents: write
 
 jobs:
   compilar-gui:
@@ -26,10 +34,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Descargar código fuente
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Instalar Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
@@ -79,8 +87,8 @@ jobs:
           DISABLE_WINRES: "1"
           SKIP_WIN_RESOURCE: "1"
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "LexiShield ${{ github.ref_name }}"
+          tagName: ${{ github.event_name == 'workflow_dispatch' && (inputs.release_tag || 'v2.0.1') || github.ref_name }}
+          releaseName: "LexiShield ${{ github.event_name == 'workflow_dispatch' && (inputs.release_tag || 'v2.0.1') || github.ref_name }}"
           releaseBody: "Esta es la nueva versión de LexiShield. Contiene los instaladores de interfaz gráfica (.msi, .deb, .AppImage, .dmg) y los binarios de consola (CLI) independientes."
           releaseDraft: false
           prerelease: false
@@ -91,10 +99,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && (inputs.release_tag || 'v2.0.1') || github.ref_name }}
         run: |
           if [ -d dist-cli ] && [ "$(ls -A dist-cli)" ]; then
-            echo "Subiendo binarios CLI a la release de GitHub..."
-            gh release upload "${{ github.ref_name }}" dist-cli/* --clobber
+            echo "Subiendo binarios CLI a la release de GitHub (${TAG_NAME})..."
+            gh release upload "${TAG_NAME}" dist-cli/* --clobber
           fi
 
 
