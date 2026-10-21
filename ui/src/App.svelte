@@ -231,7 +231,7 @@
 
   // Estado de Notificación / Modal de Acción Completada
   let actionResultModal = null; // { title: string, message: string, details?: Array<{label: string, value: string}>, type?: "success" | "info" }
-  let directoryDropModal = null; // { path: string, name: string, cleanCache: boolean, copyMode: boolean, exportMarkdown: boolean, isReverse: boolean }
+  let studioDropModal = null; // { path: string, name: string, isDir: boolean, isReverse: boolean, copyMode: boolean, suffix: string, saveSuffixDefault: boolean, cleanCache: boolean, exportMarkdown: boolean }
 
   // Estado de Depuración y Logs
   let debugMode = false;
@@ -665,18 +665,21 @@
     }
   }
 
-  async function processFilePathInStudio(selected, reverse = false) {
+  async function processFilePathInStudio(selected, reverse = false, customOptions = null) {
     if (!selected) return;
     try {
       loading = true;
+      const useCopy = customOptions ? customOptions.copyMode : copyMode;
+      const activeSuffix = customOptions?.suffix || (reverse ? ".desofuscado" : copySuffix);
+      const useMd = customOptions ? (hasPandoc && customOptions.exportMarkdown) : (hasPandoc && exportMarkdown);
+
       let outPath = selected;
-      if (copyMode) {
+      if (useCopy) {
         const dotIdx = selected.lastIndexOf(".");
-        const suffix = reverse ? ".desofuscado" : copySuffix;
         if (dotIdx !== -1) {
-          outPath = selected.substring(0, dotIdx) + suffix + selected.substring(dotIdx);
+          outPath = selected.substring(0, dotIdx) + activeSuffix + selected.substring(dotIdx);
         } else {
-          outPath = selected + suffix;
+          outPath = selected + activeSuffix;
         }
       }
 
@@ -687,28 +690,28 @@
         vaultPath: vaultPath || null,
         password: password || null,
         reverse: reverse,
-        exportMd: hasPandoc && exportMarkdown
+        exportMd: useMd
       });
       lastReport = rep;
-      const actionName = reverse ? "desofuscado" : "ofuscado";
+      const actionName = reverse ? "restaurado" : "protegido";
       statusMessage = `✅ Archivo ${actionName} (${rep.replacements_applied} tokens procesados). Guardado en: ${outPath}`;
       actionResultModal = {
-        title: reverse ? "Archivo Desofuscado con Éxito" : "Archivo Ofuscado con Éxito",
+        title: reverse ? "Archivo Restaurado con Éxito" : "Archivo Protegido con Éxito",
         type: "success",
         message: reverse
-          ? `El archivo ha sido desofuscado reconstruyendo los datos originales mediante tu bóveda local.`
+          ? `El archivo ha sido restaurado reconstruyendo los datos originales mediante tu bóveda local.`
           : `El archivo ha sido procesado y guardado con los tokens confidenciales protegidos.`,
         details: [
-          { label: "Archivo Origen", value: selected.split('/').pop() },
-          { label: "Archivo Guardado", value: outPath.split('/').pop() },
-          { label: reverse ? "Tokens Restaurados" : "Tokens Reemplazados", value: `${rep.replacements_applied}` },
+          { label: "Archivo Origen", value: selected.split(/[/\\]/).pop() },
+          { label: "Archivo Guardado", value: outPath.split(/[/\\]/).pop() },
+          { label: reverse ? "Tokens Restaurados" : "Tokens Seudonimizados", value: `${rep.replacements_applied}` },
           { label: "Tiempo", value: `${rep.elapsed_ms.toFixed(2)} ms` },
-          { label: "Exportado a Markdown", value: (hasPandoc && exportMarkdown) ? "Sí (.md)" : "No" }
+          { label: "Exportado a Markdown", value: useMd ? "Sí (.md)" : "No" }
         ]
       };
       refreshVaultsList();
     } catch (err) {
-      statusMessage = `Error al ${reverse ? "desofuscar" : "ofuscar"} archivo: ` + err;
+      statusMessage = `Error al ${reverse ? "restaurar" : "proteger"} archivo: ` + err;
     } finally {
       loading = false;
     }
@@ -906,20 +909,20 @@
           await auditFilePath(droppedPath);
         }
       } else if (activeTab === "studio") {
-        if (isDir) {
-          const folderName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
-          directoryDropModal = {
-            path: droppedPath,
-            name: folderName,
-            cleanCache: true,
-            copyMode: true,
-            exportMarkdown: hasPandoc && exportMarkdown,
-            isReverse: (targetPanel === "obfuscated")
-          };
-        } else {
-          const isReverse = (targetPanel === "obfuscated");
-          await processFilePathInStudio(droppedPath, isReverse);
-        }
+        const itemName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
+        const isReverse = (targetPanel === "obfuscated");
+        const defaultSuffix = isReverse ? ".desofuscado" : copySuffix;
+        studioDropModal = {
+          path: droppedPath,
+          name: itemName,
+          isDir: isDir,
+          isReverse: isReverse,
+          copyMode: true,
+          suffix: defaultSuffix,
+          saveSuffixDefault: false,
+          cleanCache: true,
+          exportMarkdown: hasPandoc && exportMarkdown
+        };
       } else {
         activeTab = "scanner";
         if (isDir) {
@@ -933,25 +936,57 @@
     }
   }
 
-  async function confirmProcessDirectoryFromModal() {
-    if (!directoryDropModal) return;
-    const { path: dirPath, cleanCache: shouldClean } = directoryDropModal;
-    directoryDropModal = null;
+  function computeOutputPreview(modal) {
+    if (!modal) return "";
+    if (modal.isDir) {
+      if (!modal.copyMode) return `${modal.name} (Directorio original in-situ)`;
+      return `${modal.name}${modal.suffix || ''}/ (Copias dentro de la carpeta)`;
+    }
+    if (!modal.copyMode) return `${modal.name} (Sobrescribir archivo original)`;
+    const sfx = modal.suffix || "";
+    const dotIdx = modal.name.lastIndexOf(".");
+    if (dotIdx !== -1) {
+      return modal.name.substring(0, dotIdx) + sfx + modal.name.substring(dotIdx);
+    }
+    return modal.name + sfx;
+  }
+
+  async function confirmStudioDropModal() {
+    if (!studioDropModal) return;
+    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd } = studioDropModal;
+    studioDropModal = null;
+
     try {
-      if (shouldClean) {
-        await invokeTauri("clear_scan_cache_command");
-        statusMessage = "🧹 Cachés de sesión limpiadas antes de analizar el directorio.";
+      if (saveSuffixDefault && suffix) {
+        copySuffix = suffix;
+        if (appConfig?.gui) {
+          appConfig.gui.output_suffix = suffix;
+          await saveAppSettings();
+        }
       }
-      activeTab = "scanner";
-      await auditDirectoryPath(dirPath);
-      statusMessage = `📁 Directorio cargado para análisis y protección: ${dirPath}`;
+
+      if (isDir) {
+        if (cleanCache) {
+          await invokeTauri("clear_scan_cache_command");
+          statusMessage = "🧹 Cachés de sesión limpiadas antes de analizar el directorio.";
+        }
+        activeTab = "scanner";
+        await auditDirectoryPath(path);
+        statusMessage = `📁 Directorio cargado para análisis y ${isReverse ? 'restauración' : 'protección'}: ${path}`;
+      } else {
+        await processFilePathInStudio(path, isReverse, {
+          copyMode,
+          suffix,
+          exportMarkdown: expMd
+        });
+      }
     } catch (err) {
-      statusMessage = "Error al procesar directorio: " + err;
+      statusMessage = "Error al procesar elemento: " + err;
     }
   }
 
-  function cancelDirectoryDropModal() {
-    directoryDropModal = null;
+  function cancelStudioDropModal() {
+    studioDropModal = null;
   }
 
   async function cancelScan() {
@@ -1736,26 +1771,20 @@
     {#if activeTab === "studio"}
       <!-- VISTA STUDIO -->
       <div in:fade={{ duration: 150 }} class="flex-1 flex flex-col gap-4 min-h-0">
-        <!-- Barra de Opciones Superiores del Studio -->
-        <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm text-xs">
-          <div class="flex items-center gap-4 flex-wrap">
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-              <input type="checkbox" bind:checked={copyMode} class="rounded accent-primary-500" />
-              <span>Guardar en copia sufijada ({copySuffix})</span>
-            </label>
-
-            {#if hasPandoc}
-              <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300" title="Requiere Pandoc instalado en el sistema para convertir a Markdown">
-                <input type="checkbox" bind:checked={exportMarkdown} class="rounded accent-primary-500" />
-                <span>Guardar en Markdown (.md)</span>
-              </label>
-            {/if}
+        <!-- Barra Superior Minimalista de Studio -->
+        <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 px-4 py-2 flex items-center justify-between gap-3 shadow-sm text-xs">
+          <div class="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+            <span class="text-amber-500 font-bold flex items-center gap-1">
+              <span>⚡</span> Modo Interactivo
+            </span>
+            <span class="text-slate-300 dark:text-slate-600 hidden sm:inline">•</span>
+            <span class="hidden sm:inline">Arrastra archivos o carpetas a los paneles para procesar con opciones</span>
           </div>
 
           <div class="flex items-center gap-2">
             <button
               on:click={() => openHelp('studio')}
-              class="px-2.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1"
+              class="px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1 shadow-sm"
               title="Ver guía de uso de Studio"
             >
               <span>❔</span> Ayuda
@@ -3874,8 +3903,8 @@
     </div>
   {/if}
 
-  <!-- MODAL INTELIGENTE DE PROCESAMIENTO DE CARPETA EN STUDIO -->
-  {#if directoryDropModal}
+  <!-- MODAL UNIFICADO DE PROCESAMIENTO DE ARCHIVO O CARPETA EN STUDIO -->
+  {#if studioDropModal}
     <div
       class="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
@@ -3884,65 +3913,117 @@
       <button
         type="button"
         class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
-        on:click={cancelDirectoryDropModal}
-        aria-label="Cerrar modal de carpeta"
+        on:click={cancelStudioDropModal}
+        aria-label="Cerrar modal de procesamiento"
       ></button>
       <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 flex flex-col shadow-2xl space-y-4">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-500 flex items-center justify-center text-xl shrink-0">
-            📁
+          <div class="w-10 h-10 rounded-xl {studioDropModal.isReverse ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-primary-500/10 border-primary-500/20 text-primary-500'} flex items-center justify-center text-xl shrink-0">
+            {studioDropModal.isDir ? '📁' : '📄'}
           </div>
-          <div>
-            <h3 class="text-sm font-bold text-slate-900 dark:text-white">Carpeta detectada: {directoryDropModal.name}</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-sm" title={directoryDropModal.path}>{directoryDropModal.path}</p>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white truncate">
+              {studioDropModal.isReverse ? 'Restaurar' : 'Proteger'} {studioDropModal.isDir ? 'Carpeta' : 'Archivo'}: {studioDropModal.name}
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 truncate" title={studioDropModal.path}>{studioDropModal.path}</p>
           </div>
         </div>
 
         <p class="text-xs text-slate-600 dark:text-slate-300">
-          Has arrastrado un directorio completo a <strong>Texto claro</strong>. LexiShield puede auditar y proteger en lote todos los archivos compatibles contenidos en la carpeta.
+          {#if studioDropModal.isReverse}
+            Has soltado un elemento en <strong>Texto protegido</strong>. Se restaurarán los datos originales utilizando tu bóveda local de mapeos.
+          {:else}
+            Has soltado un elemento en <strong>Texto claro</strong>. Se protegerán los tokens confidenciales reemplazándolos por seudónimos seguros.
+          {/if}
         </p>
 
-        <div class="p-3.5 bg-slate-50 dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/5 space-y-3 text-xs">
-          <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
-            <input type="checkbox" bind:checked={directoryDropModal.cleanCache} class="rounded accent-primary-500" />
-            <div>
-              <span class="font-semibold text-slate-900 dark:text-white">Limpiar cachés de sesión</span>
-              <p class="text-[11px] text-slate-400">Fuerza el re-análisis completo de todos los archivos sin utilizar cachés intermedias previas.</p>
-            </div>
-          </label>
-
-          <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
-            <input type="checkbox" bind:checked={directoryDropModal.copyMode} class="rounded accent-primary-500" />
-            <div>
-              <span class="font-semibold text-slate-900 dark:text-white">Guardar en copia sufijada ({copySuffix})</span>
-              <p class="text-[11px] text-slate-400">Conserva los archivos originales intactos y genera copias protegidas.</p>
-            </div>
-          </label>
-
-          {#if hasPandoc}
+        <div class="p-3.5 bg-slate-50 dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/5 space-y-3.5 text-xs">
+          <!-- Opción Copia Separada y Sufijo -->
+          <div class="space-y-2">
             <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
-              <input type="checkbox" bind:checked={directoryDropModal.exportMarkdown} class="rounded accent-primary-500" />
+              <input type="checkbox" bind:checked={studioDropModal.copyMode} class="rounded accent-primary-500" />
               <div>
-                <span class="font-semibold text-slate-900 dark:text-white">Guardar en Markdown (.md)</span>
-                <p class="text-[11px] text-slate-400">Convierte automáticamente documentos de Office procesados a formato Markdown.</p>
+                <span class="font-semibold text-slate-900 dark:text-white">Guardar en una copia con sufijo</span>
+                <p class="text-[11px] text-slate-400">Conserva el archivo original intacto y genera una copia procesada.</p>
               </div>
             </label>
+
+            {#if studioDropModal.copyMode}
+              <div class="pl-6 space-y-2 pt-1 border-l-2 border-primary-500/30 ml-2">
+                <div class="flex items-center gap-2">
+                  <label for="modal-suffix-input" class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 shrink-0">Sufijo del archivo:</label>
+                  <input
+                    id="modal-suffix-input"
+                    type="text"
+                    bind:value={studioDropModal.suffix}
+                    placeholder="_obfuscated"
+                    class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 font-mono text-xs focus:ring-1 focus:ring-primary-500 focus:outline-none flex-1"
+                  />
+                </div>
+
+                <div class="p-2 bg-primary-500/10 rounded-lg border border-primary-500/20 text-[11px] font-mono text-primary-700 dark:text-primary-300 flex items-center gap-1.5 truncate">
+                  <span class="font-bold">Vista previa:</span>
+                  <span class="truncate" title={computeOutputPreview(studioDropModal)}>{computeOutputPreview(studioDropModal)}</span>
+                </div>
+
+                <label class="flex items-center gap-2 cursor-pointer text-slate-600 dark:text-slate-400 text-[11px]">
+                  <input type="checkbox" bind:checked={studioDropModal.saveSuffixDefault} class="rounded accent-primary-500" />
+                  <span>Recordar este sufijo como predeterminado en mi configuración</span>
+                </label>
+              </div>
+            {:else}
+              <div class="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>Se modificará directamente el archivo original en su ubicación actual.</span>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Opciones específicas de Directorio -->
+          {#if studioDropModal.isDir}
+            <div class="pt-2 border-t border-slate-200/60 dark:border-white/5">
+              <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+                <input type="checkbox" bind:checked={studioDropModal.cleanCache} class="rounded accent-primary-500" />
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-white">Limpiar cachés de sesión</span>
+                  <p class="text-[11px] text-slate-400">Fuerza el re-análisis completo de todos los archivos del directorio sin usar cachés previas.</p>
+                </div>
+              </label>
+            </div>
+          {/if}
+
+          <!-- Opción Markdown con Pandoc -->
+          {#if hasPandoc}
+            <div class="pt-2 border-t border-slate-200/60 dark:border-white/5">
+              <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+                <input type="checkbox" bind:checked={studioDropModal.exportMarkdown} class="rounded accent-primary-500" />
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-white">Guardar en Markdown (.md)</span>
+                  <p class="text-[11px] text-slate-400">Convierte automáticamente documentos de Office procesados a formato Markdown con Pandoc.</p>
+                </div>
+              </label>
+            </div>
           {/if}
         </div>
 
         <div class="flex items-center justify-end gap-2 pt-2">
           <button
-            on:click={cancelDirectoryDropModal}
+            on:click={cancelStudioDropModal}
             class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
           >
             Cancelar
           </button>
           <button
-            on:click={confirmProcessDirectoryFromModal}
-            class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+            on:click={confirmStudioDropModal}
+            class="px-5 py-2 {studioDropModal.isReverse ? 'bg-amber-500 hover:bg-amber-400' : 'bg-primary-600 hover:bg-primary-500'} text-slate-950 text-xs font-bold rounded-xl transition shadow-md flex items-center gap-1.5"
           >
-            <span>🛡️</span>
-            Proteger Carpeta
+            {#if studioDropModal.isReverse}
+              <span>🔄</span>
+              Restaurar {studioDropModal.isDir ? 'Carpeta' : 'Archivo'}
+            {:else}
+              <span>🛡️</span>
+              Proteger {studioDropModal.isDir ? 'Carpeta' : 'Archivo'}
+            {/if}
           </button>
         </div>
       </div>
