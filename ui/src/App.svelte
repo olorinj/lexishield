@@ -149,14 +149,14 @@
   let statusMessage = "Listo. Pega tu texto o selecciona un archivo para procesarlo.";
   let lastReport = null;
   let vaultMappings = [];
-  let studioDirection = "obfuscate"; // "obfuscate" (Desofuscado -> Ofuscado) | "deobfuscate" (Ofuscado -> Desofuscado)
+  let studioDirection = "obfuscate"; // "obfuscate" (Texto claro -> Texto protegido) | "deobfuscate" (Texto protegido -> Texto claro)
   let studioDragTarget = "deobfuscated"; // "deobfuscated" | "obfuscated"
 
   function toggleStudioDirection() {
     studioDirection = studioDirection === "obfuscate" ? "deobfuscate" : "obfuscate";
     statusMessage = studioDirection === "obfuscate"
-      ? "Dirección activa: Ofuscar (Desofuscado ➔ Ofuscado)"
-      : "Dirección activa: Desofuscar (Ofuscado ➔ Desofuscado)";
+      ? "Dirección activa: Proteger (Texto claro ➔ Texto protegido)"
+      : "Dirección activa: Restaurar (Texto protegido ➔ Texto claro)";
   }
 
   // Opciones de Ofuscación
@@ -231,6 +231,7 @@
 
   // Estado de Notificación / Modal de Acción Completada
   let actionResultModal = null; // { title: string, message: string, details?: Array<{label: string, value: string}>, type?: "success" | "info" }
+  let directoryDropModal = null; // { path: string, name: string, cleanCache: boolean, copyMode: boolean, exportMarkdown: boolean, isReverse: boolean }
 
   // Estado de Depuración y Logs
   let debugMode = false;
@@ -596,7 +597,7 @@
   // Operaciones del Studio
   async function handleObfuscate() {
     if (!inputText.trim()) {
-      statusMessage = "Por favor ingresa texto en el panel 'Desofuscado' para ofuscar.";
+      statusMessage = "Por favor ingresa texto en el panel 'Texto claro' para proteger.";
       return;
     }
     loading = true;
@@ -611,21 +612,20 @@
       lastReport = res.report;
       vaultMappings = res.mappings || [];
       studioDirection = "obfuscate";
-      statusMessage = `✅ Ofuscación exitosa: ${res.report.replacements_applied} tokens reemplazados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      statusMessage = `✅ Datos protegidos exitosamente: ${res.report.replacements_applied} tokens seudonimizados en ${res.report.elapsed_ms.toFixed(2)}ms`;
       actionResultModal = {
-        title: "Ofuscación Finalizada con Éxito",
+        title: "Protección Finalizada con Éxito",
         type: "success",
         message: `El texto ha sido transformado para proteger tus datos confidenciales antes de enviarlo a la IA o compartirlo con terceros.`,
         details: [
-          { label: "Tokens Reemplazados", value: `${res.report.replacements_applied}` },
+          { label: "Tokens Seudonimizados", value: `${res.report.replacements_applied}` },
           { label: "Tiempo de Procesamiento", value: `${res.report.elapsed_ms.toFixed(2)} ms` },
-          { label: "Formato Aplicado", value: selectedFormat.toUpperCase() },
           { label: "Bóveda Destino", value: vaultPath ? vaultPath.split('/').pop() : "Predeterminada" }
         ]
       };
       refreshVaultsList();
     } catch (err) {
-      statusMessage = "Error al ofuscar: " + err;
+      statusMessage = "Error al proteger datos: " + err;
     } finally {
       loading = false;
     }
@@ -633,7 +633,7 @@
 
   async function handleDeobfuscate() {
     if (!outputText.trim()) {
-      statusMessage = "Por favor ingresa texto en el panel 'Ofuscado' para desofuscar.";
+      statusMessage = "Por favor ingresa texto en el panel 'Texto protegido' para restaurar.";
       return;
     }
     loading = true;
@@ -648,18 +648,18 @@
       inputText = res.deobfuscated_text;
       lastReport = res.report;
       studioDirection = "deobfuscate";
-      statusMessage = `✅ Desofuscación exitosa: ${res.report.replacements_applied} tokens restaurados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      statusMessage = `✅ Datos restaurados exitosamente: ${res.report.replacements_applied} tokens recuperados en ${res.report.elapsed_ms.toFixed(2)}ms`;
       actionResultModal = {
-        title: "Desofuscación Finalizada",
+        title: "Restauración Finalizada con Éxito",
         type: "success",
-        message: "Las respuestas de la IA han sido desofuscadas reconstruyendo los valores originales mediante tu bóveda local.",
+        message: "Las respuestas de la IA han sido procesadas recuperando los valores reales originales mediante tu bóveda local.",
         details: [
           { label: "Tokens Restaurados", value: `${res.report.replacements_applied}` },
           { label: "Tiempo de Proceso", value: `${res.report.elapsed_ms.toFixed(2)} ms` }
         ]
       };
     } catch (err) {
-      statusMessage = "Error al desofuscar: " + err;
+      statusMessage = "Error al restaurar datos: " + err;
     } finally {
       loading = false;
     }
@@ -892,7 +892,7 @@
     if (!textToAudit.trim()) return;
     inputText = textToAudit;
     activeTab = "studio";
-    statusMessage = "📋 Texto transferido a Studio. Listo para ofuscar o desofuscar.";
+    statusMessage = "📋 Texto transferido a Studio. Listo para proteger o restaurar.";
   }
 
   async function handleDroppedPath(droppedPath, targetPanel = "deobfuscated") {
@@ -907,8 +907,15 @@
         }
       } else if (activeTab === "studio") {
         if (isDir) {
-          activeTab = "scanner";
-          await auditDirectoryPath(droppedPath);
+          const folderName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
+          directoryDropModal = {
+            path: droppedPath,
+            name: folderName,
+            cleanCache: true,
+            copyMode: true,
+            exportMarkdown: hasPandoc && exportMarkdown,
+            isReverse: (targetPanel === "obfuscated")
+          };
         } else {
           const isReverse = (targetPanel === "obfuscated");
           await processFilePathInStudio(droppedPath, isReverse);
@@ -924,6 +931,27 @@
     } catch (err) {
       statusMessage = "Error al procesar elemento arrastrado: " + err;
     }
+  }
+
+  async function confirmProcessDirectoryFromModal() {
+    if (!directoryDropModal) return;
+    const { path: dirPath, cleanCache: shouldClean } = directoryDropModal;
+    directoryDropModal = null;
+    try {
+      if (shouldClean) {
+        await invokeTauri("clear_scan_cache_command");
+        statusMessage = "🧹 Cachés de sesión limpiadas antes de analizar el directorio.";
+      }
+      activeTab = "scanner";
+      await auditDirectoryPath(dirPath);
+      statusMessage = `📁 Directorio cargado para análisis y protección: ${dirPath}`;
+    } catch (err) {
+      statusMessage = "Error al procesar directorio: " + err;
+    }
+  }
+
+  function cancelDirectoryDropModal() {
+    directoryDropModal = null;
   }
 
   async function cancelScan() {
@@ -1710,26 +1738,10 @@
       <div in:fade={{ duration: 150 }} class="flex-1 flex flex-col gap-4 min-h-0">
         <!-- Barra de Opciones Superiores del Studio -->
         <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm text-xs">
-          <div class="flex items-center gap-3">
-            <label class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <span>📐 Formato:</span>
-              <select bind:value={selectedFormat} class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-primary-500 font-medium">
-                <option value="auto" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Auto (Detección inteligente)</option>
-                <option value="json" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">JSON Estructurado</option>
-                <option value="xml" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">XML / HTML</option>
-                <option value="log" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Log Delimitado / KVP</option>
-                <option value="text" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Texto Plano</option>
-              </select>
-            </label>
-
+          <div class="flex items-center gap-4 flex-wrap">
             <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
               <input type="checkbox" bind:checked={copyMode} class="rounded accent-primary-500" />
               <span>Guardar en copia sufijada ({copySuffix})</span>
-            </label>
-
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-              <input type="checkbox" bind:checked={cleanCache} class="rounded accent-primary-500" />
-              <span>Limpiar cachés de sesión</span>
             </label>
 
             {#if hasPandoc}
@@ -1748,21 +1760,6 @@
             >
               <span>❔</span> Ayuda
             </button>
-            {#if showFileButtons}
-              <button
-                on:click={openFileToProcess}
-                disabled={loading}
-                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <span>📄</span> Procesar Archivo...
-              </button>
-            {/if}
-            <button
-              on:click={openVaultFile}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5"
-            >
-              <span>📂</span> Cambiar Bóveda
-            </button>
           </div>
         </div>
 
@@ -1771,7 +1768,7 @@
             <div class="flex items-center gap-3">
               <span class="text-lg">✨</span>
               <p class="text-slate-700 dark:text-slate-300">
-                <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Ofusca texto para usarlo en motores de Inteligencia Artificial (p. ej. asistentes en la nube o LLMs locales) u ocúltalo de quien no deba conocer datos confidenciales (IPs, emails, nombres, claves). Al recibir la respuesta de la IA, usa <em>Desofuscar Original</em> para restaurar los valores reales.
+                <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Escribe o pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -1781,41 +1778,31 @@
           </div>
         {/if}
 
-        <!-- Paneles de Desofuscado y Ofuscado con Puente Central -->
+        <!-- Paneles de Texto claro y Texto protegido con Puente Central -->
         <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0 items-stretch relative">
-          <!-- Panel Izquierdo: Desofuscado -->
+          <!-- Panel Izquierdo: Texto claro -->
           <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'obfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
             <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>📥</span> Desofuscado
+                  <span>📥</span> Texto claro
                 </span>
                 <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Texto original en claro">
                   Texto en claro
                 </span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20" title="Formato sintáctico detectado">
-                  {detectedInputFormat}
+                <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos y carpetas">
+                  <span>📁</span> Arrastra archivo o carpeta
                 </span>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10px] font-mono text-slate-400">
                   {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
                 </span>
-                {#if showFileButtons}
-                  <button
-                    on:click={() => openFileToProcess(false)}
-                    disabled={loading}
-                    class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition flex items-center gap-1"
-                    title="Cargar y ofuscar un archivo"
-                  >
-                    <span>📄</span> Ofuscar Fichero...
-                  </button>
-                {/if}
                 <button
                   on:click={copyInputWithFeedback}
                   disabled={!inputText}
                   class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition {copiedInputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
-                  title="Copiar texto desofuscado"
+                  title="Copiar texto claro"
                 >
                   {#if copiedInputFlash}
                     <span>✓</span> ¡Copiado!
@@ -1830,7 +1817,7 @@
                   }}
                   disabled={!inputText}
                   class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
-                  title="Limpiar panel desofuscado"
+                  title="Limpiar panel de texto claro"
                 >
                   Limpiar
                 </button>
@@ -1847,7 +1834,7 @@
                 on:input={() => { studioDirection = "obfuscate"; }}
                 on:focus={() => { if (inputText.trim()) studioDirection = "obfuscate"; }}
                 on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                placeholder="Pega o escribe aquí el contenido en claro (JSON, Logs, XML, código) para OFUSCAR..."
+                placeholder="Pega o escribe aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
                 class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''}"
               ></textarea>
             </div>
@@ -1859,30 +1846,30 @@
               <button
                 on:click={handleObfuscate}
                 disabled={loading || !inputText.trim()}
-                class="px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
-                title="Ofuscar contenido (Desofuscado ➔ Ofuscado)"
+                class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
+                title="Proteger datos (Texto claro ➔ Texto protegido)"
               >
                 {#if loading}
                   <span class="animate-spin">⏳</span>
                 {:else}
                   <span>🛡️</span>
                 {/if}
-                <span>Ofuscar</span>
+                <span>Proteger</span>
                 <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
               </button>
             {:else}
               <button
                 on:click={handleDeobfuscate}
                 disabled={loading || !outputText.trim()}
-                class="px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
-                title="Desofuscar contenido (Desofuscado ⮜ Ofuscado)"
+                class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
+                title="Restaurar datos (Texto protegido ➔ Texto claro)"
               >
                 {#if loading}
                   <span class="animate-spin">⏳</span>
                 {:else}
                   <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
                 {/if}
-                <span>Desofuscar</span>
+                <span>Restaurar</span>
                 <span>🔄</span>
               </button>
             {/if}
@@ -1890,42 +1877,35 @@
             <button
               on:click={toggleStudioDirection}
               class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10 shadow-sm transition"
-              title="Cambiar dirección: {studioDirection === 'obfuscate' ? 'Cambiar a Desofuscar ⮜' : 'Cambiar a Ofuscar ➔'}"
+              title="Cambiar dirección: {studioDirection === 'obfuscate' ? 'Cambiar a Restaurar ⮜' : 'Cambiar a Proteger ➔'}"
             >
               <span>⇄</span>
             </button>
           </div>
 
-          <!-- Panel Derecho: Ofuscado -->
+          <!-- Panel Derecho: Texto protegido -->
           <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'deobfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
             <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🛡️</span> Ofuscado
+                  <span>🛡️</span> Texto protegido
                 </span>
                 <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" title="Texto con datos protegidos por seudónimos">
                   Texto protegido
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos para restaurar">
+                  <span>📄</span> Arrastra archivo
                 </span>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10px] font-mono text-slate-400">
                   {outputLinesCount} lín · {outputCharCount} car · {outputSizeKB}
                 </span>
-                {#if showFileButtons}
-                  <button
-                    on:click={() => openFileToProcess(true)}
-                    disabled={loading}
-                    class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition flex items-center gap-1"
-                    title="Cargar y desofuscar un archivo con la bóveda"
-                  >
-                    <span>📄</span> Desofuscar Fichero...
-                  </button>
-                {/if}
                 <button
                   on:click={copyOutputWithFeedback}
                   disabled={!outputText}
                   class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedOutputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
-                  title="Copiar texto ofuscado"
+                  title="Copiar texto protegido"
                 >
                   {#if copiedOutputFlash}
                     <span>✓</span> ¡Copiado!
@@ -1940,7 +1920,7 @@
                   }}
                   disabled={!outputText}
                   class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
-                  title="Limpiar panel ofuscado"
+                  title="Limpiar panel de texto protegido"
                 >
                   Limpiar
                 </button>
@@ -1957,7 +1937,7 @@
                 on:input={() => { studioDirection = "deobfuscate"; }}
                 on:focus={() => { if (outputText.trim()) studioDirection = "deobfuscate"; }}
                 on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                placeholder="Pega o escribe aquí el contenido protegido o la respuesta de la IA para DESOFUSCAR..."
+                placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
                 class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre"
               ></textarea>
             </div>
@@ -1973,7 +1953,7 @@
               title="Alternar sentido de procesamiento"
             >
               <span>⇄</span>
-              <span>Modo actual: <strong>{studioDirection === 'obfuscate' ? 'Ofuscar (Desofuscado ➔ Ofuscado)' : 'Desofuscar (Ofuscado ➔ Desofuscado)'}</strong></span>
+              <span>Modo actual: <strong>{studioDirection === 'obfuscate' ? 'Proteger (Texto claro ➔ Texto protegido)' : 'Restaurar (Texto protegido ➔ Texto claro)'}</strong></span>
             </button>
             <button
               on:click={() => {
@@ -2001,7 +1981,7 @@
                 {:else}
                   <span>🛡️</span>
                 {/if}
-                Ofuscar para IA ➔
+                Proteger datos ➔
               </button>
             {:else}
               <button
@@ -2014,7 +1994,7 @@
                 {:else}
                   <span>🔄</span>
                 {/if}
-                ⮜ Desofuscar Original
+                ⮜ Restaurar datos
               </button>
             {/if}
           </div>
@@ -3712,18 +3692,18 @@
           {#if activeHelpTab === "studio"}
             <div class="space-y-3">
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>✨</span> Cómo ofuscar texto para usar en Inteligencia Artificial o proteger secretos
+                <span>✨</span> Cómo proteger texto para usar en Inteligencia Artificial o compartir datos
               </h4>
               <p>El objetivo principal del Studio es permitirte interactuar de forma segura con modelos de lenguaje (como ChatGPT, Claude, Gemini o IAs locales), o compartir documentos con personas que no deben conocer información confidencial (nombres de clientes, DNI, IBAN, contraseñas, direcciones IP o números de tarjeta).</p>
               
               <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
                 <p class="font-bold text-slate-900 dark:text-white">Flujo de Trabajo Recomendado:</p>
                 <ol class="list-decimal list-inside space-y-1.5 pl-1">
-                  <li><strong>Pega el texto confidencial</strong> en el panel de entrada (o abre un archivo con <em>Abrir Archivo</em>).</li>
-                  <li><strong>Selecciona el formato:</strong> Si es código estructurado, elige JSON, XML o Logs para garantizar que no se alteren comillas ni delimitadores clave.</li>
-                  <li><strong>Pulsa "Ofuscar":</strong> LexiShield reemplazará cada token confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
-                  <li><strong>Usa el texto en la IA:</strong> Copia el resultado ofuscado y envíalo con total tranquilidad a cualquier modelo de IA.</li>
-                  <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en el Studio y pulsa <strong>"Desofuscar"</strong> para recuperar al 100% los valores reales.</li>
+                  <li><strong>Pega o escribe el contenido</strong> en el panel <em>Texto claro</em> (o arrastra y suelta un archivo o carpeta directamente encima).</li>
+                  <li><strong>Detección automática:</strong> El motor identifica automáticamente la estructura sintáctica (JSON, XML, Logs o texto plano) sin que tengas que configurarlo.</li>
+                  <li><strong>Pulsa "Proteger":</strong> LexiShield reemplazará cada dato confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
+                  <li><strong>Usa el texto en la IA:</strong> Copia el <em>Texto protegido</em> y envíalo con total tranquilidad a cualquier modelo de IA o tercero.</li>
+                  <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en <em>Texto protegido</em> y pulsa <strong>"Restaurar"</strong> para recuperar al 100% los valores reales.</li>
                 </ol>
               </div>
 
@@ -3894,38 +3874,113 @@
     </div>
   {/if}
 
+  <!-- MODAL INTELIGENTE DE PROCESAMIENTO DE CARPETA EN STUDIO -->
+  {#if directoryDropModal}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
+        on:click={cancelDirectoryDropModal}
+        aria-label="Cerrar modal de carpeta"
+      ></button>
+      <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 flex flex-col shadow-2xl space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-500 flex items-center justify-center text-xl shrink-0">
+            📁
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white">Carpeta detectada: {directoryDropModal.name}</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-sm" title={directoryDropModal.path}>{directoryDropModal.path}</p>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 dark:text-slate-300">
+          Has arrastrado un directorio completo a <strong>Texto claro</strong>. LexiShield puede auditar y proteger en lote todos los archivos compatibles contenidos en la carpeta.
+        </p>
+
+        <div class="p-3.5 bg-slate-50 dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/5 space-y-3 text-xs">
+          <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+            <input type="checkbox" bind:checked={directoryDropModal.cleanCache} class="rounded accent-primary-500" />
+            <div>
+              <span class="font-semibold text-slate-900 dark:text-white">Limpiar cachés de sesión</span>
+              <p class="text-[11px] text-slate-400">Fuerza el re-análisis completo de todos los archivos sin utilizar cachés intermedias previas.</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+            <input type="checkbox" bind:checked={directoryDropModal.copyMode} class="rounded accent-primary-500" />
+            <div>
+              <span class="font-semibold text-slate-900 dark:text-white">Guardar en copia sufijada ({copySuffix})</span>
+              <p class="text-[11px] text-slate-400">Conserva los archivos originales intactos y genera copias protegidas.</p>
+            </div>
+          </label>
+
+          {#if hasPandoc}
+            <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+              <input type="checkbox" bind:checked={directoryDropModal.exportMarkdown} class="rounded accent-primary-500" />
+              <div>
+                <span class="font-semibold text-slate-900 dark:text-white">Guardar en Markdown (.md)</span>
+                <p class="text-[11px] text-slate-400">Convierte automáticamente documentos de Office procesados a formato Markdown.</p>
+              </div>
+            </label>
+          {/if}
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button
+            on:click={cancelDirectoryDropModal}
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
+          >
+            Cancelar
+          </button>
+          <button
+            on:click={confirmProcessDirectoryFromModal}
+            class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+          >
+            <span>🛡️</span>
+            Proteger Carpeta
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <!-- OVERLAY VISUAL DE ARRASTRE DE ARCHIVOS O CARPETAS (DRAG & DROP) -->
   {#if isDragging && allowDragDrop}
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-8 pointer-events-none transition animate-in fade-in duration-200">
       {#if activeTab === "studio"}
-        <!-- Overlay dividido de Studio: Desofuscado (Ofuscar) y Ofuscado (Desofuscar) -->
+        <!-- Overlay dividido de Studio: Texto claro (Proteger) y Texto protegido (Restaurar) -->
         <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[360px]">
-          <!-- Zona Izquierda: Desofuscado (Ofuscar) -->
+          <!-- Zona Izquierda: Texto claro (Proteger) -->
           <div class="rounded-3xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center gap-4 transition-all duration-150 {studioDragTarget === 'deobfuscated' ? 'border-primary-400 bg-primary-500/20 scale-[1.02] shadow-2xl ring-4 ring-primary-500/30' : 'border-slate-500/50 bg-slate-900/60 opacity-75'}">
             <div class="w-20 h-20 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center text-5xl animate-bounce">
               📥
             </div>
             <h3 class="text-xl font-extrabold text-white">
-              Panel Desofuscado
+              Panel Texto Claro
             </h3>
             <div class="px-3 py-1 bg-primary-500 text-slate-950 text-xs font-black rounded-full uppercase tracking-wider">
-              🛡️ Suelta aquí para OFUSCAR
+              🛡️ Suelta aquí para PROTEGER
             </div>
             <p class="text-xs text-slate-300 max-w-xs">
-              Se protegerán los tokens confidenciales (IPs, emails, nombres, claves) por seudónimos seguros y se guardará la copia procesada.
+              Se protegerán los datos confidenciales (IPs, emails, nombres, claves) por seudónimos seguros. Admite archivos individuales o carpetas completas.
             </p>
           </div>
 
-          <!-- Zona Derecha: Ofuscado (Desofuscar) -->
+          <!-- Zona Derecha: Texto protegido (Restaurar) -->
           <div class="rounded-3xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center gap-4 transition-all duration-150 {studioDragTarget === 'obfuscated' ? 'border-amber-400 bg-amber-500/20 scale-[1.02] shadow-2xl ring-4 ring-amber-500/30' : 'border-slate-500/50 bg-slate-900/60 opacity-75'}">
             <div class="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-5xl animate-bounce">
               📤
             </div>
             <h3 class="text-xl font-extrabold text-white">
-              Panel Ofuscado
+              Panel Texto Protegido
             </h3>
             <div class="px-3 py-1 bg-amber-400 text-slate-950 text-xs font-black rounded-full uppercase tracking-wider">
-              🔄 Suelta aquí para DESOFUSCAR
+              🔄 Suelta aquí para RESTAURAR
             </div>
             <p class="text-xs text-slate-300 max-w-xs">
               Se restaurarán los valores reales originales a partir de los seudónimos utilizando tu bóveda local de mapeos.
