@@ -2068,22 +2068,6 @@
             >
               <span>📋</span> Analizar Texto
             </button>
-            {#if showFileButtons}
-              <button
-                on:click={openFileToAudit}
-                disabled={loading}
-                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-              >
-                <span>📄</span> Escanear Fichero
-              </button>
-              <button
-                on:click={openDirectoryToAudit}
-                disabled={loading}
-                class="px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-xl border border-primary-500/30 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-              >
-                <span>📁</span> Escanear Carpeta
-              </button>
-            {/if}
           </div>
         </div>
 
@@ -2151,28 +2135,23 @@
         {/if}
 
         {#if detectedItems.length === 0 && !isScanningDirectory && !showTextScanPanel}
-          <div class="mb-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl flex flex-col items-center justify-center text-center gap-2 bg-slate-50/50 dark:bg-slate-900/30 transition hover:border-primary-500/50">
-            <span class="text-4xl mb-1">📂</span>
-            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">
-              {#if allowDragDrop && showFileButtons}
+          <div class="mb-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl flex flex-col items-center justify-center text-center gap-3 bg-slate-50/50 dark:bg-slate-900/30 transition hover:border-primary-500/50">
+            <span class="text-4xl">📂</span>
+            <div class="space-y-1">
+              <p class="text-xs font-bold text-slate-800 dark:text-slate-200">
                 Arrastra y suelta aquí cualquier archivo o carpeta
-              {:else if allowDragDrop}
-                Arrastra y suelta aquí cualquier archivo o carpeta (Modo Drag & Drop)
-              {:else}
-                Selecciona un archivo o carpeta para auditar
-              {/if}
-            </p>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-md">
-              LexiShield detectará automáticamente si es un archivo individual o un directorio para iniciar la auditoría de tokens confidenciales.
-            </p>
-            <div class="flex items-center gap-2 mt-2">
-              {#if showFileButtons}
-                <button on:click={openFileToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar archivo</button>
-                <span class="text-slate-400 text-xs">•</span>
-                <button on:click={openDirectoryToAudit} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Seleccionar carpeta</button>
-                <span class="text-slate-400 text-xs">•</span>
-              {/if}
-              <button on:click={() => (showTextScanPanel = true)} class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">Pegar texto</button>
+              </p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                LexiShield detectará automáticamente si es un archivo individual o un directorio para iniciar la auditoría de tokens confidenciales.
+              </p>
+            </div>
+            <div class="pt-1">
+              <button
+                on:click={() => (showTextScanPanel = true)}
+                class="px-3.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+              >
+                <span>📋</span> O analizar texto pegado
+              </button>
             </div>
           </div>
         {/if}
