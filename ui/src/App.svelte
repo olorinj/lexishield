@@ -34,6 +34,7 @@
       },
       file_selection_mode: "ambos",
       close_to_tray: true,
+      close_action: "tray",
       output_suffix: "_obfuscated",
       font_size: "medium",
       privacy_blur: false,
@@ -427,9 +428,10 @@
         if (!["ambos", "arrastrar", "botones"].includes(cfg.gui.file_selection_mode)) {
           cfg.gui.file_selection_mode = "ambos";
         }
-        if (typeof cfg.gui.close_to_tray !== "boolean") {
-          cfg.gui.close_to_tray = true;
+        if (!["tray", "taskbar", "close"].includes(cfg.gui.close_action)) {
+          cfg.gui.close_action = cfg.gui.close_to_tray === false ? "close" : "tray";
         }
+        cfg.gui.close_to_tray = (cfg.gui.close_action === "tray");
         if (!cfg.gui.output_suffix) {
           cfg.gui.output_suffix = "_obfuscated";
         }
@@ -894,8 +896,12 @@
   function sendPastedTextToStudio() {
     if (!textToAudit.trim()) return;
     inputText = textToAudit;
+    textToAudit = "";
+    detectedItems = [];
+    auditSummary = null;
+    selectedScanOriginals = [];
     activeTab = "studio";
-    statusMessage = "📋 Texto transferido a Studio. Listo para proteger o restaurar.";
+    statusMessage = "📋 Texto transferido a Studio y escáner restablecido.";
   }
 
   async function handleDroppedPath(droppedPath, targetPanel = "deobfuscated") {
@@ -961,7 +967,7 @@
         copySuffix = suffix;
         if (appConfig?.gui) {
           appConfig.gui.output_suffix = suffix;
-          await saveAppSettings();
+          await saveSettings();
         }
       }
 
@@ -3059,11 +3065,32 @@
                 </p>
               </div>
 
-              <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs">
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" bind:checked={appConfig.gui.close_to_tray} class="rounded accent-primary-500" />
-                  <span>Minimizar a la bandeja del sistema (reloj) al cerrar [X]</span>
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5 space-y-2">
+                <label for="config-close-action-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400">
+                  Comportamiento al pulsar el botón de cerrar [X]:
                 </label>
+                <select
+                  id="config-close-action-select"
+                  bind:value={appConfig.gui.close_action}
+                  on:change={() => {
+                    appConfig.gui.close_to_tray = (appConfig.gui.close_action === "tray");
+                    saveSettings();
+                  }}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="tray">🗄️ Minimizar a la bandeja del sistema (icono junto al reloj / segundo plano)</option>
+                  <option value="taskbar">📌 Minimizar a la barra de tareas (como ventana minimizada)</option>
+                  <option value="close">🚪 Cerrar la aplicación completamente (por defecto del sistema)</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  {#if appConfig.gui.close_action === 'tray'}
+                    Al pulsar [X], la ventana se oculta y LexiShield sigue protegiendo en segundo plano desde el área de notificación.
+                  {:else if appConfig.gui.close_action === 'taskbar'}
+                    Al pulsar [X], la ventana se minimiza a la barra de tareas inferior sin cerrarse.
+                  {:else}
+                    Al pulsar [X], la ventana y el proceso se cierran por completo.
+                  {/if}
+                </p>
               </div>
             </div>
 

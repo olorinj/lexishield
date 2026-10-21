@@ -1232,14 +1232,23 @@ fn main() {
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 let config = load_config_with_rules(None, None);
-                if config.gui.close_to_tray {
-                    let _ = window.hide();
-                    api.prevent_close();
+                match config.gui.resolved_close_action() {
+                    "tray" => {
+                        let _ = window.hide();
+                        api.prevent_close();
+                    }
+                    "taskbar" => {
+                        let _ = window.minimize();
+                        api.prevent_close();
+                    }
+                    _ => {
+                        // "close" -> comportamiento nativo del SO, no prevenimos el cierre
+                    }
                 }
             }
             tauri::WindowEvent::Resized(_) if window.is_minimized().unwrap_or(false) => {
                 let config = load_config_with_rules(None, None);
-                if config.gui.close_to_tray {
+                if config.gui.resolved_close_action() == "tray" {
                     let _ = window.hide();
                 }
             }

@@ -375,6 +375,8 @@ pub struct GuiConfig {
     pub file_selection_mode: String,
     #[serde(default = "default_true")]
     pub close_to_tray: bool,
+    #[serde(default = "default_close_action")]
+    pub close_action: String,
     #[serde(default = "default_output_suffix")]
     pub output_suffix: String,
     #[serde(default = "default_font_size")]
@@ -395,6 +397,10 @@ fn default_default_tab() -> String {
 
 fn default_file_selection_mode() -> String {
     "ambos".to_string()
+}
+
+fn default_close_action() -> String {
+    "tray".to_string()
 }
 
 fn default_output_suffix() -> String {
@@ -422,6 +428,22 @@ impl GuiConfig {
             _ => "ambos",
         }
     }
+
+    /// Resuelve la acción al pulsar [X] ("tray", "taskbar" o "close"), manteniendo compatibilidad con configuraciones previas basadas en `close_to_tray`.
+    pub fn resolved_close_action(&self) -> &str {
+        match self.close_action.as_str() {
+            "taskbar" => "taskbar",
+            "close" => "close",
+            "tray" => "tray",
+            _ => {
+                if self.close_to_tray {
+                    "tray"
+                } else {
+                    "close"
+                }
+            }
+        }
+    }
 }
 
 impl Default for GuiConfig {
@@ -433,6 +455,7 @@ impl Default for GuiConfig {
             clipboard: GuiClipboardConfig::default(),
             file_selection_mode: default_file_selection_mode(),
             close_to_tray: true,
+            close_action: default_close_action(),
             output_suffix: default_output_suffix(),
             font_size: default_font_size(),
             privacy_blur: false,
