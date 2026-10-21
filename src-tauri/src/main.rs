@@ -1227,6 +1227,10 @@ fn main() {
                     .build(app)?;
             }
 
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| match event {

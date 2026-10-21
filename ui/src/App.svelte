@@ -80,6 +80,35 @@
     return "TEXTO PLANO";
   })();
 
+  // Acción Svelte para autofoco confiable con reintentos para WebViews
+  function autofocus(node) {
+    const focusAndSelect = () => {
+      try {
+        if (document.activeElement !== node) {
+          node.focus();
+        }
+        if (typeof node.select === "function") {
+          node.select();
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    focusAndSelect();
+    const t1 = setTimeout(focusAndSelect, 50);
+    const t2 = setTimeout(focusAndSelect, 150);
+    const t3 = setTimeout(focusAndSelect, 300);
+
+    return {
+      destroy() {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      },
+    };
+  }
+
   function getDetectorCategory(detectorType) {
     const dt = (detectorType || "").toLowerCase();
     if (dt.includes("ip") || dt.includes("mac") || dt.includes("domain") || dt.includes("url") || dt.includes("host") || dt.includes("red")) {
@@ -362,6 +391,10 @@
     outputText = "";
     textToAudit = "";
     detectedItems = [];
+    if (isVaultEncrypted) {
+      unlockTargetVault = vaultPath;
+      showUnlockModal = true;
+    }
     statusMessage = "🔒 Bóveda y sesión bloqueadas automáticamente por inactividad.";
   }
 
@@ -539,6 +572,13 @@
     } catch (err) {
       unlockError = String(err);
       statusMessage = "❌ " + err;
+      setTimeout(() => {
+        const el = document.getElementById("unlock-pwd-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
     }
   }
 
@@ -546,6 +586,13 @@
     const pwd = initVaultPassword.trim();
     if (!pwd) {
       alert("⚠️ Es obligatorio proporcionar una contraseña para inicializar y proteger la bóveda.");
+      setTimeout(() => {
+        const el = document.getElementById("init-vault-pwd");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     try {
@@ -562,12 +609,26 @@
       await checkAndLoadVault(created, pwd);
     } catch (e) {
       alert("Error al inicializar bóveda: " + e);
+      setTimeout(() => {
+        const el = document.getElementById("init-vault-pwd");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
     }
   }
 
   async function handleUnlockVaultSubmit() {
     if (!unlockPassword) {
       unlockError = "Por favor ingrese la contraseña de la bóveda";
+      setTimeout(() => {
+        const el = document.getElementById("unlock-pwd-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     password = unlockPassword;
@@ -1270,11 +1331,25 @@
   async function handleCreateVaultSubmit() {
     if (!newVaultName.trim()) {
       alert("Introduce un nombre para la nueva bóveda.");
+      setTimeout(() => {
+        const el = document.getElementById("create-vault-name-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     const pwd = newVaultPassword.trim();
     if (!pwd) {
       alert("⚠️ Es obligatorio configurar una contraseña para proteger la nueva bóveda.");
+      setTimeout(() => {
+        const el = document.getElementById("create-vault-pwd-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     try {
@@ -3294,6 +3369,7 @@
             </div>
             <input
               id="unlock-pwd-input"
+              use:autofocus
               type="password"
               bind:value={unlockPassword}
               placeholder="Introduce la contraseña..."
@@ -3353,6 +3429,7 @@
             </div>
             <input
               id="init-vault-pwd"
+              use:autofocus
               type="password"
               bind:value={initVaultPassword}
               placeholder="Introduce la contraseña para cifrar la bóveda..."
@@ -3455,6 +3532,7 @@
             <label for="create-vault-name-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Nombre de la Bóveda (.lexi):</label>
             <input
               id="create-vault-name-input"
+              use:autofocus
               type="text"
               bind:value={newVaultName}
               placeholder="ej: clientes_2026.lexi"
@@ -3506,6 +3584,7 @@
             <label for="rename-vault-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Nuevo Nombre:</label>
             <input
               id="rename-vault-input"
+              use:autofocus
               type="text"
               bind:value={renameNewVaultName}
               class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500"
@@ -3546,6 +3625,7 @@
             <label for="backup-pwd-modal-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Contraseña de Cifrado AES-256 (Opcional):</label>
             <input
               id="backup-pwd-modal-input"
+              use:autofocus
               type="password"
               bind:value={backupPassword}
               placeholder="Contraseña para proteger la copia..."
