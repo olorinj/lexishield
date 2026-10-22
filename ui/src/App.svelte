@@ -13,7 +13,7 @@
   let darkMode = true;
 
   // Control de Pestañas Activas
-  let activeTab = "studio"; // "studio" | "scanner" | "pairs" | "vaults" | "watch" | "config"
+  let activeTab = "studio"; // "studio" | "pairs" | "vaults" | "watch" | "config"
 
   // Configuración de la Aplicación y Ergonomía
   let appConfig = {
@@ -22,7 +22,6 @@
       show_cli_dock: true,
       tabs: {
         show_studio: true,
-        show_scanner: true,
         show_pairs: true,
         show_vaults: true,
         show_watch: true,
@@ -47,6 +46,7 @@
   let inputGutterEl;
   let outputGutterEl;
   let copiedOutputFlash = false;
+  let deobfuscateSuccessFlash = false;
 
   $: fileSelectionMode = appConfig?.gui?.file_selection_mode || "ambos";
   $: allowDragDrop = fileSelectionMode === "ambos" || fileSelectionMode === "arrastrar";
@@ -170,6 +170,7 @@
   }
 
   // Estado del Studio
+  let studioSubView = "transform"; // "transform" (Editor Bidireccional) | "audit" (Desglose y Auditoría)
   let inputText = "";
   let outputText = "";
   let selectedFormat = "auto";
@@ -256,7 +257,7 @@
   let clipboardEvents = [];
 
   // Estado de Ayuda Contextual y Onboarding
-  let activeHelpTab = null; // "studio" | "scanner" | "pairs" | "vaults" | "watch" | "config" | "logs" | "password_why"
+  let activeHelpTab = null; // "studio" | "pairs" | "vaults" | "watch" | "config" | "logs" | "password_why"
   let dismissedTips = JSON.parse(localStorage.getItem("dismissed_tips") || "{}");
 
   // Estado de Notificación / Modal de Acción Completada
@@ -711,6 +712,10 @@
       inputText = res.deobfuscated_text;
       lastReport = res.report;
       studioDirection = "deobfuscate";
+      deobfuscateSuccessFlash = true;
+      setTimeout(() => {
+        deobfuscateSuccessFlash = false;
+      }, 2000);
       statusMessage = `✅ Datos restaurados exitosamente: ${res.report.replacements_applied} tokens recuperados en ${res.report.elapsed_ms.toFixed(2)}ms`;
       actionResultModal = {
         title: "Restauración Finalizada con Éxito",
@@ -718,7 +723,8 @@
         message: "Las respuestas de la IA han sido procesadas recuperando los valores reales originales mediante tu bóveda local.",
         details: [
           { label: "Tokens Restaurados", value: `${res.report.replacements_applied}` },
-          { label: "Tiempo de Proceso", value: `${res.report.elapsed_ms.toFixed(2)} ms` }
+          { label: "Tiempo de Proceso", value: `${res.report.elapsed_ms.toFixed(2)} ms` },
+          { label: "Bóveda Utilizada", value: vaultPath ? vaultPath.split('/').pop() : "Predeterminada" }
         ]
       };
     } catch (err) {
@@ -804,7 +810,8 @@
       loading = true;
       detectedItems = [];
       auditSummary = null;
-      activeTab = "scanner";
+      activeTab = "studio";
+      studioSubView = "audit";
       const res = await invokeTauri("scan_file_command", {
         path: filePath,
         vaultPath: pairsSelectedVault || vaultPath || null,
@@ -851,7 +858,8 @@
       isScanningDirectory = true;
       detectedItems = [];
       auditSummary = null;
-      activeTab = "scanner";
+      activeTab = "studio";
+      studioSubView = "audit";
       scanCurrentFile = "Iniciando recorrido...";
       scanFilesCount = 0;
       scanFilesIgnored = 0;
@@ -900,13 +908,62 @@
     }
   }
 
+  async function scanCurrentStudioText() {
+    const textToScan = inputText.trim() || outputText.trim() || textToAudit.trim();
+    if (!textToScan) {
+      statusMessage = "Por favor ingresa o pega texto en los paneles para auditar.";
+      return;
+    }
+    try {
+      loading = true;
+      detectedItems = [];
+      auditSummary = null;
+      studioSubView = "audit";
+
+      const res = await invokeTauri("scan_content", {
+        content: textToScan,
+        vaultPath: pairsSelectedVault || vaultPath || null,
+        password: password || null
+      });
+
+      detectedItems = (res.items || []).map(item => ({
+        ...item,
+        file: "[Texto del Studio]"
+      }));
+
+      auditSummary = {
+        files_scanned: 1,
+        files_ignored: 0,
+        total_entities: res.total_entities,
+        vault_used: pairsSelectedVault || "Sesión"
+      };
+
+      if (res.total_entities === 0) {
+        statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el texto.";
+      } else {
+        statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados y clasificados en la tabla.`;
+      }
+    } catch (err) {
+      statusMessage = "Error al analizar texto: " + err;
+      actionResultModal = {
+        title: "Error al Analizar Texto",
+        type: "info",
+        message: `No se pudo analizar el texto proporcionado: ${err}`,
+        details: []
+      };
+    } finally {
+      loading = false;
+    }
+  }
+
   async function scanPastedText() {
     if (!textToAudit.trim()) return;
     try {
       loading = true;
       detectedItems = [];
       auditSummary = null;
-      activeTab = "scanner";
+      activeTab = "studio";
+      studioSubView = "audit";
 
       const res = await invokeTauri("scan_content", {
         content: textToAudit,
@@ -951,7 +1008,7 @@
     auditSummary = null;
     selectedScanOriginals = [];
     textToAudit = "";
-    statusMessage = "Escáner reiniciado. Listo para un nuevo análisis.";
+    statusMessage = "Auditoría reiniciada. Listo para un nuevo análisis.";
   }
 
   function sendPastedTextToStudio() {
@@ -962,42 +1019,28 @@
     auditSummary = null;
     selectedScanOriginals = [];
     activeTab = "studio";
-    statusMessage = "📋 Texto transferido a Studio y escáner restablecido.";
+    studioSubView = "transform";
+    statusMessage = "📋 Texto transferido al editor de Studio.";
   }
 
   async function handleDroppedPath(droppedPath, targetPanel = "deobfuscated") {
     if (!droppedPath) return;
     try {
       const isDir = await invokeTauri("is_directory", { path: droppedPath });
-      if (activeTab === "scanner") {
-        if (isDir) {
-          await auditDirectoryPath(droppedPath);
-        } else {
-          await auditFilePath(droppedPath);
-        }
-      } else if (activeTab === "studio") {
-        const itemName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
-        const isReverse = (targetPanel === "obfuscated");
-        const defaultSuffix = isReverse ? ".desofuscado" : copySuffix;
-        studioDropModal = {
-          path: droppedPath,
-          name: itemName,
-          isDir: isDir,
-          isReverse: isReverse,
-          copyMode: true,
-          suffix: defaultSuffix,
-          saveSuffixDefault: false,
-          cleanCache: true,
-          exportMarkdown: hasPandoc && exportMarkdown
-        };
-      } else {
-        activeTab = "scanner";
-        if (isDir) {
-          await auditDirectoryPath(droppedPath);
-        } else {
-          await auditFilePath(droppedPath);
-        }
-      }
+      const itemName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
+      const isReverse = (targetPanel === "obfuscated");
+      const defaultSuffix = isReverse ? ".desofuscado" : copySuffix;
+      studioDropModal = {
+        path: droppedPath,
+        name: itemName,
+        isDir: isDir,
+        isReverse: isReverse,
+        copyMode: true,
+        suffix: defaultSuffix,
+        saveSuffixDefault: false,
+        cleanCache: true,
+        exportMarkdown: hasPandoc && exportMarkdown
+      };
     } catch (err) {
       statusMessage = "Error al procesar elemento arrastrado: " + err;
     }
@@ -1037,7 +1080,8 @@
           await invokeTauri("clear_scan_cache_command");
           statusMessage = "🧹 Cachés de sesión limpiadas antes de analizar el directorio.";
         }
-        activeTab = "scanner";
+        activeTab = "studio";
+        studioSubView = "audit";
         await auditDirectoryPath(path);
         statusMessage = `📁 Directorio cargado para análisis y ${isReverse ? 'restauración' : 'protección'}: ${path}`;
       } else {
@@ -1699,11 +1743,12 @@
     const pwdArg = password ? ` -p "***"` : "";
 
     if (activeTab === "studio") {
+      if (studioSubView === "audit") {
+        const recArg = recursiveScan ? " -r" : " --no-recursive";
+        const noGitArg = noGitIgnoreScan ? " --no-git-ignore" : "";
+        return `lexishield scan -i "<ruta>"${recArg}${noGitArg}${vaultArg}`;
+      }
       return `lexishield obfuscate -f ${selectedFormat}${vaultArg}${cleanArg}${copyArg}${pwdArg}`;
-    } else if (activeTab === "scanner") {
-      const recArg = recursiveScan ? " -r" : " --no-recursive";
-      const noGitArg = noGitIgnoreScan ? " --no-git-ignore" : "";
-      return `lexishield scan -i "<ruta>"${recArg}${noGitArg}${vaultArg}`;
     } else if (activeTab === "pairs") {
       return `lexishield dict list${vaultArg}`;
     } else if (activeTab === "vaults") {
@@ -1746,15 +1791,6 @@
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'studio' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
         >
           <span>✨</span> Studio
-        </button>
-      {/if}
-
-      {#if appConfig.gui.tabs.show_scanner}
-        <button
-          on:click={() => (activeTab = "scanner")}
-          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'scanner' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
-        >
-          <span>🔍</span> Escáner
         </button>
       {/if}
 
@@ -1850,598 +1886,615 @@
   <!-- CONTENIDO DINÁMICO POR PESTAÑA -->
   <div class="flex-1 overflow-auto p-4 flex flex-col min-h-0">
     {#if activeTab === "studio"}
-      <!-- VISTA STUDIO -->
+      <!-- VISTA STUDIO UNIFICADA (TRANSFORMACIÓN + AUDITORÍA) -->
       <div in:fade={{ duration: 150 }} class="flex-1 flex flex-col gap-4 min-h-0">
-        <!-- Barra Superior Minimalista de Studio -->
-        <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 px-4 py-2 flex items-center justify-between gap-3 shadow-sm text-xs">
-          <div class="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-            <span class="text-amber-500 font-bold flex items-center gap-1">
-              <span>⚡</span> Modo Interactivo
-            </span>
-            <span class="text-slate-300 dark:text-slate-600 hidden sm:inline">•</span>
-            <span class="hidden sm:inline">Arrastra archivos o carpetas a los paneles para procesar con opciones</span>
+        <!-- Barra Superior Minimalista de Studio con Selector de Sub-vistas -->
+        <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 px-4 py-2 flex items-center justify-between gap-3 shadow-sm text-xs flex-wrap">
+          <div class="flex items-center gap-1.5 p-0.5 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5">
+            <button
+              type="button"
+              on:click={() => (studioSubView = "transform")}
+              class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'transform' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+            >
+              <span>✨</span> Transformación
+            </button>
+            <button
+              type="button"
+              on:click={() => (studioSubView = "audit")}
+              class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'audit' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+            >
+              <span>🔍</span> Desglose y Auditoría
+              {#if detectedItems.length > 0}
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
+                  {detectedItems.length}
+                </span>
+              {/if}
+            </button>
           </div>
 
           <div class="flex items-center gap-2">
+            {#if studioSubView === "transform"}
+              <button
+                type="button"
+                on:click={scanCurrentStudioText}
+                disabled={loading || (!inputText.trim() && !outputText.trim())}
+                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1 shadow-sm disabled:opacity-40"
+                title="Auditar tokens confidenciales del texto de los paneles sin modificarlo"
+              >
+                <span>🔍</span> Auditar Texto
+              </button>
+            {/if}
             <button
               on:click={() => openHelp('studio')}
               class="px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1 shadow-sm"
-              title="Ver guía de uso de Studio"
+              title="Ver guía de uso de Studio y Auditoría"
             >
               <span>❔</span> Ayuda
             </button>
           </div>
         </div>
 
-        {#if !dismissedTips.studio}
-          <div in:slide={{ duration: 150 }} class="p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
-            <div class="flex items-center gap-3">
-              <span class="text-lg">✨</span>
-              <p class="text-slate-700 dark:text-slate-300">
-                <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Escribe o pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
-              </p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
-              <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Paneles de Texto claro y Texto protegido con Puente Central -->
-        <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0 items-stretch relative">
-          <!-- Panel Izquierdo: Texto claro -->
-          <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'obfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>📥</span> Texto claro
-                </span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Texto original en claro">
-                  Texto en claro
-                </span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos y carpetas">
-                  <span>📁</span> Arrastra archivo o carpeta
-                </span>
+        {#if studioSubView === "transform"}
+          {#if !dismissedTips.studio}
+            <div in:slide={{ duration: 150 }} class="p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
+              <div class="flex items-center gap-3">
+                <span class="text-lg">✨</span>
+                <p class="text-slate-700 dark:text-slate-300">
+                  <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Escribe o pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
+                </p>
               </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-[10px] font-mono text-slate-400">
-                  {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
-                </span>
-                <button
-                  on:click={copyInputWithFeedback}
-                  disabled={!inputText}
-                  class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition {copiedInputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
-                  title="Copiar texto claro"
-                >
-                  {#if copiedInputFlash}
-                    <span>✓</span> ¡Copiado!
-                  {:else}
-                    <span>📋</span> Copiar
-                  {/if}
-                </button>
-                <button
-                  on:click={() => {
-                    inputText = "";
-                    if (!outputText) statusMessage = "Área de trabajo de Studio limpiada.";
-                  }}
-                  disabled={!inputText}
-                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
-                  title="Limpiar panel de texto claro"
-                >
-                  Limpiar
-                </button>
-              </div>
-            </div>
-            <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
-              <pre
-                bind:this={inputGutterEl}
-                class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
-                aria-hidden="true"
-              >{inputGutterText}</pre>
-              <textarea
-                bind:value={inputText}
-                on:input={() => { studioDirection = "obfuscate"; }}
-                on:focus={() => { if (inputText.trim()) studioDirection = "obfuscate"; }}
-                on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                placeholder="Pega o escribe aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
-                class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''}"
-              ></textarea>
-            </div>
-          </div>
-
-          <!-- Puente Central Direccional entre Paneles -->
-          <div class="flex md:flex-col items-center justify-center gap-2 py-1 md:py-0 shrink-0">
-            {#if studioDirection === "obfuscate"}
-              <button
-                on:click={handleObfuscate}
-                disabled={loading || !inputText.trim()}
-                class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
-                title="Proteger datos (Texto claro ➔ Texto protegido)"
-              >
-                {#if loading}
-                  <span class="animate-spin">⏳</span>
-                {:else}
-                  <span>🛡️</span>
-                {/if}
-                <span>Proteger</span>
-                <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
-              </button>
-            {:else}
-              <button
-                on:click={handleDeobfuscate}
-                disabled={loading || !outputText.trim()}
-                class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
-                title="Restaurar datos (Texto protegido ➔ Texto claro)"
-              >
-                {#if loading}
-                  <span class="animate-spin">⏳</span>
-                {:else}
-                  <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
-                {/if}
-                <span>Restaurar</span>
-                <span>🔄</span>
-              </button>
-            {/if}
-
-            <button
-              on:click={toggleStudioDirection}
-              class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10 shadow-sm transition"
-              title="Cambiar dirección: {studioDirection === 'obfuscate' ? 'Cambiar a Restaurar ⮜' : 'Cambiar a Proteger ➔'}"
-            >
-              <span>⇄</span>
-            </button>
-          </div>
-
-          <!-- Panel Derecho: Texto protegido -->
-          <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'deobfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🛡️</span> Texto protegido
-                </span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" title="Texto con datos protegidos por seudónimos">
-                  Texto protegido
-                </span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos para restaurar">
-                  <span>📄</span> Arrastra archivo
-                </span>
-              </div>
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-[10px] font-mono text-slate-400">
-                  {outputLinesCount} lín · {outputCharCount} car · {outputSizeKB}
-                </span>
-                <button
-                  on:click={copyOutputWithFeedback}
-                  disabled={!outputText}
-                  class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedOutputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
-                  title="Copiar texto protegido"
-                >
-                  {#if copiedOutputFlash}
-                    <span>✓</span> ¡Copiado!
-                  {:else}
-                    <span>📋</span> Copiar
-                  {/if}
-                </button>
-                <button
-                  on:click={() => {
-                    outputText = "";
-                    if (!inputText) statusMessage = "Área de trabajo de Studio limpiada.";
-                  }}
-                  disabled={!outputText}
-                  class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
-                  title="Limpiar panel de texto protegido"
-                >
-                  Limpiar
-                </button>
-              </div>
-            </div>
-            <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
-              <pre
-                bind:this={outputGutterEl}
-                class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
-                aria-hidden="true"
-              >{outputGutterText}</pre>
-              <textarea
-                bind:value={outputText}
-                on:input={() => { studioDirection = "deobfuscate"; }}
-                on:focus={() => { if (outputText.trim()) studioDirection = "deobfuscate"; }}
-                on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
-                class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-
-        <!-- Botonera de Acción Principal del Studio -->
-        <div class="flex items-center justify-between gap-3 pt-1">
-          <div class="flex items-center gap-2">
-            <button
-              on:click={toggleStudioDirection}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
-              title="Alternar sentido de procesamiento"
-            >
-              <span>⇄</span>
-              <span>Modo actual: <strong>{studioDirection === 'obfuscate' ? 'Proteger (Texto claro ➔ Texto protegido)' : 'Restaurar (Texto protegido ➔ Texto claro)'}</strong></span>
-            </button>
-            <button
-              on:click={() => {
-                inputText = "";
-                outputText = "";
-                statusMessage = "Ambos paneles han sido limpiados.";
-              }}
-              disabled={!inputText && !outputText}
-              class="px-2.5 py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
-              title="Limpiar ambos paneles"
-            >
-              Limpiar todo
-            </button>
-          </div>
-
-          <div class="flex items-center gap-3">
-            {#if studioDirection === "obfuscate"}
-              <button
-                on:click={handleObfuscate}
-                disabled={loading || !inputText.trim()}
-                class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
-              >
-                {#if loading}
-                  <span class="animate-spin">⏳</span>
-                {:else}
-                  <span>🛡️</span>
-                {/if}
-                Proteger datos ➔
-              </button>
-            {:else}
-              <button
-                on:click={handleDeobfuscate}
-                disabled={loading || !outputText.trim()}
-                class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
-              >
-                {#if loading}
-                  <span class="animate-spin">⏳</span>
-                {:else}
-                  <span>🔄</span>
-                {/if}
-                ⮜ Restaurar datos
-              </button>
-            {/if}
-          </div>
-        </div>
-      </div>
-
-    {:else if activeTab === "scanner"}
-      <!-- VISTA ESCÁNER -->
-      <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-0 shadow-lg">
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <div>
-            <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>🔍</span> Escáner de Entidades Confidenciales
-            </h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Escanea archivos o carpetas completas sin modificarlos. Desmarca las casillas si deseas omitir falsos positivos.</p>
-          </div>
-          
-          <div class="flex items-center gap-3">
-            <button
-              on:click={() => openHelp('scanner')}
-              class="px-2.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 text-xs font-bold transition flex items-center gap-1 shadow-sm"
-              title="Ver guía de uso del Escáner"
-            >
-              <span>❔</span> Ayuda
-            </button>
-
-            <label class="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-              <input type="checkbox" bind:checked={recursiveScan} class="rounded accent-primary-500" />
-              <span>Recursivo (subdirectorios)</span>
-            </label>
-
-            <button
-              on:click={() => (showTextScanPanel = !showTextScanPanel)}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
-              title="Copiar y pegar texto para auditar tokens confidenciales"
-            >
-              <span>📋</span> Analizar Texto
-            </button>
-          </div>
-        </div>
-
-        {#if !dismissedTips.scanner}
-          <div in:slide={{ duration: 150 }} class="mb-4 p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
-            <div class="flex items-center gap-3">
-              <span class="text-lg">🔍</span>
-              <p class="text-slate-700 dark:text-slate-300">
-                <strong class="text-primary-600 dark:text-primary-400">¿Cómo funciona el Escáner?</strong> Inspecciona archivos, carpetas o texto copiado en busca de tokens confidenciales (DNI, tarjetas, IPv4, emails, GUIDs) sin modificar el disco. Puedes omitir falsos positivos desmarcando casillas antes de registrar los hallazgos en tu bóveda.
-              </p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button on:click={() => openHelp('scanner')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
-              <button on:click={() => dismissTip('scanner')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
-            </div>
-          </div>
-        {/if}
-
-        {#if showTextScanPanel}
-          <div in:slide={{ duration: 150 }} class="mb-4 p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col gap-3 shadow-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <span>📋</span> Auditar Fragmento de Texto Copiado o Pegado
-              </span>
-              <button on:click={() => (showTextScanPanel = false)} class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                ✕ Cerrar
-              </button>
-            </div>
-            <textarea
-              bind:value={textToAudit}
-              placeholder="Pega aquí cualquier fragmento de texto, log o código para extraer y clasificar sus tokens confidenciales..."
-              class="w-full h-28 bg-white dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/10 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text {privacyBlur ? 'privacy-blurred' : ''}"
-            ></textarea>
-            <div class="flex items-center justify-between flex-wrap gap-2">
-              <span class="text-[11px] text-slate-500 dark:text-slate-400">
-                Se identificarán tokens confidenciales y se cargarán en la tabla inferior sin tocar el disco.
-              </span>
-              <div class="flex items-center gap-2">
-                {#if textToAudit.trim()}
-                  <button
-                    on:click={() => (textToAudit = "")}
-                    class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition flex items-center gap-1"
-                    title="Limpiar el texto introducido"
-                  >
-                    <span>🗑️</span> Limpiar
-                  </button>
-                  <button
-                    on:click={sendPastedTextToStudio}
-                    class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1"
-                    title="Transferir este texto a Studio para ofuscarlo directamente"
-                  >
-                    <span>➡️</span> Enviar a Studio
-                  </button>
-                {/if}
-                <button
-                  on:click={scanPastedText}
-                  disabled={loading || !textToAudit.trim()}
-                  class="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  <span>🔍</span> Analizar Tokens
-                </button>
-              </div>
-            </div>
-          </div>
-        {/if}
-
-        {#if detectedItems.length === 0 && !isScanningDirectory && !showTextScanPanel}
-          <div class="mb-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl flex flex-col items-center justify-center text-center gap-3 bg-slate-50/50 dark:bg-slate-900/30 transition hover:border-primary-500/50">
-            <span class="text-4xl">📂</span>
-            <div class="space-y-1">
-              <p class="text-xs font-bold text-slate-800 dark:text-slate-200">
-                Arrastra y suelta aquí cualquier archivo o carpeta
-              </p>
-              <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                LexiShield detectará automáticamente si es un archivo individual o un directorio para iniciar la auditoría de tokens confidenciales.
-              </p>
-            </div>
-            <div class="pt-1">
-              <button
-                on:click={() => (showTextScanPanel = true)}
-                class="px-3.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
-              >
-                <span>📋</span> O analizar texto pegado
-              </button>
-            </div>
-          </div>
-        {/if}
-
-        {#if isScanningDirectory}
-          <div in:fade={{ duration: 150 }} class="mb-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
-            <div class="flex items-center gap-3 min-w-0 flex-1">
-              <div class="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-500 flex items-center justify-center animate-spin text-base">
-                ⏳
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>Escaneando carpeta en tiempo real...</span>
-                  <span class="inline-block w-2 h-2 rounded-full bg-primary-500 animate-ping"></span>
-                </div>
-                <div class="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate font-semibold" title={scanCurrentFile}>
-                  📄 {scanCurrentFile}
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-4 text-xs font-mono">
-              <span class="text-slate-700 dark:text-slate-300">Archivos: <strong class="text-primary-600 dark:text-primary-400 font-bold">{scanFilesCount}</strong></span>
-              <span class="text-slate-700 dark:text-slate-300">Entidades: <strong class="text-amber-600 dark:text-amber-400 font-bold">{scanEntitiesCount}</strong></span>
-              
-              <button
-                on:click={cancelScan}
-                class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-lg border border-rose-500/20 transition flex items-center gap-1"
-              >
-                <span>🛑</span> Cancelar
-              </button>
-            </div>
-          </div>
-        {:else if auditSummary}
-          <div class="mb-4 p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div class="flex items-center gap-2">
-              <span class="text-slate-500">Origen escaneado:</span>
-              <span class="font-mono text-slate-800 dark:text-slate-200 font-semibold truncate max-w-sm" title={auditSummary.path_analyzed}>{auditSummary.path_analyzed}</span>
-            </div>
-            <div class="flex items-center gap-4">
-              <span>Archivos analizados: <strong class="text-primary-700 dark:text-primary-400">{auditSummary.files_scanned}</strong></span>
-              <span>Archivos omitidos: <strong class="text-slate-500">{auditSummary.files_ignored}</strong></span>
-              <span>Entidades detectadas: <strong class="text-amber-600 dark:text-amber-400">{auditSummary.total_entities}</strong></span>
-            </div>
-          </div>
-        {/if}
-
-        {#if detectedItems.length > 0}
-          <!-- Barra de Distribución Categórica de Entidades (Estilo GitHub Language Bar) -->
-          {#if categoryStats}
-            <div class="mb-3 p-3 bg-white dark:bg-brand-surface/80 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm frosted-card">
-              <div class="flex items-center justify-between text-xs mb-2 font-medium flex-wrap gap-2">
-                <span class="text-slate-600 dark:text-slate-400 font-semibold">Distribución de Entidades Detectadas ({categoryStats.total}):</span>
-                <div class="flex items-center gap-3 text-[11px] font-mono flex-wrap">
-                  {#if categoryStats.red.count > 0}
-                    <span class="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
-                      <span class="w-2 h-2 rounded-full bg-blue-500"></span> 🌐 Red ({categoryStats.red.count} · {categoryStats.red.pct}%)
-                    </span>
-                  {/if}
-                  {#if categoryStats.identidad.count > 0}
-                    <span class="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
-                      <span class="w-2 h-2 rounded-full bg-purple-500"></span> 🪪 Identidad ({categoryStats.identidad.count} · {categoryStats.identidad.pct}%)
-                    </span>
-                  {/if}
-                  {#if categoryStats.sistemas.count > 0}
-                    <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 🖥️ Sistemas ({categoryStats.sistemas.count} · {categoryStats.sistemas.pct}%)
-                    </span>
-                  {/if}
-                  {#if categoryStats.claves.count > 0}
-                    <span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
-                      <span class="w-2 h-2 rounded-full bg-amber-500"></span> 💳 Contacto/Claves ({categoryStats.claves.count} · {categoryStats.claves.pct}%)
-                    </span>
-                  {/if}
-                </div>
-              </div>
-              <div class="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden flex">
-                {#if categoryStats.red.count > 0}
-                  <div style="width: {categoryStats.red.pct}%" class="bg-blue-500 transition-all duration-300" title="Red: {categoryStats.red.count} ({categoryStats.red.pct}%)"></div>
-                {/if}
-                {#if categoryStats.identidad.count > 0}
-                  <div style="width: {categoryStats.identidad.pct}%" class="bg-purple-500 transition-all duration-300" title="Identidad: {categoryStats.identidad.count} ({categoryStats.identidad.pct}%)"></div>
-                {/if}
-                {#if categoryStats.sistemas.count > 0}
-                  <div style="width: {categoryStats.sistemas.pct}%" class="bg-emerald-500 transition-all duration-300" title="Sistemas: {categoryStats.sistemas.count} ({categoryStats.sistemas.pct}%)"></div>
-                {/if}
-                {#if categoryStats.claves.count > 0}
-                  <div style="width: {categoryStats.claves.pct}%" class="bg-amber-500 transition-all duration-300" title="Contacto/Claves: {categoryStats.claves.count} ({categoryStats.claves.pct}%)"></div>
-                {/if}
+              <div class="flex items-center gap-2 shrink-0">
+                <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
+                <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
               </div>
             </div>
           {/if}
 
-          <!-- Barra de Acciones del Escáner (Simetría CLI/GUI) -->
-          <div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-xs">
-            <div class="flex items-center gap-2">
+          <!-- Paneles de Texto claro y Texto protegido con Puente Central -->
+          <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0 items-stretch relative">
+            <!-- Panel Izquierdo: Texto claro -->
+            <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {deobfuscateSuccessFlash ? 'border-emerald-500/80 ring-2 ring-emerald-500/40 shadow-emerald-500/20' : studioDirection === 'obfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📥</span> Texto claro
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Texto original en claro">
+                    Texto en claro
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos y carpetas">
+                    <span>📁</span> Arrastra archivo o carpeta
+                  </span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] font-mono text-slate-400">
+                    {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
+                  </span>
+                  <button
+                    on:click={copyInputWithFeedback}
+                    disabled={!inputText}
+                    class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedInputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
+                    title="Copiar texto claro"
+                  >
+                    {#if copiedInputFlash}
+                      <span>✓</span> ¡Copiado!
+                    {:else}
+                      <span>📋</span> Copiar
+                    {/if}
+                  </button>
+                </div>
+              </div>
+              <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
+                <pre
+                  bind:this={inputGutterEl}
+                  class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
+                  aria-hidden="true"
+                >{inputGutterText}</pre>
+                <textarea
+                  bind:value={inputText}
+                  on:input={() => { studioDirection = "obfuscate"; }}
+                  on:focus={() => { if (inputText.trim()) studioDirection = "obfuscate"; }}
+                  on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
+                  placeholder="Pega o escribe aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
+                  class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''}"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Puente Central Direccional entre Paneles -->
+            <div class="flex md:flex-col items-center justify-center gap-2 py-1 md:py-0 shrink-0">
+              {#if studioDirection === "obfuscate"}
+                <button
+                  on:click={handleObfuscate}
+                  disabled={loading || !inputText.trim()}
+                  class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
+                  title="Proteger datos (Texto claro ➔ Texto protegido)"
+                >
+                  {#if loading}
+                    <span class="animate-spin">⏳</span>
+                  {:else}
+                    <span>🛡️</span>
+                  {/if}
+                  <span>Proteger</span>
+                  <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
+                </button>
+              {:else}
+                <button
+                  on:click={handleDeobfuscate}
+                  disabled={loading || !outputText.trim()}
+                  class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
+                  title="Restaurar datos (Texto protegido ➔ Texto claro)"
+                >
+                  {#if loading}
+                    <span class="animate-spin">⏳</span>
+                  {:else}
+                    <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
+                  {/if}
+                  <span>Restaurar</span>
+                  <span>🔄</span>
+                </button>
+              {/if}
+
               <button
-                type="button"
-                on:click={() => handleBatchOmitScanItems(true)}
-                class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg border border-amber-500/20 transition flex items-center gap-1"
-                title="Marcar como omitidos (no se ofuscarán)"
+                on:click={toggleStudioDirection}
+                class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10 shadow-sm transition"
+                title="Cambiar dirección: {studioDirection === 'obfuscate' ? 'Cambiar a Restaurar ⮜' : 'Cambiar a Proteger ➔'}"
               >
-                <span>🚫</span> Omitir {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+                <span>⇄</span>
               </button>
+
               <button
-                type="button"
-                on:click={() => handleBatchOmitScanItems(false)}
-                class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold rounded-lg border border-emerald-500/20 transition flex items-center gap-1"
-                title="Reactivar ofuscación"
+                on:click={scanCurrentStudioText}
+                disabled={loading || (!inputText.trim() && !outputText.trim())}
+                class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10 shadow-sm transition disabled:opacity-40"
+                title="Auditar tokens sin modificar el texto"
               >
-                <span>🛡️</span> Ofuscar {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+                <span>🔍</span>
               </button>
             </div>
 
+            <!-- Panel Derecho: Texto protegido -->
+            <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'deobfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🛡️</span> Texto protegido
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" title="Texto con datos protegidos por seudónimos">
+                    Texto protegido
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos para restaurar">
+                    <span>📄</span> Arrastra archivo
+                  </span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] font-mono text-slate-400">
+                    {outputLinesCount} lín · {outputCharCount} car · {outputSizeKB}
+                  </span>
+                  <button
+                    on:click={copyOutputWithFeedback}
+                    disabled={!outputText}
+                    class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedOutputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
+                    title="Copiar texto protegido"
+                  >
+                    {#if copiedOutputFlash}
+                      <span>✓</span> ¡Copiado!
+                    {:else}
+                      <span>📋</span> Copiar
+                    {/if}
+                  </button>
+                </div>
+              </div>
+              <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
+                <pre
+                  bind:this={outputGutterEl}
+                  class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
+                  aria-hidden="true"
+                >{outputGutterText}</pre>
+                <textarea
+                  bind:value={outputText}
+                  on:input={() => { studioDirection = "deobfuscate"; }}
+                  on:focus={() => { if (outputText.trim()) studioDirection = "deobfuscate"; }}
+                  on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
+                  placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
+                  class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Botonera de Acción Principal del Studio -->
+          <div class="flex items-center justify-between gap-3 pt-1 flex-wrap">
             <div class="flex items-center gap-2">
               <button
-                type="button"
-                on:click={clearScanResults}
-                class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition flex items-center gap-1"
-                title="Limpiar los resultados y reiniciar el escáner"
+                on:click={toggleStudioDirection}
+                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
+                title="Alternar sentido de procesamiento"
               >
-                <span>🗑️</span> Limpiar Resultados
+                <span>⇄</span>
+                <span>Modo actual: <strong>{studioDirection === 'obfuscate' ? 'Proteger (Texto claro ➔ Texto protegido)' : 'Restaurar (Texto protegido ➔ Texto claro)'}</strong></span>
               </button>
               <button
-                type="button"
-                on:click={handleSaveScanToVault}
-                class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold rounded-lg transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
-                title="Guardar todos los mapeos en la bóveda activa aplicando las omisiones seleccionadas"
+                on:click={() => {
+                  inputText = "";
+                  outputText = "";
+                  statusMessage = "Ambos paneles han sido limpiados.";
+                }}
+                disabled={!inputText && !outputText}
+                class="px-2.5 py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
+                title="Limpiar ambos paneles"
               >
-                <span>💾</span> Guardar en Bóveda ({detectedItems.length})
+                Limpiar todo
               </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button
+                on:click={scanCurrentStudioText}
+                disabled={loading || (!inputText.trim() && !outputText.trim())}
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
+                title="Auditar tokens confidenciales del texto actual sin modificarlo"
+              >
+                <span>🔍</span>
+                Auditar Tokens
+              </button>
+              {#if studioDirection === "obfuscate"}
+                <button
+                  on:click={handleObfuscate}
+                  disabled={loading || !inputText.trim()}
+                  class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {#if loading}
+                    <span class="animate-spin">⏳</span>
+                  {:else}
+                    <span>🛡️</span>
+                  {/if}
+                  Proteger datos ➔
+                </button>
+              {:else}
+                <button
+                  on:click={handleDeobfuscate}
+                  disabled={loading || !outputText.trim()}
+                  class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {#if loading}
+                    <span class="animate-spin">⏳</span>
+                  {:else}
+                    <span>🔄</span>
+                  {/if}
+                  ⮜ Restaurar datos
+                </button>
+              {/if}
+            </div>
+          </div>
+
+        {:else if studioSubView === "audit"}
+          <!-- SUB-VISTA DESGLOSE Y AUDITORÍA DE TOKENS -->
+          <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-5 flex flex-col min-h-0 shadow-lg">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-3 pb-2 border-b border-slate-200 dark:border-white/5">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>🔍</span> Desglose y Auditoría de Tokens Confidenciales
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Inspecciona y clasifica tokens detectados sin modificarlos. Desmarca casillas si deseas omitir falsos positivos.</p>
+              </div>
+              
+              <div class="flex items-center gap-3">
+                <label class="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input type="checkbox" bind:checked={recursiveScan} class="rounded accent-primary-500" />
+                  <span>Recursivo (subdirectorios)</span>
+                </label>
+
+                <button
+                  on:click={() => (showTextScanPanel = !showTextScanPanel)}
+                  class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
+                  title="Pegar fragmento de texto para auditar tokens confidenciales"
+                >
+                  <span>📋</span> Fragmento Adicional
+                </button>
+
+                <button
+                  on:click={() => (studioSubView = "transform")}
+                  class="px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-xs font-bold rounded-xl border border-primary-500/30 transition flex items-center gap-1.5 shadow-sm"
+                  title="Volver a los editores de transformación"
+                >
+                  <span>✨</span> Volver a Editores
+                </button>
+              </div>
+            </div>
+
+            {#if showTextScanPanel}
+              <div in:slide={{ duration: 150 }} class="mb-4 p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col gap-3 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <span>📋</span> Auditar Fragmento de Texto Copiado o Pegado
+                  </span>
+                  <button on:click={() => (showTextScanPanel = false)} class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    ✕ Cerrar
+                  </button>
+                </div>
+                <textarea
+                  bind:value={textToAudit}
+                  placeholder="Pega aquí cualquier fragmento de texto, log o código para extraer y clasificar sus tokens confidenciales..."
+                  class="w-full h-24 bg-white dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/10 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text {privacyBlur ? 'privacy-blurred' : ''}"
+                ></textarea>
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <span class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Se identificarán tokens confidenciales y se clasificarán en la tabla inferior sin tocar el disco.
+                  </span>
+                  <div class="flex items-center gap-2">
+                    {#if textToAudit.trim()}
+                      <button
+                        on:click={() => (textToAudit = "")}
+                        class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition flex items-center gap-1"
+                        title="Limpiar el fragmento introducido"
+                      >
+                        <span>🗑️</span> Limpiar
+                      </button>
+                      <button
+                        on:click={sendPastedTextToStudio}
+                        class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1"
+                        title="Transferir este texto a los paneles de Studio para procesarlo"
+                      >
+                        <span>➡️</span> Cargar en Editores
+                      </button>
+                    {/if}
+                    <button
+                      on:click={scanPastedText}
+                      disabled={loading || !textToAudit.trim()}
+                      class="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <span>🔍</span> Analizar Fragmento
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {/if}
+
+            {#if detectedItems.length === 0 && !isScanningDirectory && !showTextScanPanel}
+              <div class="mb-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl flex flex-col items-center justify-center text-center gap-3 bg-slate-50/50 dark:bg-slate-900/30 transition hover:border-primary-500/50">
+                <span class="text-4xl">📂</span>
+                <div class="space-y-1">
+                  <p class="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Arrastra y suelta aquí cualquier archivo o carpeta para auditar
+                  </p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                    LexiShield analizará los tokens sensibles sin modificar el contenido. O puedes auditar directamente el texto cargado en los editores de Studio.
+                  </p>
+                </div>
+                <div class="pt-1 flex items-center gap-2 flex-wrap justify-center">
+                  {#if inputText.trim() || outputText.trim()}
+                    <button
+                      on:click={scanCurrentStudioText}
+                      disabled={loading}
+                      class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-primary-500/20"
+                    >
+                      <span>🔍</span> Auditar Texto de los Editores ({inputLinesCount} lín)
+                    </button>
+                  {/if}
+                  <button
+                    on:click={() => (showTextScanPanel = true)}
+                    class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span>📋</span> Analizar fragmento adicional
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            {#if isScanningDirectory}
+              <div in:fade={{ duration: 150 }} class="mb-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                  <div class="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-500 flex items-center justify-center animate-spin text-base">
+                    ⏳
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>Escaneando carpeta en tiempo real...</span>
+                      <span class="inline-block w-2 h-2 rounded-full bg-primary-500 animate-ping"></span>
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate font-semibold" title={scanCurrentFile}>
+                      📄 {scanCurrentFile}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-4 text-xs font-mono">
+                  <span class="text-slate-700 dark:text-slate-300">Archivos: <strong class="text-primary-600 dark:text-primary-400 font-bold">{scanFilesCount}</strong></span>
+                  <span class="text-slate-700 dark:text-slate-300">Entidades: <strong class="text-amber-600 dark:text-amber-400 font-bold">{scanEntitiesCount}</strong></span>
+                  
+                  <button
+                    on:click={cancelScan}
+                    class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-lg border border-rose-500/20 transition flex items-center gap-1"
+                  >
+                    <span>🛑</span> Cancelar
+                  </button>
+                </div>
+              </div>
+            {:else if auditSummary}
+              <div class="mb-4 p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-500">Origen escaneado:</span>
+                  <span class="font-mono text-slate-800 dark:text-slate-200 font-semibold truncate max-w-sm" title={auditSummary.path_analyzed}>{auditSummary.path_analyzed}</span>
+                </div>
+                <div class="flex items-center gap-4">
+                  <span>Archivos analizados: <strong class="text-primary-700 dark:text-primary-400">{auditSummary.files_scanned}</strong></span>
+                  <span>Archivos omitidos: <strong class="text-slate-500">{auditSummary.files_ignored}</strong></span>
+                  <span>Entidades detectadas: <strong class="text-amber-600 dark:text-amber-400">{auditSummary.total_entities}</strong></span>
+                </div>
+              </div>
+            {/if}
+
+            {#if detectedItems.length > 0}
+              <!-- Barra de Distribución Categórica de Entidades (Estilo GitHub Language Bar) -->
+              {#if categoryStats}
+                <div class="mb-3 p-3 bg-white dark:bg-brand-surface/80 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm frosted-card">
+                  <div class="flex items-center justify-between text-xs mb-2 font-medium flex-wrap gap-2">
+                    <span class="text-slate-600 dark:text-slate-400 font-semibold">Distribución de Entidades Detectadas ({categoryStats.total}):</span>
+                    <div class="flex items-center gap-3 text-[11px] font-mono flex-wrap">
+                      {#if categoryStats.red.count > 0}
+                        <span class="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-blue-500"></span> 🌐 Red ({categoryStats.red.count} · {categoryStats.red.pct}%)
+                        </span>
+                      {/if}
+                      {#if categoryStats.identidad.count > 0}
+                        <span class="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-purple-500"></span> 🪪 Identidad ({categoryStats.identidad.count} · {categoryStats.identidad.pct}%)
+                        </span>
+                      {/if}
+                      {#if categoryStats.sistemas.count > 0}
+                        <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 🖥️ Sistemas ({categoryStats.sistemas.count} · {categoryStats.sistemas.pct}%)
+                        </span>
+                      {/if}
+                      {#if categoryStats.claves.count > 0}
+                        <span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-amber-500"></span> 💳 Contacto/Claves ({categoryStats.claves.count} · {categoryStats.claves.pct}%)
+                        </span>
+                      {/if}
+                    </div>
+                  </div>
+                  <div class="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden flex">
+                    {#if categoryStats.red.count > 0}
+                      <div style="width: {categoryStats.red.pct}%" class="bg-blue-500 transition-all duration-300" title="Red: {categoryStats.red.count} ({categoryStats.red.pct}%)"></div>
+                    {/if}
+                    {#if categoryStats.identidad.count > 0}
+                      <div style="width: {categoryStats.identidad.pct}%" class="bg-purple-500 transition-all duration-300" title="Identidad: {categoryStats.identidad.count} ({categoryStats.identidad.pct}%)"></div>
+                    {/if}
+                    {#if categoryStats.sistemas.count > 0}
+                      <div style="width: {categoryStats.sistemas.pct}%" class="bg-emerald-500 transition-all duration-300" title="Sistemas: {categoryStats.sistemas.count} ({categoryStats.sistemas.pct}%)"></div>
+                    {/if}
+                    {#if categoryStats.claves.count > 0}
+                      <div style="width: {categoryStats.claves.pct}%" class="bg-amber-500 transition-all duration-300" title="Contacto/Claves: {categoryStats.claves.count} ({categoryStats.claves.pct}%)"></div>
+                    {/if}
+                  </div>
+                </div>
+              {/if}
+
+              <!-- Barra de Acciones del Desglose/Escáner -->
+              <div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-xs">
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    on:click={() => handleBatchOmitScanItems(true)}
+                    class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg border border-amber-500/20 transition flex items-center gap-1"
+                    title="Marcar como omitidos (no se ofuscarán)"
+                  >
+                    <span>🚫</span> Omitir {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+                  </button>
+                  <button
+                    type="button"
+                    on:click={() => handleBatchOmitScanItems(false)}
+                    class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold rounded-lg border border-emerald-500/20 transition flex items-center gap-1"
+                    title="Reactivar ofuscación"
+                  >
+                    <span>🛡️</span> Ofuscar {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    on:click={clearScanResults}
+                    class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition flex items-center gap-1"
+                    title="Limpiar los resultados y reiniciar la auditoría"
+                  >
+                    <span>🗑️</span> Limpiar Resultados
+                  </button>
+                  <button
+                    type="button"
+                    on:click={handleSaveScanToVault}
+                    class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold rounded-lg transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+                    title="Guardar todos los mapeos en la bóveda activa aplicando las omisiones seleccionadas"
+                  >
+                    <span>💾</span> Guardar en Bóveda ({detectedItems.length})
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
+              <table class="w-full text-left font-mono {editorFontSizeClass}">
+                <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
+                  <tr>
+                    <th class="p-3 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={detectedItems.length > 0 && selectedScanOriginals.length === detectedItems.length}
+                        on:change={toggleSelectAllScanItems}
+                        class="rounded accent-primary-500 cursor-pointer"
+                        title="Seleccionar o desmarcar todos"
+                      />
+                    </th>
+                    <th class="p-3 w-32">Estado</th>
+                    <th class="p-3 w-40">Tipo de Entidad</th>
+                    <th class="p-3">Valor Original Confidencial</th>
+                    <th class="p-3">Seudónimo / Resultado</th>
+                    <th class="p-3 w-28 text-center">Acción</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
+                  {#each detectedItems as item (item.original)}
+                    {@const cat = getDetectorCategory(item.detector_type)}
+                    <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-50' : ''}">
+                      <td class="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          value={item.original}
+                          bind:group={selectedScanOriginals}
+                          class="rounded accent-primary-500 cursor-pointer"
+                        />
+                      </td>
+                      <td class="p-3">
+                        {#if item.omitted || item.pseudonym === '='}
+                          <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold border border-amber-500/20">
+                            🚫 Omitido
+                          </span>
+                        {:else}
+                          <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+                            🛡️ Ofuscado
+                          </span>
+                        {/if}
+                      </td>
+                      <td class="p-3">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded {cat.bgBadge} {cat.text} text-[11px] font-semibold border {cat.border}">
+                          <span>{cat.icon}</span> {item.detector_type}
+                        </span>
+                      </td>
+                      <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
+                      <td class="p-3 font-mono select-text {item.omitted ? 'text-slate-400 dark:text-slate-500' : 'text-primary-700 dark:text-primary-400'}">
+                        {item.omitted || item.pseudonym === '=' ? '=' : item.pseudonym}
+                      </td>
+                      <td class="p-3 text-center">
+                        <button
+                          type="button"
+                          on:click={() => toggleSingleScanOmit(item)}
+                          class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition {item.omitted ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20'}"
+                        >
+                          {item.omitted ? '✓ Ofuscar' : '🚫 Omitir'}
+                        </button>
+                      </td>
+                    </tr>
+                  {:else}
+                    <tr>
+                      <td colspan="6" class="p-12 text-center text-slate-400 dark:text-slate-500">
+                        {#if isScanningDirectory || loading}
+                          <div class="text-3xl mb-2 animate-spin inline-block">⏳</div>
+                          <div class="font-medium text-primary-600 dark:text-primary-400">Escaneando archivos en curso...</div>
+                          <div class="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto truncate font-mono font-semibold">📄 {scanCurrentFile}</div>
+                        {:else}
+                          <div class="text-3xl mb-2">🔍</div>
+                          <div class="font-medium text-slate-600 dark:text-slate-300">No hay entidades auditadas todavía</div>
+                          <div class="text-xs text-slate-400 mt-1">Arrastra archivos o carpetas, o pulsa "Auditar Texto" desde la vista de Transformación.</div>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
             </div>
           </div>
         {/if}
-
-        <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
-          <table class="w-full text-left font-mono {editorFontSizeClass}">
-            <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
-              <tr>
-                <th class="p-3 w-12 text-center">
-                  <input
-                    type="checkbox"
-                    checked={detectedItems.length > 0 && selectedScanOriginals.length === detectedItems.length}
-                    on:change={toggleSelectAllScanItems}
-                    class="rounded accent-primary-500 cursor-pointer"
-                    title="Seleccionar o desmarcar todos"
-                  />
-                </th>
-                <th class="p-3 w-32">Estado</th>
-                <th class="p-3 w-40">Tipo de Entidad</th>
-                <th class="p-3">Valor Original Confidencial</th>
-                <th class="p-3">Seudónimo / Resultado</th>
-                <th class="p-3 w-28 text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
-              {#each detectedItems as item (item.original)}
-                {@const cat = getDetectorCategory(item.detector_type)}
-                <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-50' : ''}">
-                  <td class="p-3 text-center">
-                    <input
-                      type="checkbox"
-                      value={item.original}
-                      bind:group={selectedScanOriginals}
-                      class="rounded accent-primary-500 cursor-pointer"
-                    />
-                  </td>
-                  <td class="p-3">
-                    {#if item.omitted || item.pseudonym === '='}
-                      <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold border border-amber-500/20">
-                        🚫 Omitido
-                      </span>
-                    {:else}
-                      <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
-                        🛡️ Ofuscado
-                      </span>
-                    {/if}
-                  </td>
-                  <td class="p-3">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded {cat.bgBadge} {cat.text} text-[11px] font-semibold border {cat.border}">
-                      <span>{cat.icon}</span> {item.detector_type}
-                    </span>
-                  </td>
-                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
-                  <td class="p-3 font-mono select-text {item.omitted ? 'text-slate-400 dark:text-slate-500' : 'text-primary-700 dark:text-primary-400'}">
-                    {item.omitted || item.pseudonym === '=' ? '=' : item.pseudonym}
-                  </td>
-                  <td class="p-3 text-center">
-                    <button
-                      type="button"
-                      on:click={() => toggleSingleScanOmit(item)}
-                      class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition {item.omitted ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20'}"
-                    >
-                      {item.omitted ? '✓ Ofuscar' : '🚫 Omitir'}
-                    </button>
-                  </td>
-                </tr>
-              {:else}
-                <tr>
-                  <td colspan="6" class="p-12 text-center text-slate-400 dark:text-slate-500">
-                    {#if isScanningDirectory || loading}
-                      <div class="text-3xl mb-2 animate-spin inline-block">⏳</div>
-                      <div class="font-medium text-primary-600 dark:text-primary-400">Escaneando archivos en curso...</div>
-                      <div class="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto truncate font-mono font-semibold">📄 {scanCurrentFile}</div>
-                    {:else}
-                      <div class="text-3xl mb-2">🔍</div>
-                      <div class="font-medium text-slate-600 dark:text-slate-300">No hay entidades escaneadas todavía</div>
-                      <div class="text-xs text-slate-400 mt-1">Usa los botones superiores "Escanear Fichero" o "Escanear Carpeta".</div>
-                    {/if}
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
       </div>
 
     {:else if activeTab === "pairs"}
@@ -3002,7 +3055,6 @@
                   class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                 >
                   <option value="studio">✨ Studio</option>
-                  <option value="scanner">🔍 Escáner</option>
                   <option value="pairs">📑 Pares de Tokens</option>
                   <option value="vaults">🗄️ Bóvedas Lexi</option>
                   <option value="watch">📋 Portapapeles</option>
@@ -3014,10 +3066,6 @@
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_studio} class="rounded accent-primary-500" />
                   <span>Studio</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" bind:checked={appConfig.gui.tabs.show_scanner} class="rounded accent-primary-500" />
-                  <span>Escáner</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_pairs} class="rounded accent-primary-500" />
@@ -3756,13 +3804,7 @@
             on:click={() => (activeHelpTab = "studio")}
             class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'studio' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
           >
-            ✨ Studio (IA)
-          </button>
-          <button
-            on:click={() => (activeHelpTab = "scanner")}
-            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'scanner' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
-          >
-            🔍 Escáner
+            ✨ Studio & Auditoría
           </button>
           <button
             on:click={() => (activeHelpTab = "pairs")}
@@ -3826,24 +3868,12 @@
                 <p class="font-bold text-primary-700 dark:text-primary-300">📄 Conversión a Markdown con Pandoc:</p>
                 <p>Si activas la casilla "Exportar Markdown con Pandoc", LexiShield convertirá documentos estructurados (.docx, .html, .rst) a Markdown nativo (.md), conservando encabezados, listas y tablas perfectas para ser interpretadas por modelos de IA con el menor consumo de tokens.</p>
               </div>
-            </div>
 
-          {:else if activeHelpTab === "scanner"}
-            <div class="space-y-3">
-              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🔍</span> Escáner y Auditoría Preventiva de Fugas
-              </h4>
-              <p>El Escáner analiza proactivamente archivos individuales o proyectos enteros sin modificarlos, informándote de cuántos tokens sensibles están expuestos antes de publicar código o compartir repositorios.</p>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div class="p-3 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-1">
-                  <p class="font-bold text-slate-900 dark:text-white">Escaneo con .gitignore:</p>
-                  <p>Por defecto, el motor respeta los archivos <code class="font-mono">.gitignore</code> y omite carpetas masivas como <code class="font-mono">node_modules</code>, <code class="font-mono">target</code>, <code class="font-mono">.git</code> o archivos binarios.</p>
-                </div>
-                <div class="p-3 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-1">
-                  <p class="font-bold text-slate-900 dark:text-white">Telemetría en Vivo:</p>
-                  <p>Durante escaneos de grandes directorios, verás el contador de archivos procesados, entidades encontradas y el archivo que se está examinando en ese instante.</p>
-                </div>
+              <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
+                <p class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <span>🔍</span> Desglose y Auditoría de Tokens:
+                </p>
+                <p>Puedes cambiar a la sub-vista <em>"Desglose y Auditoría"</em> o pulsar <em>"Auditar"</em> en cualquier momento. LexiShield analizará tu texto o carpetas completas sin tocarlas, clasificando los tokens por Red, Identidad, Sistemas o Claves, y permitiéndote omitir falsos positivos antes de guardarlos en tu bóveda.</p>
               </div>
             </div>
 
