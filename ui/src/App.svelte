@@ -2190,71 +2190,103 @@
             </button>
           </div>
 
-          <!-- Grupo Derecho: Perfil de Sensibilidad, Auto-copiado y Herramientas -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <!-- Selector de Perfil de Sensibilidad -->
-            <select
-              bind:value={activeSensitivityProfile}
-              class="bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-xl px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300 font-medium focus:outline-none cursor-pointer"
-              title="Filtrar detectores por perfil de sensibilidad rápido"
-            >
-              <option value="all">🛡️ Perfil: Completo (Todos)</option>
-              <option value="devops">🌐 Perfil: DevOps & Red</option>
-              <option value="gdpr">🪪 Perfil: RGPD & Identidad</option>
-            </select>
+          <!-- Grupo Derecho: Agrupación Semántica por Bloques Visuales (Opción 1) -->
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- Bloque 1: Ajustes de Procesamiento (Perfil y Auto-copiado) -->
+            <div class="flex items-center gap-1.5">
+              <!-- Selector de Perfil de Sensibilidad -->
+              <select
+                bind:value={activeSensitivityProfile}
+                class="bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-xl px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300 font-medium focus:outline-none cursor-pointer"
+                title="Filtrar detectores por perfil de sensibilidad"
+              >
+                <option value="all">🛡️ Perfil: Completo (Todos)</option>
+                <option value="devops">🌐 Perfil: DevOps & Red</option>
+                <option value="gdpr">🪪 Perfil: RGPD & Identidad</option>
+              </select>
 
-            <!-- Casilla de Auto-copiado al portapapeles -->
-            <label class="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 cursor-pointer select-none px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10" title="Copiar automáticamente al portapapeles al procesar (Proteger o Restaurar)">
-              <input type="checkbox" bind:checked={autoCopyToClipboard} class="rounded accent-primary-500 cursor-pointer" />
-              <span class="font-medium hidden sm:inline">Auto-copiar</span>
-              <span>📋</span>
-            </label>
-
-            {#if studioSubView === "transform"}
+              <!-- Marcador Interactivo de Auto-copiado con indicador de estado (LED) -->
               <button
                 type="button"
-                on:click={scanCurrentStudioText}
-                disabled={loading || (!inputText.trim() && !outputText.trim())}
-                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1 shadow-sm disabled:opacity-40"
-                title="Auditar tokens confidenciales del texto de los paneles sin modificarlo (Ctrl+Shift+A)"
+                on:click={() => {
+                  autoCopyToClipboard = !autoCopyToClipboard;
+                  statusMessage = autoCopyToClipboard
+                    ? "📋 Auto-copiado al portapapeles ACTIVADO."
+                    : "📋 Auto-copiado al portapapeles DESACTIVADO.";
+                }}
+                class="px-2.5 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border {autoCopyToClipboard ? 'bg-primary-500/15 border-primary-500/40 text-primary-700 dark:text-primary-300 shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
+                title="Copiar automáticamente al portapapeles al proteger o restaurar (Clic para alternar)"
               >
-                <span>🔍</span> Auditar Texto
+                <span>📋</span>
+                <span class="hidden sm:inline">Auto-copiar</span>
+                <span
+                  class="inline-block w-2 h-2 rounded-full transition-all duration-200 {autoCopyToClipboard ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]' : 'bg-slate-300 dark:bg-slate-600'}"
+                  aria-hidden="true"
+                ></span>
               </button>
-            {/if}
+            </div>
 
-            <!-- Botón Historial de Sesión -->
-            <button
-              type="button"
-              on:click={() => (showSessionHistoryModal = true)}
-              class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-sm"
-              title="Ver historial temporal de sesiones en memoria RAM"
-            >
-              <span>⏱️</span>
-              <span class="hidden sm:inline">Historial</span>
-              {#if sessionHistory.length > 0}
-                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
-                  {sessionHistory.length}
-                </span>
+            <!-- Divisor Vertical Sutil -->
+            <span class="w-px h-4 bg-slate-200 dark:border-white/10 dark:bg-white/10 hidden sm:inline-block" aria-hidden="true"></span>
+
+            <!-- Bloque 2: Acciones y Recuperación de Sesión -->
+            <div class="flex items-center gap-1.5">
+              {#if studioSubView === "transform"}
+                <button
+                  type="button"
+                  on:click={scanCurrentStudioText}
+                  disabled={loading || (!inputText.trim() && !outputText.trim())}
+                  class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1 shadow-sm disabled:opacity-40"
+                  title="Auditar tokens confidenciales del texto de los paneles sin modificarlo (Ctrl+Shift+A)"
+                >
+                  <span>🔍</span>
+                  <span class="hidden md:inline">Auditar Texto</span>
+                  <span class="md:hidden">Auditar</span>
+                </button>
               {/if}
-            </button>
 
-            <!-- Botón Atajos de Teclado -->
-            <button
-              type="button"
-              on:click={() => (showKeyboardShortcutsModal = true)}
-              class="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1 shadow-sm"
-              title="Ver guía de atajos de teclado rápidos (o pulsa '?')"
-            >
-              <span>⌨️</span>
-            </button>
+              <!-- Botón Historial de Sesión -->
+              <button
+                type="button"
+                on:click={() => (showSessionHistoryModal = true)}
+                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-sm"
+                title="Ver historial temporal de sesiones en memoria RAM"
+              >
+                <span>⏱️</span>
+                <span class="hidden sm:inline">Historial</span>
+                {#if sessionHistory.length > 0}
+                  <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
+                    {sessionHistory.length}
+                  </span>
+                {/if}
+              </button>
+            </div>
 
-            <button
-              on:click={() => openHelp('studio')}
-              class="px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1 shadow-sm"
-              title="Ver guía de uso de Studio y Auditoría"
-            >
-              <span>❔</span> Ayuda
-            </button>
+            <!-- Divisor Vertical Sutil -->
+            <span class="w-px h-4 bg-slate-200 dark:border-white/10 dark:bg-white/10 hidden sm:inline-block" aria-hidden="true"></span>
+
+            <!-- Bloque 3: Soporte y Atajos -->
+            <div class="flex items-center gap-1.5">
+              <!-- Botón Atajos de Teclado -->
+              <button
+                type="button"
+                on:click={() => (showKeyboardShortcutsModal = true)}
+                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1 shadow-sm"
+                title="Ver guía de atajos de teclado rápidos (o pulsa '?')"
+              >
+                <span>⌨️</span>
+                <span class="hidden lg:inline text-[11px]">Atajos</span>
+              </button>
+
+              <button
+                on:click={() => openHelp('studio')}
+                class="px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1 shadow-sm"
+                title="Ver guía de uso de Studio y Auditoría"
+              >
+                <span>❔</span>
+                <span class="hidden sm:inline">Ayuda</span>
+              </button>
+            </div>
           </div>
         </div>
 
