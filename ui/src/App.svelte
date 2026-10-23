@@ -549,31 +549,86 @@
     return items;
   }
 
-  function renderHighlightedTokens(text, isProtected = false) {
-    if (!text) return "";
-    let escaped = text
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function renderHighlightedTokens(text, isProtected = false) {
+    if (!text) return "";
 
     if (isProtected) {
-      escaped = escaped.replace(/&lt;([A-Za-z0-9_]+)&gt;/g, (match, tokenName) => {
+      // Reemplazo en una sola pasada sobre el texto escapado
+      let escaped = escapeHtml(text);
+      return escaped.replace(/&lt;([A-Za-z0-9_]+)&gt;/g, (match, tokenName) => {
         const cat = getDetectorCategory(tokenName);
         const mapping = vaultMappings.find(m => m.pseudonym === `<${tokenName}>` || m.pseudonym === tokenName);
         const origTooltip = mapping ? `Original: ${mapping.original}` : `Token seudonimizado (${cat.name})`;
-        return `<mark class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs" title="${origTooltip}">&lt;${tokenName}&gt;</mark>`;
+        return `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(origTooltip)}">&lt;${tokenName}&gt;</mark>`;
       });
-    } else {
-      const knownItems = detectedItems.length > 0 ? detectedItems : vaultMappings;
-      for (const item of knownItems) {
-        if (!item.original || item.original.length < 3) continue;
-        const escOrig = item.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const cat = getDetectorCategory(item.detector_type);
-        const re = new RegExp(`(${escOrig})`, 'g');
-        escaped = escaped.replace(re, `<mark class="inline-flex items-center gap-1 px-1 py-0.2 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs" title="Detectado como ${cat.name} (${item.detector_type})">$1</mark>`);
+    }
+
+    // Para texto claro: búsqueda exacta en una sola pasada lineal sobre el string bruto original
+    const knownItems = (detectedItems && detectedItems.length > 0) ? detectedItems : vaultMappings;
+    if (!knownItems || knownItems.length === 0) {
+      return escapeHtml(text);
+    }
+
+    // Filtrar términos no vacíos y deduplicar
+    const terms = [];
+    const seen = new Set();
+    for (const item of knownItems) {
+      if (!item.original || item.original.trim().length < 2) continue;
+      if (!seen.has(item.original)) {
+        seen.add(item.original);
+        terms.push({
+          original: item.original,
+          detector_type: item.detector_type
+        });
       }
     }
-    return escaped;
+
+    if (terms.length === 0) {
+      return escapeHtml(text);
+    }
+
+    // Ordenar de mayor a menor longitud para priorizar coincidencias más específicas
+    terms.sort((a, b) => b.original.length - a.original.length);
+
+    const termMap = new Map();
+    const escapedTerms = [];
+    for (const t of terms) {
+      termMap.set(t.original, t.detector_type);
+      escapedTerms.push(t.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    }
+
+    const combinedRegex = new RegExp(`(${escapedTerms.join('|')})`, 'g');
+    let result = "";
+    let lastIdx = 0;
+    let match;
+
+    while ((match = combinedRegex.exec(text)) !== null) {
+      if (match.index > lastIdx) {
+        result += escapeHtml(text.slice(lastIdx, match.index));
+      }
+      const matchedStr = match[0];
+      const detType = termMap.get(matchedStr) || "Token";
+      const cat = getDetectorCategory(detType);
+      const title = `Detectado como ${cat.name} (${detType})`;
+      result += `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(title)}">${escapeHtml(matchedStr)}</mark>`;
+      lastIdx = combinedRegex.lastIndex;
+    }
+
+    if (lastIdx < text.length) {
+      result += escapeHtml(text.slice(lastIdx));
+    }
+
+    return result;
   }
 
   function renderMarkdownPreview(rawText) {
@@ -2112,29 +2167,31 @@
       <div in:fade={{ duration: 150 }} class="flex-1 flex flex-col gap-4 min-h-0">
         <!-- Barra Superior Minimalista de Studio con Selector de Sub-vistas y Controles Rápidos -->
         <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 px-4 py-2 flex items-center justify-between gap-3 shadow-sm text-xs flex-wrap">
-          <div class="flex items-center gap-2 flex-wrap">
-            <div class="flex items-center gap-1.5 p-0.5 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5">
-              <button
-                type="button"
-                on:click={() => (studioSubView = "transform")}
-                class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'transform' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
-              >
-                <span>✨</span> Transformación
-              </button>
-              <button
-                type="button"
-                on:click={() => (studioSubView = "audit")}
-                class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'audit' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
-              >
-                <span>🔍</span> Desglose y Auditoría
-                {#if visibleDetectedItems.length > 0}
-                  <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
-                    {visibleDetectedItems.length}
-                  </span>
-                {/if}
-              </button>
-            </div>
+          <!-- Grupo Izquierdo: Sub-vistas de Studio exclusivamente -->
+          <div class="flex items-center gap-1.5 p-0.5 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5">
+            <button
+              type="button"
+              on:click={() => (studioSubView = "transform")}
+              class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'transform' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+            >
+              <span>✨</span> Transformación
+            </button>
+            <button
+              type="button"
+              on:click={() => (studioSubView = "audit")}
+              class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'audit' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+            >
+              <span>🔍</span> Desglose y Auditoría
+              {#if visibleDetectedItems.length > 0}
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
+                  {visibleDetectedItems.length}
+                </span>
+              {/if}
+            </button>
+          </div>
 
+          <!-- Grupo Derecho: Perfil de Sensibilidad, Auto-copiado y Herramientas -->
+          <div class="flex items-center gap-2 flex-wrap">
             <!-- Selector de Perfil de Sensibilidad -->
             <select
               bind:value={activeSensitivityProfile}
@@ -2152,9 +2209,7 @@
               <span class="font-medium hidden sm:inline">Auto-copiar</span>
               <span>📋</span>
             </label>
-          </div>
 
-          <div class="flex items-center gap-2 flex-wrap">
             {#if studioSubView === "transform"}
               <button
                 type="button"
@@ -2220,9 +2275,9 @@
           {/if}
 
           <!-- Paneles de Texto claro y Texto protegido con Puente Central -->
-          <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0 items-stretch relative">
+          <div class="flex-1 min-w-0 flex flex-col md:flex-row gap-3 min-h-0 items-stretch relative">
             <!-- Panel Izquierdo: Texto claro -->
-            <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {deobfuscateSuccessFlash ? 'border-emerald-500/80 ring-2 ring-emerald-500/40 shadow-emerald-500/20' : studioDirection === 'obfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
+            <div class="flex-1 min-w-0 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {deobfuscateSuccessFlash ? 'border-emerald-500/80 ring-2 ring-emerald-500/40 shadow-emerald-500/20' : studioDirection === 'obfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
               <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
@@ -2261,9 +2316,9 @@
                   </button>
                 </div>
               </div>
-              <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
+              <div class="flex-1 min-w-0 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
                 {#if showTokenBadges && inputText.trim()}
-                  <div class="flex-1 w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''}">
+                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''}">
                     {@html renderHighlightedTokens(inputText, false)}
                   </div>
                 {:else}
@@ -2337,7 +2392,7 @@
             </div>
 
             <!-- Panel Derecho: Texto protegido -->
-            <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'deobfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
+            <div class="flex-1 min-w-0 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'deobfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
               <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
@@ -2396,13 +2451,13 @@
                   </button>
                 </div>
               </div>
-              <div class="flex-1 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
+              <div class="flex-1 min-w-0 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
                 {#if studioOutputViewMode === "markdown"}
-                  <div class="flex-1 w-full p-4 overflow-auto select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans">
+                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words">
                     {@html renderMarkdownPreview(outputText)}
                   </div>
                 {:else if showTokenBadges && outputText.trim()}
-                  <div class="flex-1 w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-auto select-text whitespace-pre">
+                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words">
                     {@html renderHighlightedTokens(outputText, true)}
                   </div>
                 {:else}
