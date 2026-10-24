@@ -5,10 +5,43 @@ Todos los cambios notables de este proyecto se documentarán en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-10-15
-*Actualización de compatibilidad CI/CD y motor contextual estructurado para eventos de seguridad y SIEM (Wazuh / Windows EventLog / Sysmon).*
+## [2.0.1] - 2026-10-24
+*Actualización integral de ergonomía, fusión de Studio y Escáner, resiliencia multiplataforma de portapapeles en Linux (Wayland/X11/KDE) y blindaje de privacidad.*
 
 ### Añadido
+- **✨ Fusión Arquitectónica de Escáner y Studio**:
+  - Unificación completa de la experiencia de usuario en una única pestaña **Studio** con dos sub-vistas fluidas:
+    - *Transformación Bidireccional*: Paneles simétricos de *Texto claro* y *Texto protegido* con puente direccional interactivo, soporte Drag & Drop dividido y telemetría de caracteres/líneas.
+    - *Desglose y Auditoría*: Tabla categorizada de hallazgos (Red, Identidad, Sistemas, Contacto/Claves), barra de distribución cromática, filtrado por tipo y botón de adición directa de correspondencias a la bóveda.
+- **📋 Cadena de Respaldo Híbrida de Portapapeles en Linux (Wayland / X11 / KDE)**:
+  - Implementación en Rust (`src/clipboard.rs`) de mecanismos automáticos de fallback cuando `arboard` falla por inaccesibilidad del servidor X11:
+    - *Wayland*: Ejecución de `wl-paste` y `wl-copy` mediante pipes estándar.
+    - *KDE Plasma*: Interacción nativa con el demonio Klipper mediante llamadas D-Bus con `qdbus6` / `qdbus`.
+    - *X11*: Respaldo clásico mediante utilidades `xclip` y `xsel`.
+  - El bucle CLI (`watch_clipboard_loop`) inicializa el portapapeles de manera resiliente sin abortar la ejecución ante fallos de backend nativo.
+  - Banner informativo y diagnóstico activo en la interfaz gráfica ante problemas de permisos o paquetes faltantes en Linux.
+- **⏱️ Historial Temporal de Sesión en Memoria RAM**:
+  - Almacenamiento local volátil (Zero-Knowledge) de las últimas 30 transformaciones en Studio, permitiendo restaurar estados anteriores con un solo clic.
+- **⌨️ Atajos de Teclado Centralizados en el Sistema de Ayuda**:
+  - Pestaña dedicada *⌨️ Atajos de Teclado* en el modal de Ayuda contextual, invocable en cualquier momento mediante la tecla `?` o el botón de ayuda.
+- **🛡️ Gestión Persistente de Perfiles de Sensibilidad en Opciones**:
+  - Selector de perfiles (*Completo*, *DevOps & Red*, *RGPD & Identidad*) ubicado en la pestaña **Opciones**, con persistencia local automática (`localStorage`) entre sesiones.
+
+### Modificado
+- **🎨 Ergonomía y Limpieza Visual de la Barra Superior de Studio**:
+  - Botón de auto-copiado al portapapeles rediseñado a formato de conmutador cuadrado (`w-8 h-8`) con cambio dinámico de icono (`📋` activo / `📄` inactivo).
+  - Reubicación de la acción **"Auditar Texto"** dentro de la cabecera del panel **"Texto claro"**, donde reside el contexto operativo de los datos en claro.
+  - Retirada de desplegables y botones redundantes de la cabecera superior para evitar desbordamientos horizontales.
+
+### Corregido
+- **🙈 Cobertura Universal del Modo Privacidad (*Privacy Blur*)**:
+  - Aplicado desenfoque condicional a los valores originales confidenciales en la tabla de la pestaña **Pares de Tokens**.
+  - Desenfoque aplicado al campo de texto original en el modal **Añadir Par**.
+  - Desenfoque aplicado al texto capturado y a las fichas de tokens en el historial del **Portapapeles**.
+- **🔍 Observabilidad en el Sondeo de Portapapeles**:
+  - Eliminado el silenciamiento de errores en `startWatchPolling()`; las incidencias de acceso al portapapeles ahora se notifican de inmediato en la barra de estado y en la vista de portapapeles.
+
+### Añadido (Versiones Previas de 2.0.1)
 - **🛡️ Adaptador JSON Jerárquico y Perfil SIEM / Wazuh / Windows Events (`json_adapter.rs`)**:
   - Detección e inspección semántica mediante rutas jerárquicas (JSON Path) para eventos de seguridad.
   - Clasificación forzada y generación de pseudónimos para equipos y servidores (`agent.name`, `manager.name`, `workstationName`, `system.computer`).

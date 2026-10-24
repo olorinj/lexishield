@@ -82,34 +82,35 @@ flowchart LR
 
 ### Pestañas y Capacidades Principales
 
-1. **✨ Studio (Protección para IAs y Consultas Externas):**
-   * **Ofuscación Contextual:** Oculta nombres, correos, documentos de identidad (DNI/NIE), tarjetas bancarias, IPs o tokens de acceso sustituyéndolos por seudónimos sintéticos coherentes.
-   * **Selector de Formato Estructurado:** Preserva intacta la sintaxis en archivos `JSON`, `XML`, `Logs`, `Markdown` o `Texto Plano`.
-   * **Exportación a Markdown con Pandoc:** Convierte automáticamente documentos estructurados a Markdown (.md) conservando tablas y jerarquías con el menor consumo de tokens para el modelo de IA.
-   * **Desofuscación Inmediata:** Pega la respuesta devuelta por la IA y pulsa *Desofuscar* para restaurar los valores originales con correspondencia biyectiva 1:1.
+1. **✨ Studio Unificado (Transformación Bidireccional y Auditoría Preventiva):**
+   * **Paneles Bidireccionales Editables:** Vistas simétricas de *Texto claro* y *Texto protegido* con detección inteligente de flujo (`Texto claro ➔ Texto protegido` para Proteger y `Texto protegido ➔ Texto claro` para Restaurar datos).
+   * **Puente Direccional Dinámico:** Conmutador central interactivo (`[ 🛡️ Proteger ➔ ]` / `[ ⮜ Restaurar datos 🔄 ]`) con selector de dirección manual `[ ⇄ ]`.
+   * **Sub-vista de Auditoría y Desglose:** Análisis no destructivo de entidades confidenciales agrupadas por categorías semánticas (Red 🌐, Identidad 🪪, Sistemas 🖥️ y Contacto/Claves 💳) con barra de distribución cromática y opción de omitir falsos positivos antes de guardarlos.
+   * **Arrastrar y Soltar (*Drag & Drop*) Dividido:** Arrastra archivos individuales o carpetas sobre la zona izquierda para proteger o sobre la derecha para restaurar datos con la bóveda.
+   * **Acciones Integradas por Panel:** Botón directo *"Auditar"* en la cabecera del panel de texto claro para inspeccionar tokens al vuelo sin modificar el documento original.
+   * **Auto-copiado Conmutable:** Conmutador rápido (`📋` / `📄`) para copiar automáticamente el resultado de la transformación al portapapeles.
+   * **Historial de Sesión en Memoria RAM:** Recuperación instantánea de estados anteriores con un solo clic sin persistencia en disco (Zero-Knowledge).
 
-2. **🔍 Escáner (Auditoría Preventiva):**
-   * Análisis pasivo y no destructivo de archivos individuales o árboles de directorios enteros.
-   * Respeta de forma nativa los archivos `.gitignore` y `.lexiignore`, omitiendo automáticamente artefactos pesados (`target`, `node_modules`, `.git`, binarios).
-   * Progreso en vivo con recuento de archivos escaneados y tokens detectados en tiempo real.
-
-3. **📑 Pares de Tokens (Biyectividad 1:1):**
-   * Visualización y administración directa del diccionario activo de correspondencias.
+2. **📑 Pares de Tokens (Biyectividad 1:1 y Privacidad):**
+   * Visualización y administración directa del diccionario activo de correspondencias en la bóveda.
    * Permite añadir pares manuales personalizados, editar sustituciones y marcar tokens a **Omitir** (`=`) para evitar reemplazos indeseados.
+   * **Modo Privacidad Blindado:** Desenfoque automático de valores confidenciales en la tabla y en el modal de adición para compartir pantalla con total seguridad.
    * Recuperación instantánea desde la última copia de seguridad automática (`.bak`).
 
-4. **🗄️ Bóvedas Lexi y Copias Bzip2:**
+3. **🗄️ Bóvedas Lexi y Copias Bzip2:**
    * Creación, renombramiento, exportación e importación de contenedores criptográficos aislados (`.lexi`).
    * Generación de copias de seguridad completas de perfil comprimidas con **Bzip2** y opcionalmente cifradas con AES-256.
    * **Arquitectura Zero-Knowledge:** Las bóvedas se protegen con contraseña maestra; la clave se deriva mediante **Argon2id** en memoria de sesión y los datos se sellan con **ChaCha20-Poly1305**.
 
-5. **📋 Portapapeles (Watch Mode):**
+4. **📋 Portapapeles (Watch Mode Multiplataforma):**
    * Monitorización continua en segundo plano del portapapeles (`Ctrl+C` / `Cmd+C`).
-   * Ofuscación o desofuscación automática al vuelo con vista previa instantánea del texto capturado frente al transformado.
-   * Notificación explícita de *"0 tokens reconocidos"* cuando el texto no contiene secretos.
+   * **Compatibilidad Total en Linux:** Cadena de respaldo híbrida automática con soporte nativo para Wayland (`wl-paste`/`wl-copy`), KDE Plasma (Klipper vía D-Bus) y X11 (`xclip`/`xsel`).
+   * Diagnóstico activo en interfaz y notificaciones explícitas de estado ante errores de conexión.
    * Vaciado seguro del portapapeles manual o temporizado para máxima higiene en el sistema operativo.
 
-6. **⚙️ Configuración y 🐞 Logs:**
+5. **⚙️ Configuración y 🐞 Logs:**
+   * **Perfiles de Sensibilidad Persistentes:** Selección de perfiles de detección (*Completo*, *DevOps & Red*, *RGPD & Identidad*) con guardado automático entre sesiones.
+   * **Atajos de Teclado Centralizados:** Acceso inmediato a la guía de atajos de teclado (`⌨️`) desde el modal de Ayuda (`?`) o desde cualquier vista.
    * Selección de pestaña predeterminada al arrancar, personalización de pestañas visibles en la barra superior y barra CLI docking en vivo.
    * Consola de telemetría y diagnóstico en vivo con niveles de filtrado (`INFO`, `WARN`, `ERROR`, `DEBUG`).
 

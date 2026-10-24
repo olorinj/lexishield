@@ -269,10 +269,9 @@
 
   // Mejoras Ergonómicas y Funcionales de Studio (v2.1)
   let autoCopyToClipboard = true;
-  let showKeyboardShortcutsModal = false;
   let sessionHistory = [];
   let showSessionHistoryModal = false;
-  let activeSensitivityProfile = "all"; // "all" | "devops" | "gdpr"
+  let activeSensitivityProfile = localStorage.getItem("sensitivity_profile") || "all"; // "all" | "devops" | "gdpr"
   let showTokenBadges = false;
   let studioOutputViewMode = "editor"; // "editor" | "markdown"
 
@@ -419,8 +418,6 @@
         actionResultModal = null;
       } else if (studioDropModal) {
         studioDropModal = null;
-      } else if (showKeyboardShortcutsModal) {
-        showKeyboardShortcutsModal = false;
       } else if (showSessionHistoryModal) {
         showSessionHistoryModal = false;
       }
@@ -485,10 +482,10 @@
       return;
     }
 
-    // Atajo: ? para abrir la chuleta de atajos si no se está escribiendo en un input/textarea
+    // Atajo: ? para abrir la ayuda con la pestaña de atajos si no se está escribiendo en un input/textarea
     if (e.key === "?" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
       e.preventDefault();
-      showKeyboardShortcutsModal = true;
+      openHelp("shortcuts");
     }
   }
 
@@ -2195,103 +2192,48 @@
             </button>
           </div>
 
-          <!-- Grupo Derecho: Agrupación Semántica por Bloques Visuales (Opción 1) -->
-          <div class="flex items-center gap-2.5 flex-wrap">
-            <!-- Bloque 1: Ajustes de Procesamiento (Perfil y Auto-copiado) -->
-            <div class="flex items-center gap-1.5">
-              <!-- Selector de Perfil de Sensibilidad -->
-              <select
-                bind:value={activeSensitivityProfile}
-                class="bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-xl px-2.5 py-1 text-xs text-slate-700 dark:text-slate-300 font-medium focus:outline-none cursor-pointer"
-                title="Filtrar detectores por perfil de sensibilidad"
-              >
-                <option value="all">🛡️ Perfil: Completo (Todos)</option>
-                <option value="devops">🌐 Perfil: DevOps & Red</option>
-                <option value="gdpr">🪪 Perfil: RGPD & Identidad</option>
-              </select>
+          <!-- Grupo Derecho: Acciones de Sesión y Ergonomía -->
+          <div class="flex items-center gap-2">
+            <!-- Botón Conmutable de Auto-copiado (estilo toggle con cambio de icono 📋 / 📄) -->
+            <button
+              type="button"
+              on:click={() => {
+                autoCopyToClipboard = !autoCopyToClipboard;
+                statusMessage = autoCopyToClipboard
+                  ? "📋 Auto-copiado al portapapeles ACTIVADO."
+                  : "📄 Auto-copiado al portapapeles DESACTIVADO.";
+              }}
+              class="w-8 h-8 rounded-xl flex items-center justify-center transition border {autoCopyToClipboard ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
+              title={autoCopyToClipboard ? "Auto-copiar ACTIVO: Copia el resultado automáticamente al proteger o restaurar (Clic para desactivar)" : "Auto-copiar DESACTIVADO: Clic para activar copiado automático"}
+            >
+              <span>{autoCopyToClipboard ? "📋" : "📄"}</span>
+            </button>
 
-              <!-- Marcador Interactivo de Auto-copiado con indicador de estado (LED) -->
-              <button
-                type="button"
-                on:click={() => {
-                  autoCopyToClipboard = !autoCopyToClipboard;
-                  statusMessage = autoCopyToClipboard
-                    ? "📋 Auto-copiado al portapapeles ACTIVADO."
-                    : "📋 Auto-copiado al portapapeles DESACTIVADO.";
-                }}
-                class="px-2.5 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border {autoCopyToClipboard ? 'bg-primary-500/15 border-primary-500/40 text-primary-700 dark:text-primary-300 shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
-                title="Copiar automáticamente al portapapeles al proteger o restaurar (Clic para alternar)"
-              >
-                <span>📋</span>
-                <span class="hidden sm:inline">Auto-copiar</span>
-                <span
-                  class="inline-block w-2 h-2 rounded-full transition-all duration-200 {autoCopyToClipboard ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]' : 'bg-slate-300 dark:bg-slate-600'}"
-                  aria-hidden="true"
-                ></span>
-              </button>
-            </div>
-
-            <!-- Divisor Vertical Sutil -->
-            <span class="w-px h-4 bg-slate-200 dark:border-white/10 dark:bg-white/10 hidden sm:inline-block" aria-hidden="true"></span>
-
-            <!-- Bloque 2: Acciones y Recuperación de Sesión -->
-            <div class="flex items-center gap-1.5">
-              {#if studioSubView === "transform"}
-                <button
-                  type="button"
-                  on:click={scanCurrentStudioText}
-                  disabled={loading || (!inputText.trim() && !outputText.trim())}
-                  class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1 shadow-sm disabled:opacity-40"
-                  title="Auditar tokens confidenciales del texto de los paneles sin modificarlo (Ctrl+Shift+A)"
-                >
-                  <span>🔍</span>
-                  <span class="hidden md:inline">Auditar Texto</span>
-                  <span class="md:hidden">Auditar</span>
-                </button>
+            <!-- Botón Historial de Sesión -->
+            <button
+              type="button"
+              on:click={() => (showSessionHistoryModal = true)}
+              class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs"
+              title="Ver historial temporal de sesiones en memoria RAM"
+            >
+              <span>⏱️</span>
+              <span class="hidden sm:inline">Historial</span>
+              {#if sessionHistory.length > 0}
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
+                  {sessionHistory.length}
+                </span>
               {/if}
+            </button>
 
-              <!-- Botón Historial de Sesión -->
-              <button
-                type="button"
-                on:click={() => (showSessionHistoryModal = true)}
-                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-sm"
-                title="Ver historial temporal de sesiones en memoria RAM"
-              >
-                <span>⏱️</span>
-                <span class="hidden sm:inline">Historial</span>
-                {#if sessionHistory.length > 0}
-                  <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
-                    {sessionHistory.length}
-                  </span>
-                {/if}
-              </button>
-            </div>
-
-            <!-- Divisor Vertical Sutil -->
-            <span class="w-px h-4 bg-slate-200 dark:border-white/10 dark:bg-white/10 hidden sm:inline-block" aria-hidden="true"></span>
-
-            <!-- Bloque 3: Soporte y Atajos -->
-            <div class="flex items-center gap-1.5">
-              <!-- Botón Atajos de Teclado -->
-              <button
-                type="button"
-                on:click={() => (showKeyboardShortcutsModal = true)}
-                class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1 shadow-sm"
-                title="Ver guía de atajos de teclado rápidos (o pulsa '?')"
-              >
-                <span>⌨️</span>
-                <span class="hidden lg:inline text-[11px]">Atajos</span>
-              </button>
-
-              <button
-                on:click={() => openHelp('studio')}
-                class="px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1 shadow-sm"
-                title="Ver guía de uso de Studio y Auditoría"
-              >
-                <span>❔</span>
-                <span class="hidden sm:inline">Ayuda</span>
-              </button>
-            </div>
+            <!-- Botón Ayuda (con atajos integrados) -->
+            <button
+              on:click={() => openHelp('studio')}
+              class="px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1 shadow-xs"
+              title="Ver guía de uso de Studio y atajos de teclado"
+            >
+              <span>❔</span>
+              <span class="hidden sm:inline">Ayuda</span>
+            </button>
           </div>
         </div>
 
@@ -2331,6 +2273,15 @@
                   <span class="text-[10px] font-mono text-slate-400">
                     {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
                   </span>
+                  <button
+                    type="button"
+                    on:click={scanCurrentStudioText}
+                    disabled={loading || !inputText.trim()}
+                    class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition shadow-xs disabled:opacity-40"
+                    title="Auditar tokens confidenciales del texto en claro sin modificarlo (Ctrl+Shift+A)"
+                  >
+                    <span>🔍</span> Auditar
+                  </button>
                   <button
                     type="button"
                     on:click={() => (showTokenBadges = !showTokenBadges)}
@@ -3557,6 +3508,31 @@
               </div>
             </div>
 
+            <!-- Studio y Perfil de Sensibilidad -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Studio y Sensibilidad</span>
+              
+              <div>
+                <label for="config-sensitivity-profile-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Perfil de Sensibilidad de Auditoría:</label>
+                <select
+                  id="config-sensitivity-profile-select"
+                  bind:value={activeSensitivityProfile}
+                  on:change={() => {
+                    localStorage.setItem("sensitivity_profile", activeSensitivityProfile);
+                    statusMessage = `🛡️ Perfil de sensibilidad actualizado a: ${activeSensitivityProfile === 'all' ? 'Completo' : activeSensitivityProfile === 'devops' ? 'DevOps & Red' : 'RGPD & Identidad'}.`;
+                  }}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="all">🛡️ Perfil: Completo (Todos los detectores activos)</option>
+                  <option value="devops">🌐 Perfil: DevOps & Red (IPs, UUIDs, Hostnames, Logs)</option>
+                  <option value="gdpr">🪪 Perfil: RGPD & Identidad (Emails, Nombres, DNI/NIE, Tarjetas)</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                  Filtra los tipos de entidades analizadas y mostradas en la auditoría de Studio. La preferencia se guarda automáticamente entre sesiones.
+                </p>
+              </div>
+            </div>
+
             <!-- Selección de Archivos y Carpetas -->
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Selección de Archivos y Carpetas</span>
@@ -4271,6 +4247,12 @@
           >
             🐞 Logs
           </button>
+          <button
+            on:click={() => (activeHelpTab = "shortcuts")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'shortcuts' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            ⌨️ Atajos de Teclado
+          </button>
         </div>
 
         <!-- Contenido Específico del Tema -->
@@ -4303,6 +4285,19 @@
                   <span>🔍</span> Desglose y Auditoría de Tokens:
                 </p>
                 <p>Puedes cambiar a la sub-vista <em>"Desglose y Auditoría"</em> o pulsar <em>"Auditar"</em> en cualquier momento. LexiShield analizará tu texto o carpetas completas sin tocarlas, clasificando los tokens por Red, Identidad, Sistemas o Claves, y permitiéndote omitir falsos positivos antes de guardarlos en tu bóveda.</p>
+              </div>
+
+              <div class="p-3 bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-white/5 rounded-xl flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">⌨️</span>
+                  <span>¿Prefieres operar con el teclado? Consulta la chuleta completa de atajos rápidos.</span>
+                </div>
+                <button
+                  on:click={() => (activeHelpTab = "shortcuts")}
+                  class="px-2.5 py-1 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded-lg font-bold border border-primary-500/30 hover:bg-primary-500/30 transition shrink-0"
+                >
+                  Ver Atajos ➔
+                </button>
               </div>
             </div>
 
@@ -4384,6 +4379,87 @@
                 <span>🐞</span> Diagnóstico y Registros de Telemetría
               </h4>
               <p>La consola de logs registra cada evento del motor nativo en Rust (invocaciones a Tauri, lecturas y escrituras de bóvedas, detecciones y transformaciones). Puedes activar el <strong>Modo DEBUG</strong> para trazas detalladas o filtrar por nivel (INFO, WARN, ERROR).</p>
+            </div>
+
+          {:else if activeHelpTab === "shortcuts"}
+            <div class="space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
+                <div>
+                  <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>⌨️</span> Atajos de Teclado Rápidos
+                  </h4>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Opera todo el flujo de protección y navegación sin levantar las manos del teclado.</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-2.5 text-xs font-mono">
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Proteger o Restaurar datos (según dirección activa)</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Enter</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Copiar texto resultante al portapapeles</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">C</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Alternar dirección (Proteger ⇄ Restaurar)</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">X</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Auditar texto actual sin modificarlo</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">A</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Limpiar ambos paneles (con guardado en historial)</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">L</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Abrir manual de ayuda y atajos rápidos</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">?</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Cerrar ventanas y modales activos</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Esc</kbd>
+                  </div>
+                </div>
+              </div>
             </div>
           {/if}
         </div>
@@ -4627,112 +4703,6 @@
           </p>
         </div>
       {/if}
-    </div>
-  {/if}
-
-  <!-- MODAL DE ATAJOS DE TECLADO ERGONÓMICOS -->
-  {#if showKeyboardShortcutsModal}
-    <div
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <button
-        type="button"
-        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
-        on:click={() => (showKeyboardShortcutsModal = false)}
-        aria-label="Cerrar chuleta de atajos"
-      ></button>
-      <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 flex flex-col shadow-2xl space-y-4">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
-          <div class="flex items-center gap-2.5">
-            <span class="text-2xl">⌨️</span>
-            <div>
-              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Atajos de Teclado de Studio</h3>
-              <p class="text-xs text-slate-500 dark:text-slate-400">Opera todo el flujo de protección sin separar las manos del teclado.</p>
-            </div>
-          </div>
-          <button on:click={() => (showKeyboardShortcutsModal = false)} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg px-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">✕</button>
-        </div>
-
-        <div class="grid grid-cols-1 gap-2.5 text-xs font-mono">
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
-            <span class="font-sans text-slate-700 dark:text-slate-300">Proteger o Restaurar datos (según modo activo)</span>
-            <div class="flex items-center gap-1">
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Enter</kbd>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
-            <span class="font-sans text-slate-700 dark:text-slate-300">Copiar texto resultante al portapapeles</span>
-            <div class="flex items-center gap-1">
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">C</kbd>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
-            <span class="font-sans text-slate-700 dark:text-slate-300">Alternar dirección (Proteger ⇄ Restaurar)</span>
-            <div class="flex items-center gap-1">
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">X</kbd>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
-            <span class="font-sans text-slate-700 dark:text-slate-300">Auditar texto actual sin modificarlo</span>
-            <div class="flex items-center gap-1">
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">A</kbd>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
-            <span class="font-sans text-slate-700 dark:text-slate-300">Limpiar ambos paneles (con guardado en historial)</span>
-            <div class="flex items-center gap-1">
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
-              <span>+</span>
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">L</kbd>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
-            <span class="font-sans text-slate-700 dark:text-slate-300">Abrir esta chuleta de atajos rápidos</span>
-            <div class="flex items-center gap-1">
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">?</kbd>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
-            <span class="font-sans text-slate-700 dark:text-slate-300">Cerrar ventanas y modales activos</span>
-            <div class="flex items-center gap-1">
-              <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Esc</kbd>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-end pt-2">
-          <button
-            on:click={() => (showKeyboardShortcutsModal = false)}
-            class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-primary-500/20"
-          >
-            Entendido
-          </button>
-        </div>
-      </div>
     </div>
   {/if}
 
