@@ -5,8 +5,8 @@ Todos los cambios notables de este proyecto se documentarán en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-10-24
-*Actualización integral de ergonomía, fusión de Studio y Escáner, resiliencia multiplataforma de portapapeles en Linux (Wayland/X11/KDE) y blindaje de privacidad.*
+## [2.1.0] - 2026-10-24
+*Actualización integral de experiencia de usuario: Fusión Arquitectónica de Escáner y Studio, resiliencia multiplataforma de portapapeles en Linux (Wayland/X11/KDE), estandarización de escala de iconos y blindaje universal de privacidad.*
 
 ### Añadido
 - **✨ Fusión Arquitectónica de Escáner y Studio**:
@@ -48,7 +48,10 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 - **🔍 Observabilidad en el Sondeo de Portapapeles**:
   - Eliminado el silenciamiento de errores en `startWatchPolling()`; las incidencias de acceso al portapapeles ahora se notifican de inmediato en la barra de estado y en la vista de portapapeles.
 
-### Añadido (Versiones Previas de 2.0.1)
+## [2.0.1] - 2026-10-21
+*Actualización de compatibilidad CI/CD y motor contextual estructurado para eventos de seguridad y SIEM (Wazuh / Windows EventLog / Sysmon), modernización estética y ergonomía.*
+
+### Añadido
 - **🛡️ Adaptador JSON Jerárquico y Perfil SIEM / Wazuh / Windows Events (`json_adapter.rs`)**:
   - Detección e inspección semántica mediante rutas jerárquicas (JSON Path) para eventos de seguridad.
   - Clasificación forzada y generación de pseudónimos para equipos y servidores (`agent.name`, `manager.name`, `workstationName`, `system.computer`).

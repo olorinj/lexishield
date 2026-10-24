@@ -3779,7 +3779,7 @@
         UTF-8
       </div>
       <div class="px-2 py-0.5 rounded bg-primary-600/15 text-primary-700 dark:text-primary-400 font-semibold border border-primary-500/20">
-        v2.0.1
+        v2.1.0
       </div>
     </div>
   </footer>
