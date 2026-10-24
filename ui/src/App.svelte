@@ -257,6 +257,7 @@
   let clipboardFlash = false;
   let autoClearTimer = null;
   let clipboardEvents = [];
+  let clipboardError = null;
 
   // Estado de Ayuda Contextual y Onboarding
   let activeHelpTab = null; // "studio" | "pairs" | "vaults" | "watch" | "config" | "logs" | "password_why"
@@ -1848,6 +1849,7 @@
     watchPollInterval = setInterval(async () => {
       try {
         const text = await invokeTauri("get_system_clipboard");
+        if (clipboardError) clipboardError = null;
         if (text && text.trim() && text !== lastSeenClipboard) {
           lastSeenClipboard = text;
           if (watchDirection === "obfuscate") {
@@ -1940,7 +1942,10 @@
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        clipboardError = String(e);
+        statusMessage = "⚠️ Portapapeles: " + String(e);
+      }
     }, 300);
   }
 
@@ -3054,7 +3059,7 @@
                       </span>
                     {/if}
                   </td>
-                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text">{item.original}</td>
+                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
                   <td class="p-3 text-primary-700 dark:text-primary-400 select-text">
                     {#if editingPairOriginal === item.original}
                       <div class="flex items-center gap-1">
@@ -3310,6 +3315,17 @@
             </div>
           </div>
 
+          {#if clipboardError}
+            <div class="mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3 text-xs text-amber-800 dark:text-amber-200">
+              <span class="text-base">⚠️</span>
+              <div class="flex-1">
+                <p class="font-bold text-slate-900 dark:text-white mb-0.5">Aviso de acceso al portapapeles de Linux</p>
+                <p class="mb-1">{clipboardError}</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Si utilizas Wayland (KDE Plasma/GNOME), instala el paquete <code class="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded font-mono">wl-clipboard</code> (<code class="font-mono">sudo apt install wl-clipboard</code> o <code class="font-mono">sudo pacman -S wl-clipboard</code>) o asegúrate de que Klipper/XWayland esté activo.</p>
+              </div>
+            </div>
+          {/if}
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dirección de Transformación</span>
@@ -3376,7 +3392,7 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono pt-1">
                     <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
                       <span class="block text-[10px] text-slate-400 font-sans uppercase font-bold mb-1">Texto Capturado:</span>
-                      <p class="truncate text-slate-700 dark:text-slate-300 select-all" title={ev.originalText}>{ev.originalText}</p>
+                      <p class="truncate text-slate-700 dark:text-slate-300 select-all {privacyBlur ? 'privacy-blurred' : ''}" title={ev.originalText}>{ev.originalText}</p>
                     </div>
                     <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
                       <span class="block text-[10px] text-primary-500 font-sans uppercase font-bold mb-1">Resultado en Portapapeles:</span>
@@ -3389,7 +3405,7 @@
                       {#each ev.tokens as tok}
                         <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-mono">
                           <span class="text-[10px] px-1 py-0.2 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded font-semibold">{tok.detector_type || 'Token'}</span>
-                          <span class="text-amber-600 dark:text-amber-400 font-semibold">{tok.original}</span>
+                          <span class="text-amber-600 dark:text-amber-400 font-semibold {privacyBlur ? 'privacy-blurred' : ''}">{tok.original}</span>
                           <span class="text-slate-400">→</span>
                           <span class="text-primary-600 dark:text-primary-400">{tok.pseudonym}</span>
                         </div>
@@ -3928,7 +3944,7 @@
               type="text"
               bind:value={newPairOriginal}
               placeholder="ej: Juan Pérez o 192.168.1.10"
-              class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500"
+              class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500 {privacyBlur ? 'privacy-blurred' : ''}"
             />
           </div>
 
