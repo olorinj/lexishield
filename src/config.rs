@@ -105,6 +105,7 @@ ignored_extensions = [
 [gui]
 default_tab = "studio"
 show_cli_dock = true
+show_token_badges = true # Mostrar insignias y badges coloreados en tokens por defecto
 
 [gui.tabs]
 show_studio = true
@@ -362,6 +363,7 @@ impl Default for GuiClipboardConfig {
 
 /// Configuración de la interfaz gráfica y ergonomía de usuario.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct GuiConfig {
     #[serde(default = "default_default_tab")]
     pub default_tab: String,
@@ -383,6 +385,8 @@ pub struct GuiConfig {
     pub font_size: String,
     #[serde(default)]
     pub privacy_blur: bool,
+    #[serde(default = "default_true")]
+    pub show_token_badges: bool,
     #[serde(default)]
     pub auto_lock_minutes: u32,
     #[serde(default = "default_theme")]
@@ -459,6 +463,7 @@ impl Default for GuiConfig {
             output_suffix: default_output_suffix(),
             font_size: default_font_size(),
             privacy_blur: false,
+            show_token_badges: true,
             auto_lock_minutes: 0,
             theme: default_theme(),
             accent_color: default_accent_color(),

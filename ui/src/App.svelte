@@ -37,6 +37,7 @@
       output_suffix: "_obfuscated",
       font_size: "medium",
       privacy_blur: false,
+      show_token_badges: true,
       auto_lock_minutes: 0,
       theme: "system",
       accent_color: "cyan",
@@ -53,6 +54,7 @@
   $: showFileButtons = fileSelectionMode === "ambos" || fileSelectionMode === "botones";
   $: copySuffix = appConfig?.gui?.output_suffix || "_obfuscated";
   $: privacyBlur = appConfig?.gui?.privacy_blur || false;
+  $: showTokenBadges = appConfig?.gui?.show_token_badges !== undefined ? appConfig.gui.show_token_badges : true;
   $: editorFontSizeClass =
     appConfig?.gui?.font_size === "small"
       ? "text-[11px]"
@@ -272,7 +274,7 @@
   let sessionHistory = [];
   let showSessionHistoryModal = false;
   let activeSensitivityProfile = localStorage.getItem("sensitivity_profile") || "all"; // "all" | "devops" | "gdpr"
-  let showTokenBadges = false;
+  let showTokenBadges = true;
   let studioOutputViewMode = "editor"; // "editor" | "markdown"
 
   // Estado de Depuración y Logs
@@ -557,7 +559,7 @@
       .replace(/'/g, "&#039;");
   }
 
-  function renderHighlightedTokens(text, isProtected = false) {
+  function renderHighlightedTokens(text, isProtected = false, customItems = null) {
     if (!text) return "";
 
     if (isProtected) {
@@ -565,14 +567,15 @@
       let escaped = escapeHtml(text);
       return escaped.replace(/&lt;([A-Za-z0-9_]+)&gt;/g, (match, tokenName) => {
         const cat = getDetectorCategory(tokenName);
-        const mapping = vaultMappings.find(m => m.pseudonym === `<${tokenName}>` || m.pseudonym === tokenName);
+        const searchList = (customItems && customItems.length > 0) ? customItems : vaultMappings;
+        const mapping = searchList.find(m => m.pseudonym === `<${tokenName}>` || m.pseudonym === tokenName);
         const origTooltip = mapping ? `Original: ${mapping.original}` : `Token seudonimizado (${cat.name})`;
         return `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(origTooltip)}">&lt;${tokenName}&gt;</mark>`;
       });
     }
 
     // Para texto claro: búsqueda exacta en una sola pasada lineal sobre el string bruto original
-    const knownItems = (detectedItems && detectedItems.length > 0) ? detectedItems : vaultMappings;
+    const knownItems = (customItems && customItems.length > 0) ? customItems : ((detectedItems && detectedItems.length > 0) ? detectedItems : vaultMappings);
     if (!knownItems || knownItems.length === 0) {
       return escapeHtml(text);
     }
@@ -683,6 +686,13 @@
     saveSettings();
   }
 
+  function toggleTokenBadges() {
+    if (!appConfig.gui) appConfig.gui = {};
+    showTokenBadges = !showTokenBadges;
+    appConfig.gui.show_token_badges = showTokenBadges;
+    saveSettings();
+  }
+
   function openHelp(tabKey) {
     activeHelpTab = tabKey;
   }
@@ -727,6 +737,10 @@
         if (!["cyan", "emerald", "cobalt", "purple", "amber"].includes(cfg.gui.accent_color)) {
           cfg.gui.accent_color = "cyan";
         }
+        if (cfg.gui.show_token_badges === undefined) {
+          cfg.gui.show_token_badges = true;
+        }
+        showTokenBadges = cfg.gui.show_token_badges;
         appConfig = cfg;
         applyThemeFromConfig();
         applyAccentFromConfig();
@@ -2147,6 +2161,15 @@
         <span>{privacyBlur ? "🙈" : "👁️"}</span>
       </button>
 
+      <!-- Botón Insignias / Badges de Tokens -->
+      <button
+        on:click={toggleTokenBadges}
+        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {showTokenBadges ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+        title={showTokenBadges ? "Insignias (Badges) ACTIVAS: Tokens resaltados visualmente (Clic para desactivar)" : "Activar Insignias (Badges) en tokens confidenciales"}
+      >
+        <span>🏷️</span>
+      </button>
+
       <!-- Botón Tema Claro/Oscuro -->
       <button
         on:click={toggleTheme}
@@ -2284,7 +2307,7 @@
                   </button>
                   <button
                     type="button"
-                    on:click={() => (showTokenBadges = !showTokenBadges)}
+                    on:click={toggleTokenBadges}
                     class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {showTokenBadges ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}"
                     title="Alternar vista de badges coloreados en tokens confidenciales"
                   >
@@ -2418,7 +2441,7 @@
                   {#if studioOutputViewMode === "editor"}
                     <button
                       type="button"
-                      on:click={() => (showTokenBadges = !showTokenBadges)}
+                      on:click={toggleTokenBadges}
                       class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {showTokenBadges ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}"
                       title="Alternar vista de badges coloreados en tokens seudonimizados"
                     >
@@ -3343,27 +3366,41 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono pt-1">
                     <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
                       <span class="block text-[10px] text-slate-400 font-sans uppercase font-bold mb-1">Texto Capturado:</span>
-                      <p class="truncate text-slate-700 dark:text-slate-300 select-all {privacyBlur ? 'privacy-blurred' : ''}" title={ev.originalText}>{ev.originalText}</p>
+                      {#if showTokenBadges}
+                        <p class="truncate text-slate-700 dark:text-slate-300 select-all {privacyBlur ? 'privacy-blurred' : ''}" title={ev.originalText}>
+                          {@html renderHighlightedTokens(ev.originalText, ev.direction === 'deobfuscate', ev.tokens)}
+                        </p>
+                      {:else}
+                        <p class="truncate text-slate-700 dark:text-slate-300 select-all {privacyBlur ? 'privacy-blurred' : ''}" title={ev.originalText}>{ev.originalText}</p>
+                      {/if}
                     </div>
                     <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
                       <span class="block text-[10px] text-primary-500 font-sans uppercase font-bold mb-1">Resultado en Portapapeles:</span>
-                      <p class="truncate text-primary-700 dark:text-primary-300 select-all" title={ev.transformedText}>{ev.transformedText}</p>
+                      {#if showTokenBadges}
+                        <p class="truncate text-primary-700 dark:text-primary-300 select-all" title={ev.transformedText}>
+                          {@html renderHighlightedTokens(ev.transformedText, ev.direction === 'obfuscate', ev.tokens)}
+                        </p>
+                      {:else}
+                        <p class="truncate text-primary-700 dark:text-primary-300 select-all" title={ev.transformedText}>{ev.transformedText}</p>
+                      {/if}
                     </div>
                   </div>
 
-                  {#if ev.tokens.length > 0}
-                    <div class="flex flex-wrap gap-1.5 pt-1">
-                      {#each ev.tokens as tok}
-                        <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-mono">
-                          <span class="text-[10px] px-1 py-0.2 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded font-semibold">{tok.detector_type || 'Token'}</span>
-                          <span class="text-amber-600 dark:text-amber-400 font-semibold {privacyBlur ? 'privacy-blurred' : ''}">{tok.original}</span>
-                          <span class="text-slate-400">→</span>
-                          <span class="text-primary-600 dark:text-primary-400">{tok.pseudonym}</span>
-                        </div>
-                      {/each}
-                    </div>
-                  {:else}
-                    <p class="text-[11px] text-slate-400 italic">0 tokens confidenciales detectados (texto íntegro mantenido).</p>
+                  {#if showTokenBadges}
+                    {#if ev.tokens.length > 0}
+                      <div class="flex flex-wrap gap-1.5 pt-1">
+                        {#each ev.tokens as tok}
+                          <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-mono">
+                            <span class="text-[10px] px-1 py-0.2 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded font-semibold">{tok.detector_type || 'Token'}</span>
+                            <span class="text-amber-600 dark:text-amber-400 font-semibold {privacyBlur ? 'privacy-blurred' : ''}">{tok.original}</span>
+                            <span class="text-slate-400">→</span>
+                            <span class="text-primary-600 dark:text-primary-400">{tok.pseudonym}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <p class="text-[11px] text-slate-400 italic">0 tokens confidenciales detectados (texto íntegro mantenido).</p>
+                    {/if}
                   {/if}
                 </div>
               {:else}
@@ -3661,10 +3698,14 @@
                   </select>
                 </div>
 
-                <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs">
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs space-y-2">
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" bind:checked={appConfig.gui.privacy_blur} class="rounded accent-primary-500" />
                     <span>Activar Modo Privacidad (Desenfoque de pantalla) por defecto</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.show_token_badges} on:change={() => { showTokenBadges = appConfig.gui.show_token_badges; }} class="rounded accent-primary-500" />
+                    <span>Activar Insignias (Badges) coloreadas de tokens por defecto</span>
                   </label>
                 </div>
               </div>
