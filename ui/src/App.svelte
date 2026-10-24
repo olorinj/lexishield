@@ -2120,19 +2120,19 @@
       <!-- Botón Configuración -->
       <button
         on:click={() => (activeTab = "config")}
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition border {activeTab === 'config' ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {activeTab === 'config' ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
         title="Configuración general"
       >
-        ⚙️
+        <span>⚙️</span>
       </button>
 
       <!-- Botón Modo DEBUG y Logs -->
       <button
         on:click={openLogsModal}
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition border {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
         title="Registro de depuración (Logs)"
       >
-        🐞
+        <span>🐞</span>
       </button>
 
       <!-- Botón Modo Privacidad / Desenfoque de Pantalla -->
@@ -2141,16 +2141,16 @@
           appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
           saveSettings();
         }}
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition border {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
         title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados (Pasa el cursor por encima para verlos)" : "Activar Modo Privacidad (Desenfocar datos originales para compartir pantalla)"}
       >
-        {privacyBlur ? "🙈" : "👁️"}
+        <span>{privacyBlur ? "🙈" : "👁️"}</span>
       </button>
 
       <!-- Botón Tema Claro/Oscuro -->
       <button
         on:click={toggleTheme}
-        class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center transition"
+        class="w-8 h-8 rounded-xl text-sm bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center transition"
         title="Alternar Tema Claro / Oscuro"
       >
         {#if darkMode}
@@ -2203,7 +2203,7 @@
                   ? "📋 Auto-copiado al portapapeles ACTIVADO."
                   : "📄 Auto-copiado al portapapeles DESACTIVADO.";
               }}
-              class="w-8 h-8 rounded-xl flex items-center justify-center transition border {autoCopyToClipboard ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
+              class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {autoCopyToClipboard ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
               title={autoCopyToClipboard ? "Auto-copiar ACTIVO: Copia el resultado automáticamente al proteger o restaurar (Clic para desactivar)" : "Auto-copiar DESACTIVADO: Clic para activar copiado automático"}
             >
               <span>{autoCopyToClipboard ? "📋" : "📄"}</span>
@@ -2241,14 +2241,14 @@
           {#if !dismissedTips.studio}
             <div in:slide={{ duration: 150 }} class="p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
               <div class="flex items-center gap-3">
-                <span class="text-lg">✨</span>
+                <span class="text-base shrink-0">✨</span>
                 <p class="text-slate-700 dark:text-slate-300">
                   <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Escribe o pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
                 </p>
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
-                <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
+                <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
               </div>
             </div>
           {/if}
@@ -2363,7 +2363,7 @@
 
               <button
                 on:click={toggleStudioDirection}
-                class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10 shadow-sm transition"
+                class="w-8 h-8 rounded-xl text-sm flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-xs transition"
                 title="Cambiar dirección (Ctrl+Shift+X)"
               >
                 <span>⇄</span>
@@ -2372,7 +2372,7 @@
               <button
                 on:click={scanCurrentStudioText}
                 disabled={loading || (!inputText.trim() && !outputText.trim())}
-                class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10 shadow-sm transition disabled:opacity-40"
+                class="w-8 h-8 rounded-xl text-sm flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-xs transition disabled:opacity-40"
                 title="Auditar tokens sin modificar el texto (Ctrl+Shift+A)"
               >
                 <span>🔍</span>
@@ -3368,7 +3368,7 @@
                 </div>
               {:else}
                 <div class="h-full flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500 text-center">
-                  <div class="text-2xl mb-1">📋</div>
+                  <div class="text-3xl mb-2">📋</div>
                   <p class="text-xs font-medium">Esperando actividad en el portapapeles...</p>
                   <p class="text-[11px] text-slate-400 mt-0.5">Al copiar texto con IPs, emails, claves o tokens, verás aquí su reconocimiento en vivo.</p>
                 </div>
@@ -4112,7 +4112,9 @@
       <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-4xl w-full h-[80vh] flex flex-col shadow-2xl">
         <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <span class="text-xl">🐞</span>
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center text-xl shrink-0">
+              🐞
+            </div>
             <div>
               <h3 class="text-sm font-bold text-slate-900 dark:text-white">Registros de Depuración en Tiempo Real</h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">Telemetría profunda del motor de ofuscación y llamadas Tauri.</p>
@@ -4133,7 +4135,13 @@
             >
               {debugMode ? 'Modo DEBUG: ACTIVO' : 'Modo DEBUG: INACTIVO'}
             </button>
-            <button on:click={closeLogsModal} class="text-slate-400 hover:text-slate-200 text-lg px-2">✕</button>
+            <button
+              on:click={closeLogsModal}
+              class="w-8 h-8 rounded-xl text-sm flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+              title="Cerrar"
+            >
+              ✕
+            </button>
           </div>
         </div>
 
@@ -4193,14 +4201,22 @@
       <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         <!-- Cabecera del modal de ayuda -->
         <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
-          <div class="flex items-center gap-2.5">
-            <span class="text-xl">📘</span>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-500 flex items-center justify-center text-xl shrink-0">
+              📘
+            </div>
             <div>
               <h3 class="text-sm font-bold text-slate-900 dark:text-white">Manual y Ayuda Contextual de LexiShield</h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">Conceptos clave, recomendaciones de seguridad y flujos de trabajo.</p>
             </div>
           </div>
-          <button on:click={closeHelp} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg px-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">✕</button>
+          <button
+            on:click={closeHelp}
+            class="w-8 h-8 rounded-xl text-sm flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+            title="Cerrar"
+          >
+            ✕
+          </button>
         </div>
 
         <!-- Selector de Tema de Ayuda -->
@@ -4723,7 +4739,9 @@
         <!-- Cabecera -->
         <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
           <div class="flex items-center gap-3">
-            <span class="text-2xl">⏱️</span>
+            <div class="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-500 flex items-center justify-center text-xl shrink-0">
+              ⏱️
+            </div>
             <div>
               <div class="flex items-center gap-2">
                 <h3 class="text-sm font-bold text-slate-900 dark:text-white">Historial Temporal de Sesión</h3>
@@ -4734,14 +4752,20 @@
               <p class="text-xs text-slate-500 dark:text-slate-400">Recupera cualquier texto protegido, restaurado o limpiado en la sesión activa.</p>
             </div>
           </div>
-          <button on:click={() => (showSessionHistoryModal = false)} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg px-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">✕</button>
+          <button
+            on:click={() => (showSessionHistoryModal = false)}
+            class="w-8 h-8 rounded-xl text-sm flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+            title="Cerrar"
+          >
+            ✕
+          </button>
         </div>
 
         <!-- Lista de tarjetas de historial -->
         <div class="flex-1 overflow-auto p-4 space-y-3">
           {#if sessionHistory.length === 0}
             <div class="p-10 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-center space-y-2">
-              <span class="text-3xl">📭</span>
+              <div class="text-3xl mb-2">📭</div>
               <h4 class="text-sm font-bold text-slate-700 dark:text-slate-300">Aún no hay transformaciones en esta sesión</h4>
               <p class="text-xs text-slate-400 max-w-sm mx-auto">
                 Cada vez que pulses "Proteger", "Restaurar" o "Limpiar todo", se creará una copia instantánea aquí para que nunca pierdas tu trabajo.
