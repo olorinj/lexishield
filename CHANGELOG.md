@@ -28,6 +28,13 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - Selector de perfiles (*Completo*, *DevOps & Red*, *RGPD & Identidad*) ubicado en la pestaña **Opciones**, con persistencia local automática (`localStorage`) entre sesiones.
 
 ### Modificado
+- **📐 Estandarización de Escala y Contenedores de Iconos (5 Niveles Unificados)**:
+  - Normalización geométrica de todos los iconos de la interfaz en [ui/src/App.svelte](file:///home/olorinj/DEV/rust/lexishield/ui/src/App.svelte) para eliminar discrepancias de tamaño entre sistemas operativos:
+    - *Nivel 1 (Botones de acción cuadrados)*: Normalizados a `w-8 h-8 rounded-xl text-sm flex items-center justify-center` (cabecera general, Studio, puente direccional, cierres de modales).
+    - *Nivel 2 (Banners informativos y consejos)*: Tipos e iconos alineados uniformemente a `text-base shrink-0`.
+    - *Nivel 3 (Cápsulas de cabecera de modales)*: Tarjetas distintivas unificadas a `w-10 h-10 rounded-xl text-xl flex items-center justify-center`.
+    - *Nivel 4 (Estados vacíos)*: Estandarizados a `text-3xl mb-2`.
+    - *Nivel 5 (Botones de descartar consejos)*: Homogeneizados a `text-xs px-2 py-0.5 rounded`.
 - **🎨 Ergonomía y Limpieza Visual de la Barra Superior de Studio**:
   - Botón de auto-copiado al portapapeles rediseñado a formato de conmutador cuadrado (`w-8 h-8`) con cambio dinámico de icono (`📋` activo / `📄` inactivo).
   - Reubicación de la acción **"Auditar Texto"** dentro de la cabecera del panel **"Texto claro"**, donde reside el contexto operativo de los datos en claro.
