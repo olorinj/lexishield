@@ -1896,11 +1896,11 @@ fn handle_dict(subcommand: DictCommands) -> Result<(), Box<dyn std::error::Error
 
             if !yes {
                 use std::io::{self, Write};
-                print!(
+                eprint!(
                     "⚠️  ¡ATENCIÓN! Vas a eliminar de forma IRREVERSIBLE la bóveda de mapeos '{}'.\nSi lo haces, NO podrás desofuscar los textos procesados con este archivo.\n¿Estás completamente seguro? [s/N]: ",
                     map_path.display()
                 );
-                io::stdout().flush()?;
+                io::stderr().flush()?;
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 let trimmed = input.trim().to_lowercase();
@@ -1973,11 +1973,11 @@ fn handle_vault(subcommand: VaultCommands) -> Result<(), Box<dyn std::error::Err
         VaultCommands::Delete { name, yes } => {
             if !yes {
                 use std::io::{self, Write};
-                print!(
+                eprint!(
                     "⚠️  ¿Seguro que deseas eliminar la bóveda '{}'? [s/N]: ",
                     name
                 );
-                io::stdout().flush()?;
+                io::stderr().flush()?;
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 let trimmed = input.trim().to_lowercase();
@@ -2047,11 +2047,11 @@ fn handle_backup(subcommand: BackupCommands) -> Result<(), Box<dyn std::error::E
         } => {
             if !yes {
                 use std::io::{self, Write};
-                print!(
+                eprint!(
                     "⚠️  ¿Restaurar copia de seguridad desde '{}'? Se sobrescribirán configuraciones y bóvedas con el mismo nombre. [s/N]: ",
                     input.display()
                 );
-                io::stdout().flush()?;
+                io::stderr().flush()?;
                 let mut input_str = String::new();
                 io::stdin().read_line(&mut input_str)?;
                 let trimmed = input_str.trim().to_lowercase();
@@ -2106,11 +2106,11 @@ fn handle_config(
         ConfigCommands::Reset { yes } => {
             if !yes {
                 use std::io::{self, Write};
-                print!(
+                eprint!(
                     "⚠️  ¿Restablecer la configuración en '{}' a los valores por defecto? [s/N]: ",
                     cfg_path.display()
                 );
-                io::stdout().flush()?;
+                io::stderr().flush()?;
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 let trimmed = input.trim().to_lowercase();
@@ -2137,12 +2137,13 @@ fn handle_install_bin(symlink: bool, force: bool) -> Result<(), Box<dyn std::err
     fs::create_dir_all(&bin_dir)?;
 
     let current_exe = std::env::current_exe()?;
-    let exe_name = current_exe
+    let exe_source = fs::canonicalize(&current_exe).unwrap_or_else(|_| current_exe.clone());
+    let exe_name = exe_source
         .file_name()
         .unwrap_or_else(|| std::ffi::OsStr::new("lexishield"));
     let target_path = bin_dir.join(exe_name);
 
-    if target_path.exists() {
+    if target_path.symlink_metadata().is_ok() {
         if !force {
             eprintln!(
                 "⚠️  El binario ya existe en '{}'. Usa --force (-f) para sobrescribirlo.",
@@ -2156,23 +2157,23 @@ fn handle_install_bin(symlink: bool, force: bool) -> Result<(), Box<dyn std::err
     if symlink {
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(&current_exe, &target_path)?;
+            std::os::unix::fs::symlink(&exe_source, &target_path)?;
         }
         #[cfg(windows)]
         {
-            std::os::windows::fs::symlink_file(&current_exe, &target_path)?;
+            std::os::windows::fs::symlink_file(&exe_source, &target_path)?;
         }
         #[cfg(not(any(unix, windows)))]
         {
-            fs::copy(&current_exe, &target_path)?;
+            fs::copy(&exe_source, &target_path)?;
         }
         eprintln!(
             "🔗 Enlace simbólico creado con éxito: {} -> {}",
             target_path.display(),
-            current_exe.display()
+            exe_source.display()
         );
     } else {
-        fs::copy(&current_exe, &target_path)?;
+        fs::copy(&exe_source, &target_path)?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
