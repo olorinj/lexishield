@@ -269,6 +269,18 @@
   let actionResultModal = null; // { title: string, message: string, details?: Array<{label: string, value: string}>, type?: "success" | "info" }
   let studioDropModal = null; // { path: string, name: string, isDir: boolean, isReverse: boolean, copyMode: boolean, suffix: string, saveSuffixDefault: boolean, cleanCache: boolean, exportMarkdown: boolean }
 
+  // Notificación Toast flotante para acciones de Studio
+  let studioToast = null;
+  let studioToastTimer = null;
+  function showStudioToast(message, type = "success", copied = false) {
+    if (studioToastTimer) clearTimeout(studioToastTimer);
+    studioToast = { message, type, copied };
+    studioToastTimer = setTimeout(() => {
+      studioToast = null;
+      studioToastTimer = null;
+    }, 4000);
+  }
+
   // Mejoras Ergonómicas y Funcionales de Studio (v2.1)
   let autoCopyToClipboard = true;
   let sessionHistory = [];
@@ -563,15 +575,63 @@
     if (!text) return "";
 
     if (isProtected) {
-      // Reemplazo en una sola pasada sobre el texto escapado
-      let escaped = escapeHtml(text);
-      return escaped.replace(/&lt;([A-Za-z0-9_]+)&gt;/g, (match, tokenName) => {
-        const cat = getDetectorCategory(tokenName);
-        const searchList = (customItems && customItems.length > 0) ? customItems : vaultMappings;
-        const mapping = searchList.find(m => m.pseudonym === `<${tokenName}>` || m.pseudonym === tokenName);
-        const origTooltip = mapping ? `Original: ${mapping.original}` : `Token seudonimizado (${cat.name})`;
-        return `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(origTooltip)}">&lt;${tokenName}&gt;</mark>`;
-      });
+      const searchList = (customItems && customItems.length > 0) ? customItems : vaultMappings;
+      if (!searchList || searchList.length === 0) {
+        return escapeHtml(text);
+      }
+
+      // Filtrar términos no vacíos y deduplicar por seudónimo
+      const terms = [];
+      const seen = new Set();
+      for (const item of searchList) {
+        if (!item.pseudonym || item.pseudonym === "=" || item.pseudonym.trim().length < 2) continue;
+        if (!seen.has(item.pseudonym)) {
+          seen.add(item.pseudonym);
+          terms.push({
+            pseudonym: item.pseudonym,
+            original: item.original,
+            detector_type: item.detector_type
+          });
+        }
+      }
+
+      if (terms.length === 0) {
+        return escapeHtml(text);
+      }
+
+      // Ordenar de mayor a menor longitud para priorizar coincidencias más específicas
+      terms.sort((a, b) => b.pseudonym.length - a.pseudonym.length);
+
+      const pseudoMap = new Map();
+      const escapedTerms = [];
+      for (const t of terms) {
+        pseudoMap.set(t.pseudonym, t);
+        escapedTerms.push(t.pseudonym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      }
+
+      const combinedRegex = new RegExp(`(${escapedTerms.join('|')})`, 'g');
+      let result = "";
+      let lastIdx = 0;
+      let match;
+
+      while ((match = combinedRegex.exec(text)) !== null) {
+        if (match.index > lastIdx) {
+          result += escapeHtml(text.slice(lastIdx, match.index));
+        }
+        const matchedStr = match[0];
+        const itemInfo = pseudoMap.get(matchedStr);
+        const detType = itemInfo?.detector_type || "Token";
+        const cat = getDetectorCategory(detType);
+        const origTooltip = itemInfo?.original ? `Original: ${itemInfo.original} (${cat.name})` : `Token seudonimizado (${cat.name})`;
+        result += `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(origTooltip)}">${escapeHtml(matchedStr)}</mark>`;
+        lastIdx = combinedRegex.lastIndex;
+      }
+
+      if (lastIdx < text.length) {
+        result += escapeHtml(text.slice(lastIdx));
+      }
+
+      return result;
     }
 
     // Para texto claro: búsqueda exacta en una sola pasada lineal sobre el string bruto original
@@ -953,16 +1013,8 @@
         }
       }
       pushToSessionHistory("obfuscate", res.report);
-      actionResultModal = {
-        title: "Protección Finalizada con Éxito",
-        type: "success",
-        message: `El texto ha sido transformado para proteger tus datos confidenciales antes de enviarlo a la IA o compartirlo con terceros.`,
-        details: [
-          { label: "Tokens Seudonimizados", value: `${res.report.replacements_applied}` },
-          { label: "Tiempo de Procesamiento", value: `${res.report.elapsed_ms.toFixed(2)} ms` },
-          { label: "Bóveda Destino", value: vaultPath ? vaultPath.split('/').pop() : "Predeterminada" }
-        ]
-      };
+      const copiedMsg = autoCopyToClipboard && res.obfuscated_text ? " · ¡Copiado al portapapeles! 📋" : "";
+      showStudioToast(`🛡️ ${res.report.replacements_applied} tokens protegidos${copiedMsg}`, "success", !!copiedMsg);
       refreshVaultsList();
     } catch (err) {
       statusMessage = "Error al proteger datos: " + err;
@@ -1006,16 +1058,8 @@
         }
       }
       pushToSessionHistory("deobfuscate", res.report);
-      actionResultModal = {
-        title: "Restauración Finalizada con Éxito",
-        type: "success",
-        message: "Las respuestas de la IA han sido procesadas recuperando los valores reales originales mediante tu bóveda local.",
-        details: [
-          { label: "Tokens Restaurados", value: `${res.report.replacements_applied}` },
-          { label: "Tiempo de Proceso", value: `${res.report.elapsed_ms.toFixed(2)} ms` },
-          { label: "Bóveda Utilizada", value: vaultPath ? vaultPath.split('/').pop() : "Predeterminada" }
-        ]
-      };
+      const copiedMsg = autoCopyToClipboard && res.deobfuscated_text ? " · ¡Copiado al portapapeles! 📋" : "";
+      showStudioToast(`🔄 ${res.report.replacements_applied} tokens restaurados${copiedMsg}`, "success", !!copiedMsg);
     } catch (err) {
       statusMessage = "Error al restaurar datos: " + err;
     } finally {
@@ -1197,6 +1241,49 @@
     }
   }
 
+  async function handleClearTextPaste() {
+    studioDirection = "obfuscate";
+    setTimeout(async () => {
+      const textToScan = inputText.trim();
+      if (!textToScan) return;
+      try {
+        loading = true;
+        detectedItems = [];
+        auditSummary = null;
+
+        const res = await invokeTauri("scan_content", {
+          content: textToScan,
+          vaultPath: pairsSelectedVault || vaultPath || null,
+          password: password || null
+        });
+
+        detectedItems = (res.items || []).map(item => ({
+          ...item,
+          file: "[Texto del Studio]"
+        }));
+
+        auditSummary = {
+          files_scanned: 1,
+          files_ignored: 0,
+          total_entities: res.total_entities,
+          vault_used: pairsSelectedVault || "Sesión"
+        };
+
+        if (res.total_entities > 0) {
+          studioSubView = "audit";
+          showTextScanPanel = false; // Plegar automáticamente para dar máximo espacio vertical a la tabla
+          statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados. Revisa la tabla para ofuscar u omitir.`;
+        } else {
+          statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el texto pegado.";
+        }
+      } catch (err) {
+        statusMessage = "Error al auditar texto: " + err;
+      } finally {
+        loading = false;
+      }
+    }, 50);
+  }
+
   async function scanCurrentStudioText() {
     const textToScan = inputText.trim() || outputText.trim() || textToAudit.trim();
     if (!textToScan) {
@@ -1230,6 +1317,7 @@
       if (res.total_entities === 0) {
         statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el texto.";
       } else {
+        showTextScanPanel = false; // Plegar panel para maximizar espacio de tabla
         statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados y clasificados en la tabla.`;
       }
     } catch (err) {
@@ -2261,6 +2349,16 @@
         </div>
 
         {#if studioSubView === "transform"}
+          {#if studioToast}
+            <div in:slide={{ duration: 150 }} out:fade={{ duration: 150 }} class="p-3 bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/40 text-emerald-800 dark:text-emerald-200 rounded-xl flex items-center justify-between gap-3 shadow-md text-xs font-semibold">
+              <div class="flex items-center gap-2">
+                <span class="text-base">✅</span>
+                <span>{studioToast.message}</span>
+              </div>
+              <button type="button" on:click={() => (studioToast = null)} class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-white px-2 py-0.5 rounded text-xs font-bold" title="Cerrar aviso">✕</button>
+            </div>
+          {/if}
+
           {#if !dismissedTips.studio}
             <div in:slide={{ duration: 150 }} class="p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
               <div class="flex items-center gap-3">
@@ -2297,23 +2395,6 @@
                     {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
                   </span>
                   <button
-                    type="button"
-                    on:click={scanCurrentStudioText}
-                    disabled={loading || !inputText.trim()}
-                    class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 transition shadow-xs disabled:opacity-40"
-                    title="Auditar tokens confidenciales del texto en claro sin modificarlo (Ctrl+Shift+A)"
-                  >
-                    <span>🔍</span> Auditar
-                  </button>
-                  <button
-                    type="button"
-                    on:click={toggleTokenBadges}
-                    class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {showTokenBadges ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}"
-                    title="Alternar vista de badges coloreados en tokens confidenciales"
-                  >
-                    <span>👁️</span> Badges
-                  </button>
-                  <button
                     on:click={copyInputWithFeedback}
                     disabled={!inputText}
                     class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedInputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
@@ -2340,6 +2421,7 @@
                   >{inputGutterText}</pre>
                   <textarea
                     bind:value={inputText}
+                    on:paste={handleClearTextPaste}
                     on:input={() => { studioDirection = "obfuscate"; }}
                     on:focus={() => { if (inputText.trim()) studioDirection = "obfuscate"; }}
                     on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
@@ -2383,23 +2465,6 @@
                   <span>🔄</span>
                 </button>
               {/if}
-
-              <button
-                on:click={toggleStudioDirection}
-                class="w-8 h-8 rounded-xl text-sm flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-xs transition"
-                title="Cambiar dirección (Ctrl+Shift+X)"
-              >
-                <span>⇄</span>
-              </button>
-
-              <button
-                on:click={scanCurrentStudioText}
-                disabled={loading || (!inputText.trim() && !outputText.trim())}
-                class="w-8 h-8 rounded-xl text-sm flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 shadow-xs transition disabled:opacity-40"
-                title="Auditar tokens sin modificar el texto (Ctrl+Shift+A)"
-              >
-                <span>🔍</span>
-              </button>
             </div>
 
             <!-- Panel Derecho: Texto protegido -->
@@ -2438,16 +2503,6 @@
                       👁️ Markdown
                     </button>
                   </div>
-                  {#if studioOutputViewMode === "editor"}
-                    <button
-                      type="button"
-                      on:click={toggleTokenBadges}
-                      class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {showTokenBadges ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}"
-                      title="Alternar vista de badges coloreados en tokens seudonimizados"
-                    >
-                      <span>👁️</span> Badges
-                    </button>
-                  {/if}
                   <button
                     on:click={copyOutputWithFeedback}
                     disabled={!outputText}
@@ -2479,6 +2534,7 @@
                   >{outputGutterText}</pre>
                   <textarea
                     bind:value={outputText}
+                    on:paste={() => { studioDirection = "deobfuscate"; }}
                     on:input={() => { studioDirection = "deobfuscate"; }}
                     on:focus={() => { if (outputText.trim()) studioDirection = "deobfuscate"; }}
                     on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
@@ -2494,14 +2550,6 @@
           <div class="flex items-center justify-between gap-3 pt-1 flex-wrap">
             <div class="flex items-center gap-2">
               <button
-                on:click={toggleStudioDirection}
-                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
-                title="Alternar sentido de procesamiento (Ctrl+Shift+X)"
-              >
-                <span>⇄</span>
-                <span>Modo actual: <strong>{studioDirection === 'obfuscate' ? 'Proteger (Texto claro ➔ Texto protegido)' : 'Restaurar (Texto protegido ➔ Texto claro)'}</strong></span>
-              </button>
-              <button
                 on:click={() => {
                   if (inputText || outputText) {
                     pushToSessionHistory("clear");
@@ -2511,23 +2559,14 @@
                   }
                 }}
                 disabled={!inputText && !outputText}
-                class="px-2.5 py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition disabled:opacity-40"
+                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
                 title="Limpiar ambos paneles (Ctrl+Shift+L)"
               >
-                Limpiar todo
+                <span>🗑️</span> Limpiar todo
               </button>
             </div>
 
             <div class="flex items-center gap-3">
-              <button
-                on:click={scanCurrentStudioText}
-                disabled={loading || (!inputText.trim() && !outputText.trim())}
-                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
-                title="Auditar tokens confidenciales del texto actual sin modificarlo (Ctrl+Shift+A)"
-              >
-                <span>🔍</span>
-                Auditar Tokens
-              </button>
               {#if studioDirection === "obfuscate"}
                 <button
                   on:click={handleObfuscate}
@@ -2582,7 +2621,7 @@
                   class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
                   title="Pegar fragmento de texto para auditar tokens confidenciales"
                 >
-                  <span>📋</span> Fragmento Adicional
+                  <span>📋</span> {showTextScanPanel ? 'Ocultar Fragmento' : 'Fragmento Adicional'}
                 </button>
 
                 <button
