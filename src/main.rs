@@ -519,6 +519,17 @@ enum Commands {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+
+    /// Instala o enlaza el binario en el directorio de usuario (~/.local/bin/lexishield).
+    InstallBin {
+        /// Crea un enlace simbólico (symlink) en lugar de copiar el archivo binario.
+        #[arg(short = 's', long = "symlink")]
+        symlink: bool,
+
+        /// Sobrescribe el binario existente si ya estuviera instalado.
+        #[arg(short = 'f', long = "force")]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -612,7 +623,7 @@ fn prompt_new_password(prompt: &str) -> Result<String, Box<dyn std::error::Error
             check_password_complexity(&p1);
             return Ok(p1);
         } else {
-            println!("Las contraseñas no coinciden. Inténtalo de nuevo.");
+            eprintln!("Las contraseñas no coinciden. Inténtalo de nuevo.");
         }
     }
 }
@@ -626,18 +637,24 @@ fn resolve_password(
         return Ok(Some(p));
     }
 
-    let exists = path.is_some_and(|p| p.exists());
-    let is_encrypted = if exists {
-        let data = fs::read(path.unwrap()).unwrap_or_default();
-        lexishield::is_encrypted_vault(&data)
+    let (exists, is_encrypted) = if let Some(p) = path {
+        if p.exists() {
+            let data = fs::read(p).unwrap_or_default();
+            (true, lexishield::is_encrypted_vault(&data))
+        } else {
+            (false, false)
+        }
     } else {
-        false
+        (false, false)
     };
 
-    if exists && is_encrypted {
+    if exists
+        && is_encrypted
+        && let Some(p_path) = path
+    {
         let p = rpassword::prompt_password(format!(
             "El archivo '{}' está cifrado. Introduce la contraseña actual: ",
-            path.unwrap().display()
+            p_path.display()
         ))?;
         return Ok(Some(p));
     }
@@ -694,7 +711,7 @@ fn export_office_to_md_with_pandoc(
         (md, media)
     };
 
-    println!(
+    eprintln!(
         "🔄 Exportando a Markdown mediante Pandoc: {}...",
         docx_path.display()
     );
@@ -711,7 +728,7 @@ fn export_office_to_md_with_pandoc(
     match status {
         Ok(exit_status) => {
             if exit_status.success() {
-                println!(
+                eprintln!(
                     "✅ Exportación a Markdown completada con éxito: {}\n   Imágenes y medios extraídos en: {}",
                     md_path.display(),
                     media_dir.display()
@@ -756,10 +773,10 @@ fn handle_obfuscate(
     opts: ObfuscateOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let is_default = opts.save_mappings.is_none();
-    let map_path = if !opts.no_save {
-        Some(resolve_vault_path(opts.save_mappings)?)
-    } else {
+    let map_path = if opts.no_save {
         None
+    } else {
+        Some(resolve_vault_path(opts.save_mappings)?)
     };
 
     let is_office = if let Some(ref in_path) = opts.input {
@@ -793,7 +810,10 @@ fn handle_obfuscate(
     };
 
     if is_office {
-        let in_path = opts.input.as_ref().unwrap();
+        let in_path = opts
+            .input
+            .as_ref()
+            .ok_or("Debe proporcionar un archivo de entrada con --input")?;
         let out_path = target_out_path.unwrap_or_else(|| {
             let stem = in_path
                 .file_stem()
@@ -841,7 +861,7 @@ fn handle_obfuscate(
             }
         }
 
-        println!(
+        eprintln!(
             "✅ Documento Office sanitizado con éxito en: {}",
             out_path.display()
         );
@@ -914,7 +934,7 @@ fn handle_obfuscate(
     }
 
     if opts.export_md.is_some() {
-        println!(
+        eprintln!(
             "ℹ️ El archivo procesado es texto plano o Markdown; no se requiere conversión con Pandoc."
         );
     }
@@ -959,7 +979,10 @@ fn handle_deobfuscate(
     };
 
     if is_office {
-        let in_path = opts.input.as_ref().unwrap();
+        let in_path = opts
+            .input
+            .as_ref()
+            .ok_or("Debe proporcionar un archivo de entrada con --input")?;
         let out_path = opts.output.clone().unwrap_or_else(|| {
             let stem = in_path
                 .file_stem()
@@ -991,7 +1014,7 @@ fn handle_deobfuscate(
 
         let report = engine.process_file(in_path, &out_path, opts.format, true)?;
 
-        println!(
+        eprintln!(
             "✅ Documento Office desofuscado con éxito en: {}",
             out_path.display()
         );
@@ -1061,11 +1084,12 @@ fn collect_files_with_ignore(
     recursive: bool,
     git_ignore_enabled: bool,
 ) -> std::io::Result<Vec<PathBuf>> {
+    use ignore::WalkBuilder;
+
     if !dir.is_dir() {
         return Ok(vec![dir.to_path_buf()]);
     }
 
-    use ignore::WalkBuilder;
     let mut builder = WalkBuilder::new(dir);
     builder.add_custom_ignore_filename(".lexiignore");
     builder.hidden(true);
@@ -1130,6 +1154,8 @@ fn format_size(bytes: u64) -> String {
 }
 
 fn is_binary_or_compressed(path: &Path, file: &mut std::fs::File) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+
     // 1. Detección por extensiones comunes binarias/comprimidas
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
         let ext_lower = ext.to_lowercase();
@@ -1153,7 +1179,6 @@ fn is_binary_or_compressed(path: &Path, file: &mut std::fs::File) -> bool {
     }
 
     // 2. Inspección rápida de cabecera (primeros 1024 bytes)
-    use std::io::{Read, Seek, SeekFrom};
     let mut header = [0u8; 1024];
     if let Ok(n) = file.read(&mut header) {
         let _ = file.seek(SeekFrom::Start(0));
@@ -1220,7 +1245,7 @@ fn scan_file_with_progress(
 
     if is_binary_or_compressed(path, &mut file) {
         if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
-            println!(
+            eprintln!(
                 "\r  {}[ {} ] Omitido (formato binario o comprimido no admitido): {} \x1b[K",
                 tag,
                 format_size(total_bytes),
@@ -1236,7 +1261,7 @@ fn scan_file_with_progress(
     let cache_check = scan_cache.check_file(path, current_rules_hash);
     if let lexishield::cache::CacheCheckResult::Skip { entities_found } = cache_check {
         if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
-            println!(
+            eprintln!(
                 "\r  {}[ {} ] En caché (sin cambios): {} ({} entidades) \x1b[K",
                 tag,
                 format_size(total_bytes),
@@ -1253,19 +1278,19 @@ fn scan_file_with_progress(
             != lexishield::format_adapters::office_adapter::OfficeType::Unknown
     {
         if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
-            print!(
+            eprint!(
                 "\r  {}[ {} ] Analizando documento Office: {} \x1b[K",
                 tag,
                 format_size(total_bytes),
                 name
             );
-            let _ = std::io::stdout().flush();
+            let _ = std::io::stderr().flush();
         }
         let mappings = engine.scan_file(path)?;
         scan_cache.record_file(path, current_rules_hash, mappings.len());
         let _ = scan_cache.save();
         if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
-            println!(
+            eprintln!(
                 "\r  {}[ {} ] Analizado (Office): {} ({} entidades) \x1b[K",
                 tag,
                 format_size(total_bytes),
@@ -1283,13 +1308,13 @@ fn scan_file_with_progress(
     let mut byte_buf = Vec::new();
 
     if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
-        print!(
+        eprint!(
             "\r  {}[ 0 B / {} ] (0.0%) Analizando: {} \x1b[K",
             tag,
             format_size(total_bytes),
             name
         );
-        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
     }
 
     loop {
@@ -1311,7 +1336,7 @@ fn scan_file_with_progress(
                 100.0
             };
             if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
-                print!(
+                eprint!(
                     "\r  {}[ {} / {} ] ({:.1}%) Analizando: {} \x1b[K",
                     tag,
                     format_size(bytes_read),
@@ -1319,7 +1344,7 @@ fn scan_file_with_progress(
                     pct,
                     name
                 );
-                let _ = std::io::stdout().flush();
+                let _ = std::io::stderr().flush();
             }
             last_update = std::time::Instant::now();
         }
@@ -1329,7 +1354,7 @@ fn scan_file_with_progress(
     let _ = scan_cache.save();
 
     if let (Some(tag), Some(name)) = (prefix_tag, display_name) {
-        println!(
+        eprintln!(
             "\r  {}[ {} / {} ] (100.0%) Analizado: {} \x1b[K",
             tag,
             format_size(total_bytes),
@@ -1371,7 +1396,7 @@ fn parse_omitted_indices(input: &str, total_count: usize) -> Option<Vec<usize>> 
                     }
                     any_valid = true;
                 } else {
-                    println!(
+                    eprintln!(
                         "⚠️  Aviso: el rango '{}-{}' está fuera de los límites (1-{}).",
                         start, end, total_count
                     );
@@ -1382,7 +1407,7 @@ fn parse_omitted_indices(input: &str, total_count: usize) -> Option<Vec<usize>> 
                 indices.push(num - 1);
                 any_valid = true;
             } else {
-                println!(
+                eprintln!(
                     "⚠️  Aviso: el número '{}' está fuera de rango (1-{}).",
                     num, total_count
                 );
@@ -1405,7 +1430,7 @@ fn prompt_file_mappings(
         return Ok(());
     }
 
-    println!(
+    eprintln!(
         "\n📄 Nuevos elementos detectados en '{}' ({} nuevo{}):",
         file_display_name,
         count,
@@ -1416,7 +1441,7 @@ fn prompt_file_mappings(
     let chunk_size = 20;
 
     for (i, m) in mappings.iter().enumerate() {
-        println!(
+        eprintln!(
             "  {}. [{:?}] '{}' -> '{}'",
             i + 1,
             m.detector_type,
@@ -1425,12 +1450,12 @@ fn prompt_file_mappings(
         );
 
         if (i + 1) % chunk_size == 0 && i + 1 < count {
-            print!(
+            eprint!(
                 "--- Mostrados {} de {} [Enter para continuar, 'q' para saltar al final, o números/rangos a omitir (ej: 1, 3-5)]: ",
                 i + 1,
                 count
             );
-            io::stdout().flush()?;
+            io::stderr().flush()?;
             let mut buf = String::new();
             io::stdin().read_line(&mut buf)?;
             let trimmed = buf.trim();
@@ -1442,7 +1467,7 @@ fn prompt_file_mappings(
                     .iter()
                     .map(|idx| (idx + 1).to_string())
                     .collect();
-                println!("  -> Marcados para OMITIR: {}", om_display.join(", "));
+                eprintln!("  -> Marcados para OMITIR: {}", om_display.join(", "));
                 omitted_indices.append(&mut newly_omitted);
             }
         }
@@ -1451,20 +1476,20 @@ fn prompt_file_mappings(
     omitted_indices.sort_unstable();
     omitted_indices.dedup();
 
-    let omitted_msg = if !omitted_indices.is_empty() {
+    let omitted_msg = if omitted_indices.is_empty() {
+        String::new()
+    } else {
         format!(
             " ({} marcados previamente para omitir)",
             omitted_indices.len()
         )
-    } else {
-        String::new()
     };
 
-    print!(
+    eprint!(
         "¿Aceptar estos mapeos para '{}'{}? [S/n, o números adicionales a omitir (ej: 1, 3-5)]: ",
         file_display_name, omitted_msg
     );
-    io::stdout().flush()?;
+    io::stderr().flush()?;
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     let trimmed = input.trim();
@@ -1485,7 +1510,7 @@ fn prompt_file_mappings(
             .iter()
             .map(|idx| (idx + 1).to_string())
             .collect();
-        println!("  -> Marcados para OMITIR: {}", om_display.join(", "));
+        eprintln!("  -> Marcados para OMITIR: {}", om_display.join(", "));
         omitted_indices.append(&mut newly_omitted);
     }
 
@@ -1501,7 +1526,7 @@ fn prompt_file_mappings(
         }
     }
 
-    println!();
+    eprintln!();
     Ok(())
 }
 
@@ -1529,7 +1554,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
             opts.clipboard,
             opts.stdin,
         )?;
-        println!(
+        eprintln!(
             "🔍 Analizando flujo de entrada estándar stdin ({})...",
             format_size(content.len() as u64)
         );
@@ -1549,7 +1574,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
                 !opts.no_git_ignore,
             )?;
             let total = files.len();
-            println!(
+            eprintln!(
                 "🔍 Escaneando directorio '{}' ({} archivos)...",
                 path.display(),
                 total
@@ -1557,9 +1582,12 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
             if opts.yes {
                 use indicatif::{ProgressBar, ProgressStyle};
                 let pb = ProgressBar::new(total as u64);
-                pb.set_style(ProgressStyle::default_bar()
-                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})").unwrap()
-                    .progress_chars("#>-"));
+                pb.set_style(
+                    ProgressStyle::default_bar()
+                        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+                        .expect("Plantilla ProgressBar válida")
+                        .progress_chars("#>-"),
+                );
 
                 let cfg_arc = engine.config.clone();
                 let all_results: Vec<Vec<Mapping>> = files
@@ -1604,7 +1632,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
                 }
             }
         } else {
-            println!("🔍 Escaneando archivo '{}'...", path.display());
+            eprintln!("🔍 Escaneando archivo '{}'...", path.display());
             let mut file_new = scan_file_with_progress(
                 &mut engine,
                 path,
@@ -1625,7 +1653,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
             opts.clipboard,
             opts.stdin,
         )?;
-        println!(
+        eprintln!(
             "🔍 Analizando texto en memoria ({})...",
             format_size(content.len() as u64)
         );
@@ -1644,7 +1672,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
     );
 
     if total_discovered == 0 {
-        println!("\n✨ Escaneo completado: no se encontraron nuevos elementos sensibles.");
+        eprintln!("\n✨ Escaneo completado: no se encontraron nuevos elementos sensibles.");
         return Ok(());
     }
 
@@ -1655,7 +1683,7 @@ fn handle_scan(config: LexiConfig, opts: ScanOptions) -> Result<(), Box<dyn std:
     let force_ask = is_default && final_pwd.is_none();
     let pwd = resolve_password(final_pwd, opts.ask_password || force_ask, None)?;
     lexishield::save_mappings_auto(&map_path, &final_mappings, pwd.as_deref())?;
-    println!(
+    eprintln!(
         "\n💾 Se han guardado {} mapeos ({} activos, {} omitidos) en '{}'.",
         final_mappings.len(),
         active_count,
@@ -2101,6 +2129,78 @@ fn handle_config(
     Ok(())
 }
 
+/// Instala o enlaza el binario en el directorio ~/.local/bin del usuario.
+fn handle_install_bin(symlink: bool, force: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let home =
+        dirs::home_dir().ok_or("No se pudo determinar el directorio de inicio del usuario (~)")?;
+    let bin_dir = home.join(".local").join("bin");
+    fs::create_dir_all(&bin_dir)?;
+
+    let current_exe = std::env::current_exe()?;
+    let exe_name = current_exe
+        .file_name()
+        .unwrap_or_else(|| std::ffi::OsStr::new("lexishield"));
+    let target_path = bin_dir.join(exe_name);
+
+    if target_path.exists() {
+        if !force {
+            eprintln!(
+                "⚠️  El binario ya existe en '{}'. Usa --force (-f) para sobrescribirlo.",
+                target_path.display()
+            );
+            return Ok(());
+        }
+        let _ = fs::remove_file(&target_path);
+    }
+
+    if symlink {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&current_exe, &target_path)?;
+        }
+        #[cfg(windows)]
+        {
+            std::os::windows::fs::symlink_file(&current_exe, &target_path)?;
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            fs::copy(&current_exe, &target_path)?;
+        }
+        eprintln!(
+            "🔗 Enlace simbólico creado con éxito: {} -> {}",
+            target_path.display(),
+            current_exe.display()
+        );
+    } else {
+        fs::copy(&current_exe, &target_path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&target_path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&target_path, perms)?;
+        }
+        eprintln!(
+            "✅ LexiShield instalado exitosamente en: {}",
+            target_path.display()
+        );
+    }
+
+    if let Some(path_var) = std::env::var_os("PATH") {
+        let in_path = std::env::split_paths(&path_var).any(|p| p == bin_dir);
+        if !in_path {
+            eprintln!(
+                "⚠️  Aviso: '{}' no se encuentra en tu variable de entorno PATH.",
+                bin_dir.display()
+            );
+            eprintln!("   Añade la siguiente línea a tu ~/.bashrc, ~/.zshrc o perfil de terminal:");
+            eprintln!("   export PATH=\"$HOME/.local/bin:$PATH\"");
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     init_logger();
@@ -2225,6 +2325,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         Commands::Dict { subcommand } => handle_dict(subcommand),
+        Commands::InstallBin { symlink, force } => handle_install_bin(symlink, force),
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();
             clap_complete::generate(shell, &mut cmd, "lexishield", &mut std::io::stdout());
