@@ -287,6 +287,7 @@
   let showSessionHistoryModal = false;
   let activeSensitivityProfile = localStorage.getItem("sensitivity_profile") || "all"; // "all" | "devops" | "gdpr"
   let showTokenBadges = true;
+  let studioInputViewMode = "editor"; // "editor" | "markdown"
   let studioOutputViewMode = "editor"; // "editor" | "markdown"
 
   // Estado de Depuración y Logs
@@ -1572,12 +1573,13 @@
       });
 
       vaultMappings = mergedList;
-      statusMessage = `💾 ${itemsToSave.length} entidades del escaneo guardadas e integradas en '${targetVault.split('/').pop()}'.`;
+      statusMessage = `💾 ${itemsToSave.length} entidades guardadas e integradas en '${targetVault.split('/').pop()}'.`;
       
-      // Limpiar de la pantalla los elementos guardados
+      // Limpiar de la pantalla los elementos guardados y regresar a Transformación
       const savedOriginals = new Set(itemsToSave.map(it => it.original));
       detectedItems = detectedItems.filter(it => !savedOriginals.has(it.original));
       selectedScanOriginals = []; // Limpiar selección
+      studioSubView = "transform";
 
       await refreshVaultsList();
     } catch (e) {
@@ -2383,17 +2385,29 @@
                   <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                     <span>📥</span> Texto claro
                   </span>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Texto original en claro">
-                    Texto en claro
-                  </span>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos y carpetas">
-                    <span>📁</span> Arrastra archivo o carpeta
-                  </span>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-[10px] font-mono text-slate-400">
                     {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
                   </span>
+                  <div class="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-900/60 p-0.5 rounded-lg border border-slate-200 dark:border-white/5 text-[11px]">
+                    <button
+                      type="button"
+                      on:click={() => (studioInputViewMode = "editor")}
+                      class="px-2 py-0.5 rounded font-semibold transition {studioInputViewMode === 'editor' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                      title="Vista editor editable"
+                    >
+                      📄 Editor
+                    </button>
+                    <button
+                      type="button"
+                      on:click={() => (studioInputViewMode = "markdown")}
+                      class="px-2 py-0.5 rounded font-semibold transition {studioInputViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                      title="Vista previa Markdown formateada"
+                    >
+                      👁️ Markdown
+                    </button>
+                  </div>
                   <button
                     on:click={copyInputWithFeedback}
                     disabled={!inputText}
@@ -2409,7 +2423,11 @@
                 </div>
               </div>
               <div class="flex-1 min-w-0 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
-                {#if showTokenBadges && inputText.trim()}
+                {#if studioInputViewMode === "markdown"}
+                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words">
+                    {@html renderMarkdownPreview(inputText)}
+                  </div>
+                {:else if showTokenBadges && inputText.trim()}
                   <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''}">
                     {@html renderHighlightedTokens(inputText, false)}
                   </div>
@@ -2473,12 +2491,6 @@
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                     <span>🛡️</span> Texto protegido
-                  </span>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20" title="Texto con datos protegidos por seudónimos">
-                    Texto protegido
-                  </span>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10 flex items-center gap-1" title="Admite arrastrar archivos para restaurar">
-                    <span>📄</span> Arrastra archivo
                   </span>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
@@ -2611,105 +2623,31 @@
               </div>
               
               <div class="flex items-center gap-3">
-                <label class="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-                  <input type="checkbox" bind:checked={recursiveScan} class="rounded accent-primary-500" />
-                  <span>Recursivo (subdirectorios)</span>
-                </label>
-
-                <button
-                  on:click={() => (showTextScanPanel = !showTextScanPanel)}
-                  class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm"
-                  title="Pegar fragmento de texto para auditar tokens confidenciales"
-                >
-                  <span>📋</span> {showTextScanPanel ? 'Ocultar Fragmento' : 'Fragmento Adicional'}
-                </button>
-
                 <button
                   on:click={() => (studioSubView = "transform")}
-                  class="px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 text-xs font-bold rounded-xl border border-primary-500/30 transition flex items-center gap-1.5 shadow-sm"
+                  class="px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-md shadow-primary-500/20 flex items-center gap-1.5"
                   title="Volver a los editores de transformación"
                 >
-                  <span>✨</span> Volver a Editores
+                  <span>✨</span> Volver a Transformación
                 </button>
               </div>
             </div>
 
-            {#if showTextScanPanel}
-              <div in:slide={{ duration: 150 }} class="mb-4 p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col gap-3 shadow-sm">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <span>📋</span> Auditar Fragmento de Texto Copiado o Pegado
-                  </span>
-                  <button on:click={() => (showTextScanPanel = false)} class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    ✕ Cerrar
-                  </button>
-                </div>
-                <textarea
-                  bind:value={textToAudit}
-                  placeholder="Pega aquí cualquier fragmento de texto, log o código para extraer y clasificar sus tokens confidenciales..."
-                  class="w-full h-24 bg-white dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/10 p-3 {editorFontSizeClass} font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text {privacyBlur ? 'privacy-blurred' : ''}"
-                ></textarea>
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <span class="text-[11px] text-slate-500 dark:text-slate-400">
-                    Se identificarán tokens confidenciales y se clasificarán en la tabla inferior sin tocar el disco.
-                  </span>
-                  <div class="flex items-center gap-2">
-                    {#if textToAudit.trim()}
-                      <button
-                        on:click={() => (textToAudit = "")}
-                        class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition flex items-center gap-1"
-                        title="Limpiar el fragmento introducido"
-                      >
-                        <span>🗑️</span> Limpiar
-                      </button>
-                      <button
-                        on:click={sendPastedTextToStudio}
-                        class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition flex items-center gap-1"
-                        title="Transferir este texto a los paneles de Studio para procesarlo"
-                      >
-                        <span>➡️</span> Cargar en Editores
-                      </button>
-                    {/if}
-                    <button
-                      on:click={scanPastedText}
-                      disabled={loading || !textToAudit.trim()}
-                      class="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      <span>🔍</span> Analizar Fragmento
-                    </button>
-                  </div>
-                </div>
-              </div>
-            {/if}
-
-            {#if detectedItems.length === 0 && !isScanningDirectory && !showTextScanPanel}
-              <div class="mb-4 p-8 border-2 border-dashed border-slate-300 dark:border-white/15 rounded-2xl flex flex-col items-center justify-center text-center gap-3 bg-slate-50/50 dark:bg-slate-900/30 transition hover:border-primary-500/50">
-                <span class="text-4xl">📂</span>
-                <div class="space-y-1">
-                  <p class="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Arrastra y suelta aquí cualquier archivo o carpeta para auditar
-                  </p>
-                  <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                    LexiShield analizará los tokens sensibles sin modificar el contenido. O puedes auditar directamente el texto cargado en los editores de Studio.
-                  </p>
-                </div>
-                <div class="pt-1 flex items-center gap-2 flex-wrap justify-center">
-                  {#if inputText.trim() || outputText.trim()}
-                    <button
-                      on:click={scanCurrentStudioText}
-                      disabled={loading}
-                      class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-primary-500/20"
-                    >
-                      <span>🔍</span> Auditar Texto de los Editores ({inputLinesCount} lín)
-                    </button>
-                  {/if}
-                  <button
-                    on:click={() => (showTextScanPanel = true)}
-                    class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
-                  >
-                    <span>📋</span> Analizar fragmento adicional
-                  </button>
-                </div>
+            {#if detectedItems.length === 0 && !isScanningDirectory}
+              <div class="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
+                <span class="text-3xl mb-2">✨</span>
+                <p class="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                  No hay tokens pendientes de revisión
+                </p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mb-4">
+                  Los tokens confidenciales detectados se desglosan aquí automáticamente al pegar texto o arrastrar archivos en la pestaña de Transformación.
+                </p>
+                <button
+                  on:click={() => (studioSubView = "transform")}
+                  class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-primary-500/20"
+                >
+                  <span>✨</span> Volver a Transformación
+                </button>
               </div>
             {/if}
 

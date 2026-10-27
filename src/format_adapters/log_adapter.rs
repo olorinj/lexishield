@@ -3,7 +3,7 @@
 //! Respeta cabeceras, nombres de campo (pares clave=valor tipo `src_ip=...`) y
 //! marcas de tiempo de syslog, anonimizando exclusivamente los valores sensibles.
 
-use crate::engine::replacer::apply_single_pass_replacements;
+use crate::engine::replacer::CompiledReplacer;
 use crate::models::ObfuscationError;
 use regex::Regex;
 use std::collections::HashMap;
@@ -43,6 +43,11 @@ impl LogAdapter {
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
     ) -> Result<(String, usize), ObfuscationError> {
+        if text.is_empty() || replacement_map.is_empty() {
+            return Ok((text.to_string(), 0));
+        }
+
+        let replacer = CompiledReplacer::new(replacement_map, strict_word_boundaries);
         let mut total_replacements = 0;
         let mut output_lines = Vec::new();
 
@@ -65,11 +70,7 @@ impl LogAdapter {
                         val
                     };
 
-                    let (new_val, count) = apply_single_pass_replacements(
-                        raw_val,
-                        replacement_map,
-                        strict_word_boundaries,
-                    );
+                    let (new_val, count) = replacer.replace(raw_val);
                     total_replacements += count;
 
                     if is_quoted {
@@ -81,8 +82,7 @@ impl LogAdapter {
                 output_lines.push(replaced_line.into_owned());
             } else {
                 // Línea de log estándar: aplicar reemplazo con guardia de palabras
-                let (replaced_line, count) =
-                    apply_single_pass_replacements(line, replacement_map, strict_word_boundaries);
+                let (replaced_line, count) = replacer.replace(line);
                 total_replacements += count;
                 output_lines.push(replaced_line);
             }

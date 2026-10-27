@@ -113,17 +113,27 @@ impl ScanCache {
         }
 
         let path = Self::get_cache_file_path()?;
-        let json_str = serde_json::to_string_pretty(self).map_err(|e| {
-            ObfuscationError::ConfigError(format!("Error serializando caché de escaneo: {e}"))
-        })?;
-
         let temp_path = path.with_extension("tmp");
-        fs::write(&temp_path, json_str).map_err(|e| {
-            ObfuscationError::ConfigError(format!(
-                "Error escribiendo archivo temporal de caché en {}: {e}",
-                temp_path.display()
-            ))
-        })?;
+
+        {
+            use std::io::Write;
+            let file = File::create(&temp_path).map_err(|e| {
+                ObfuscationError::ConfigError(format!(
+                    "Error creando archivo temporal de caché en {}: {e}",
+                    temp_path.display()
+                ))
+            })?;
+            let mut writer = std::io::BufWriter::new(file);
+            serde_json::to_writer_pretty(&mut writer, self).map_err(|e| {
+                ObfuscationError::ConfigError(format!("Error serializando caché de escaneo: {e}"))
+            })?;
+            writer.flush().map_err(|e| {
+                ObfuscationError::ConfigError(format!(
+                    "Error volcando búfer de caché en {}: {e}",
+                    temp_path.display()
+                ))
+            })?;
+        }
 
         fs::rename(&temp_path, &path).map_err(|e| {
             ObfuscationError::ConfigError(format!(
