@@ -1,0 +1,34 @@
+# Agent Scope & Capabilities Manifest for LexiShield
+# Defined according to Section 22 of Central Standards (AGENTS.md)
+
+[project]
+id = "lexishield"
+name = "LexiShield"
+description = "High-performance, zero-knowledge mathematical data and log obfuscation and anonymization engine in Rust with Tauri GUI"
+version = "2.1.0"
+license = "MIT OR Apache-2.0"
+
+[stacks]
+primary = "rust"
+frameworks = ["tauri", "svelte"]
+toolchains = ["cargo", "npm", "vite"]
+
+[capabilities]
+security_auditing = true
+quality_gate_auditing = true
+fuzz_testing = true
+hermetic_cross_compilation = true
+zero_knowledge_cryptography = true
+strict_stdout_hygiene = true
+
+[roles]
+project_role = ".agents/roles/projects/lexishield.md"
+project_rules = ".agents/rules/projects/lexishield.md"
+
+[roles.common]
+quality_gate = ".agents/roles/common/quality-gate-auditor.md"
+security_auditor = ".agents/roles/common/security-auditor.md"
+code_reviewer = ".agents/roles/common/code-reviewer.md"
+test_engineer = ".agents/roles/common/test-engineer.md"
+tauri_specialist = ".agents/roles/common/tauri-ui-agent.md"
+

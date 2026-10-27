@@ -300,13 +300,13 @@ mod tests {
     #[test]
     fn test_ipv4_no_false_positives_on_snmp_oids() {
         let detector = IPv4Detector::new();
-        let snmp_text = r#"
+        let snmp_text = r"
 iso.3.6.1.2.1.1.2.0 = OID: iso.3.6.1.4.1.8072.3.2.10
 iso.3.6.1.2.1.1.3.0 = Timeticks: (63469694) 7 days, 8:18:16.94
 iso.3.6.1.2.1.1.9.1.2.1 = OID: iso.3.6.1.6.3.11.3.1.1
 1.3.6.1.4.1.8072.3.2.10 = OID: 1.3.6.1.2.1.92
 Servidor legítimo en 192.168.1.55 con gateway 10.0.0.1.
-"#;
+";
         let matches = detector.find_matches(snmp_text);
         assert_eq!(matches.len(), 2);
         assert_eq!(matches[0].2, "192.168.1.55");
