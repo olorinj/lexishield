@@ -56,6 +56,30 @@ impl IPv4Detector {
         IPV4_REGEX
             .find_iter(text)
             .filter_map(|m| {
+                // Verificar que no esté precedida por un punto (ej. OIDs como iso.3.6.1.2 o prefijo de versión)
+                if m.start() > 0 {
+                    let prefix = &text[..m.start()];
+                    if prefix.ends_with('.') || prefix.ends_with("\\.") {
+                        return None;
+                    }
+                }
+
+                // Verificar que no esté seguida por un punto y otro segmento alfanumérico o punto (ej. 3.6.1.2.1)
+                let suffix = &text[m.end()..];
+                let after_dot = if let Some(r) = suffix.strip_prefix("\\.") {
+                    Some(r)
+                } else {
+                    suffix.strip_prefix('.')
+                };
+
+                if after_dot.is_some_and(|rest| {
+                    rest.chars()
+                        .next()
+                        .is_some_and(|c| c.is_ascii_alphanumeric() || c == '.')
+                }) {
+                    return None;
+                }
+
                 let clean_str = m.as_str().replace('\\', "");
                 if clean_str.parse::<Ipv4Addr>().is_ok() {
                     Some((m.start(), m.end(), m.as_str()))
@@ -271,6 +295,22 @@ mod tests {
 
         let pseudo = detector.generate_pseudonym("192.168.1.50");
         assert!(pseudo.parse::<Ipv4Addr>().is_ok());
+    }
+
+    #[test]
+    fn test_ipv4_no_false_positives_on_snmp_oids() {
+        let detector = IPv4Detector::new();
+        let snmp_text = r#"
+iso.3.6.1.2.1.1.2.0 = OID: iso.3.6.1.4.1.8072.3.2.10
+iso.3.6.1.2.1.1.3.0 = Timeticks: (63469694) 7 days, 8:18:16.94
+iso.3.6.1.2.1.1.9.1.2.1 = OID: iso.3.6.1.6.3.11.3.1.1
+1.3.6.1.4.1.8072.3.2.10 = OID: 1.3.6.1.2.1.92
+Servidor legítimo en 192.168.1.55 con gateway 10.0.0.1.
+"#;
+        let matches = detector.find_matches(snmp_text);
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].2, "192.168.1.55");
+        assert_eq!(matches[1].2, "10.0.0.1");
     }
 
     #[test]
