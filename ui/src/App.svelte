@@ -164,7 +164,7 @@
     try {
       await navigator.clipboard.writeText(inputText);
       copiedInputFlash = true;
-      statusMessage = "📋 Texto desofuscado copiado al portapapeles.";
+      statusMessage = "📋 Texto restaurado copiado al portapapeles.";
       setTimeout(() => {
         copiedInputFlash = false;
       }, 2000);
@@ -194,7 +194,7 @@
       : "Dirección activa: Restaurar (Texto protegido ➔ Texto claro)";
   }
 
-  // Opciones de Ofuscación
+  // Opciones de Protección
   let copyMode = true; // Por defecto guardar en copia sufijada
   let cleanCache = false;
   let hasPandoc = false;
@@ -216,7 +216,7 @@
   let scanEntitiesCount = 0;
   let scanPollTimer = null;
 
-  // Estado de la Pestaña Pares de Ofuscación
+  // Estado de la Pestaña Pares de Sustitución / Tokens
   let pairsSelectedVault = "";
   let pairSearch = "";
   let pairTypeFilter = "all";
@@ -1085,7 +1085,7 @@
     try {
       loading = true;
       const useCopy = customOptions ? customOptions.copyMode : copyMode;
-      const activeSuffix = customOptions?.suffix || (reverse ? ".desofuscado" : copySuffix);
+      const activeSuffix = customOptions?.suffix || (reverse ? ".restaurado" : copySuffix);
       const useMd = customOptions ? (hasPandoc && customOptions.exportMarkdown) : (hasPandoc && exportMarkdown);
 
       let outPath = selected;
@@ -1285,7 +1285,7 @@
         if (res.total_entities > 0) {
           studioSubView = "audit";
           showTextScanPanel = false; // Plegar automáticamente para dar máximo espacio vertical a la tabla
-          statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados. Revisa la tabla para ofuscar u omitir.`;
+          statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados. Revisa la tabla para proteger u omitir.`;
         } else {
           statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el texto pegado.";
         }
@@ -1419,7 +1419,7 @@
       const isDir = await invokeTauri("is_directory", { path: droppedPath });
       const itemName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
       const isReverse = (targetPanel === "obfuscated");
-      const defaultSuffix = isReverse ? ".desofuscado" : copySuffix;
+      const defaultSuffix = isReverse ? ".restaurado" : copySuffix;
       studioDropModal = {
         path: droppedPath,
         name: itemName,
@@ -1520,8 +1520,8 @@
         };
       });
       statusMessage = shouldOmit
-        ? "🚫 Todas las entidades marcadas para OMITIR (no se ofuscarán)."
-        : "🛡️ Todas las entidades reactivadas para ofuscación.";
+        ? "🚫 Todas las entidades marcadas para OMITIR (no se protegerán)."
+        : "🛡️ Todas las entidades reactivadas para protección.";
     } else {
       detectedItems = detectedItems.map(it => {
         if (selectedScanOriginals.includes(it.original)) {
@@ -1535,7 +1535,7 @@
       });
       statusMessage = shouldOmit
         ? `🚫 ${selectedScanOriginals.length} entidades seleccionadas marcadas para OMITIR.`
-        : `🛡️ ${selectedScanOriginals.length} entidades seleccionadas reactivadas para ofuscación.`;
+        : `🛡️ ${selectedScanOriginals.length} entidades seleccionadas reactivadas para protección.`;
       selectedScanOriginals = [];
     }
   }
@@ -1689,7 +1689,7 @@
       });
       vaultMappings = updated;
       statusMessage = isCurrentlyOmitted
-        ? `✅ Entidad '${item.original}' reactivada para ofuscación.`
+        ? `✅ Entidad '${item.original}' reactivada para protección.`
         : `🚫 Entidad '${item.original}' configurada como ignorada/omitida.`;
     } catch (e) {
       alert("Error al cambiar estado de omisión: " + e);
@@ -1715,7 +1715,7 @@
       selectedPairKeys = [];
       statusMessage = shouldOmit
         ? `🚫 Entidades seleccionadas configuradas como ignoradas/omitidas.`
-        : `✓ Entidades seleccionadas reactivadas para ofuscación.`;
+        : `✓ Entidades seleccionadas reactivadas para protección.`;
     } catch (e) {
       alert("Error al actualizar omisiones en lote: " + e);
     }
@@ -1991,7 +1991,7 @@
                 ...clipboardEvents.slice(0, 49)
               ];
 
-              triggerClipboardNotification(`Portapapeles ofuscado (${detectedTokens.length} tokens detectados)`, detectedTokens.length, false);
+              triggerClipboardNotification(`Portapapeles protegido (${detectedTokens.length} tokens detectados)`, detectedTokens.length, false);
               scheduleAutoClearIfNeeded();
             } else {
               // Texto copiado sin tokens confidenciales reconocidos
@@ -2035,7 +2035,7 @@
                 ...clipboardEvents.slice(0, 49)
               ];
 
-              triggerClipboardNotification(`Portapapeles desofuscado (${detectedTokens.length} tokens restaurados)`, detectedTokens.length, true);
+              triggerClipboardNotification(`Portapapeles restaurado (${detectedTokens.length} tokens restaurados)`, detectedTokens.length, true);
               scheduleAutoClearIfNeeded();
             } else {
               // Texto copiado sin tokens seudónimos para revertir
@@ -2758,7 +2758,7 @@
                     type="button"
                     on:click={() => handleBatchOmitScanItems(true)}
                     class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg border border-amber-500/20 transition flex items-center gap-1"
-                    title="Marcar como omitidos (no se ofuscarán)"
+                    title="Marcar como omitidos (no se protegerán)"
                   >
                     <span>🚫</span> Omitir {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
                   </button>
@@ -2766,7 +2766,7 @@
                     type="button"
                     on:click={() => handleBatchOmitScanItems(false)}
                     class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold rounded-lg border border-emerald-500/20 transition flex items-center gap-1"
-                    title="Reactivar ofuscación"
+                    title="Reactivar protección"
                   >
                     <span>🛡️</span> Proteger {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
                   </button>
@@ -2959,7 +2959,7 @@
               <button
                 on:click={() => handleBatchOmitPairs(false)}
                 class="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl border border-emerald-500/30 transition flex items-center gap-1.5"
-                title="Reactivar ofuscación para los seleccionados"
+                title="Reactivar protección para los seleccionados"
               >
                 {#if toolbarButtonStyle !== 'text_only'}<span>✓</span>{/if}
                 {#if toolbarButtonStyle !== 'icons_only'}<span>Reactivar ({selectedPairKeys.length})</span>{/if}
@@ -3075,7 +3075,7 @@
                       <button
                         on:click={() => handleToggleOmitPair(item)}
                         class="p-1 transition font-bold {item.omitted || item.pseudonym === '=' ? 'text-emerald-500 hover:text-emerald-700' : 'text-amber-500 hover:text-amber-700'}"
-                        title={item.omitted || item.pseudonym === '=' ? "Reactivar ofuscación para esta entidad" : "Ignorar/Omitir esta entidad (mantener original)"}
+                        title={item.omitted || item.pseudonym === '=' ? "Reactivar protección para esta entidad" : "Ignorar/Omitir esta entidad (mantener original)"}
                       >
                         {item.omitted || item.pseudonym === '=' ? '✓ Reactivar' : '🚫 Ignorar'}
                       </button>
@@ -4299,7 +4299,7 @@
             </div>
             <div>
               <h3 class="text-sm font-bold text-slate-900 dark:text-white">Registros de Depuración en Tiempo Real</h3>
-              <p class="text-xs text-slate-500 dark:text-slate-400">Telemetría profunda del motor de ofuscación y llamadas Tauri.</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Telemetría profunda del motor de protección y llamadas Tauri.</p>
             </div>
           </div>
           
