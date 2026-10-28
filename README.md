@@ -39,18 +39,18 @@ El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendim
 ```mermaid
 flowchart TD
     subgraph Local["Entorno Local (Seguro)"]
-        A[Datos Sensibles Originales\nLogs / JSON / XML] -->|lexishield obfuscate| B(LexiShield Engine)
-        B -->|Genera| C[Texto Ofuscado]
-        B -->|Guarda| D[(Diccionario de Mapeos JSON)]
+        A[Datos Sensibles Originales\nLogs / JSON / XML] -->|lexishield protect / obfuscate| B(LexiShield Engine)
+        B -->|Genera| C[Texto Protegido con Tokens]
+        B -->|Guarda| D[(Bóveda de Mapeos .lexi)]
     end
 
     subgraph Nube["Servicios de IA (Inseguro)"]
-        C -->|Petición| E(Chatgpt / Claude / etc.)
-        E -->|Respuesta| F[Solución Ofuscada]
+        C -->|Petición| E(ChatGPT / Claude / Gemini)
+        E -->|Respuesta| F[Solución con Seudónimos]
     end
     
     subgraph Restauración["Entorno Local (Seguro)"]
-        F -->|lexishield deobfuscate| G(LexiShield Engine)
+        F -->|lexishield restore / deobfuscate| G(LexiShield Engine)
         D -.->|Lee mapeos| G
         G --> H[Respuesta Final con\nDatos Reales Restaurados]
     end
@@ -68,9 +68,9 @@ Además de la potente herramienta de consola, LexiShield incluye una aplicación
 flowchart LR
     subgraph Usuario["Flujo de Trabajo del Usuario"]
         U1["Pega texto o abre archivo confidencial"] --> S["✨ Studio"]
-        S -->|Ofuscar| O["Texto Sanitizado con Tokens"]
+        S -->|Proteger| O["Texto Sanitizado con Tokens"]
         O -->|Copiar| AI["🤖 Modelo de IA\n(ChatGPT, Claude, Gemini)"]
-        AI -->|Respuesta con Tokens| D["📥 Desofuscar"]
+        AI -->|Respuesta con Tokens| D["📥 Restaurar"]
         D --> R["Texto Final con Datos Reales"]
     end
 
@@ -135,8 +135,8 @@ lexishield [GLOBAL_OPTIONS] <COMMAND> [OPTIONS]
 #  --config <PATH>  Ruta a un archivo TOML de configuración personalizado
 ```
 
-### 1. Comando: `obfuscate`
-Ofusca un archivo, texto directo o el portapapeles.
+### 1. Comando: `protect` (o `obfuscate`)
+Protege u ofusca un archivo, texto directo o el portapapeles reemplazando los datos confidenciales por seudónimos.
 
 * **`-i, --input <FILE>`**: Archivo de entrada a procesar.
 * **`-o, --output <FILE>`**: Archivo de salida donde guardar el resultado.
@@ -149,20 +149,20 @@ Ofusca un archivo, texto directo o el portapapeles.
 
 *Ejemplos:*
 ```bash
-# Ofuscar archivo y guardar mapeos cifrados con contraseña
-lexishield obfuscate -i server_logs.json -o logs_seguros.json -s mapeos.lexi -p "MiContraseña123!"
+# Proteger archivo y guardar mapeos cifrados con contraseña
+lexishield protect -i server_logs.json -o logs_seguros.json -s mapeos.lexi -p "MiContraseña123!"
 
-# Ofuscar directamente lo que tienes copiado en el portapapeles (One-Shot)
-lexishield obfuscate -c
+# Proteger directamente lo que tienes copiado en el portapapeles (One-Shot)
+lexishield protect -c
 ```
 
-### 2. Comando: `deobfuscate`
-Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado).
+### 2. Comando: `restore` (o `deobfuscate`)
+Restaura o desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado).
 
-* **`-i, --input <FILE>`**: Archivo de entrada a desofuscar.
+* **`-i, --input <FILE>`**: Archivo de entrada a restaurar.
 * **`-o, --output <FILE>`**: Archivo de salida.
-* **`-t, --text <STRING>`**: Texto directo a desofuscar.
-* **`-c, --clipboard`**: Desofusca el texto copiado en el portapapeles y lo reemplaza con el texto real.
+* **`-t, --text <STRING>`**: Texto directo a restaurar.
+* **`-c, --clipboard`**: Restaura el texto copiado en el portapapeles y lo reemplaza con el texto real.
 * **`-m, --mappings <FILE>`**: Archivo con los mapeos a aplicar (detecta automáticamente si está cifrado o en texto plano).
 * **`-p, --password <PASSWORD>`**: Contraseña de descifrado (si el archivo está protegido).
 * **`--ask-password`**: Pide la contraseña por consola. Si el archivo está cifrado y no pasas contraseña, te la pedirá automáticamente.
@@ -170,7 +170,7 @@ Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guarda
 
 *Ejemplo:*
 ```bash
-lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi -p "MiContraseña123!"
+lexishield restore -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi -p "MiContraseña123!"
 ```
 
 ### 3. Comando: `scan`

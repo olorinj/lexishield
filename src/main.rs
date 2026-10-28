@@ -70,7 +70,9 @@ impl From<CliFormat> for FormatType {
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
 enum CliDirection {
+    #[value(alias = "protect")]
     Obfuscate,
+    #[value(alias = "restore")]
     Deobfuscate,
 }
 
@@ -315,7 +317,8 @@ enum ClipboardCommands {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Ofusca un archivo, texto directo, entrada estándar (stdin) o portapapeles.
+    /// Protege u ofusca un archivo, texto directo, entrada estándar (stdin) o portapapeles.
+    #[command(alias = "protect", alias = "p")]
     Obfuscate {
         /// Archivo de entrada a procesar (use '-' para leer desde stdin).
         #[arg(value_parser = parse_path, short, long)]
@@ -374,7 +377,8 @@ enum Commands {
         no_save: bool,
     },
 
-    /// Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada.
+    /// Restaura o desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada.
+    #[command(alias = "restore", alias = "r")]
     Deobfuscate {
         /// Archivo de entrada a desofuscar (use '-' para leer desde stdin).
         #[arg(value_parser = parse_path, short, long)]
