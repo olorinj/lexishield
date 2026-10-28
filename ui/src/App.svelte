@@ -34,7 +34,7 @@
       file_selection_mode: "ambos",
       close_to_tray: true,
       close_action: "tray",
-      output_suffix: "_obfuscated",
+      output_suffix: ".protegido",
       font_size: "medium",
       privacy_blur: false,
       show_token_badges: true,
@@ -52,7 +52,7 @@
   $: fileSelectionMode = appConfig?.gui?.file_selection_mode || "ambos";
   $: allowDragDrop = fileSelectionMode === "ambos" || fileSelectionMode === "arrastrar";
   $: showFileButtons = fileSelectionMode === "ambos" || fileSelectionMode === "botones";
-  $: copySuffix = appConfig?.gui?.output_suffix || "_obfuscated";
+  $: copySuffix = appConfig?.gui?.output_suffix || ".protegido";
   $: privacyBlur = appConfig?.gui?.privacy_blur || false;
   $: showTokenBadges = appConfig?.gui?.show_token_badges !== undefined ? appConfig.gui.show_token_badges : true;
   $: editorFontSizeClass =
@@ -799,7 +799,7 @@
         }
         cfg.gui.close_to_tray = (cfg.gui.close_action === "tray");
         if (!cfg.gui.output_suffix) {
-          cfg.gui.output_suffix = "_obfuscated";
+          cfg.gui.output_suffix = ".protegido";
         }
         if (!["small", "medium", "large"].includes(cfg.gui.font_size)) {
           cfg.gui.font_size = "medium";
@@ -832,7 +832,7 @@
         appConfig.gui.file_selection_mode = "ambos";
       }
       if (!appConfig?.gui?.output_suffix) {
-        appConfig.gui.output_suffix = "_obfuscated";
+        appConfig.gui.output_suffix = ".protegido";
       }
       if (!["small", "medium", "large"].includes(appConfig?.gui?.font_size)) {
         appConfig.gui.font_size = "medium";
@@ -3678,11 +3678,11 @@
                   id="config-output-suffix-input"
                   type="text"
                   bind:value={appConfig.gui.output_suffix}
-                  placeholder="_obfuscated"
+                  placeholder=".protegido"
                   class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
                 />
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Se añadirá automáticamente antes de la extensión (ej. <code>archivo{appConfig.gui.output_suffix || '_obfuscated'}.json</code>).
+                  Se añadirá automáticamente antes de la extensión (ej. <code>archivo{appConfig.gui.output_suffix || '.protegido'}.json</code>).
                 </p>
               </div>
 
@@ -4775,7 +4775,7 @@
                     id="modal-suffix-input"
                     type="text"
                     bind:value={studioDropModal.suffix}
-                    placeholder="_obfuscated"
+                    placeholder={studioDropModal.isReverse ? ".restaurado" : ".protegido"}
                     class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 font-mono text-xs focus:ring-1 focus:ring-primary-500 focus:outline-none flex-1"
                   />
                 </div>

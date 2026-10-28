@@ -336,7 +336,7 @@ enum Commands {
         #[arg(long)]
         copy: bool,
 
-        /// Sufijo personalizado para modo copia (por defecto: _obfuscated).
+        /// Sufijo personalizado para modo copia (por defecto: .protegido).
         #[arg(long)]
         suffix: Option<String>,
 
@@ -807,7 +807,7 @@ fn handle_obfuscate(
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("txt");
-        let suffix = opts.suffix.as_deref().unwrap_or("_obfuscated");
+        let suffix = opts.suffix.as_deref().unwrap_or(".protegido");
         Some(in_path.with_file_name(format!("{stem}{suffix}.{ext}")))
     } else {
         None

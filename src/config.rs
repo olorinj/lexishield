@@ -408,7 +408,7 @@ fn default_close_action() -> String {
 }
 
 fn default_output_suffix() -> String {
-    "_obfuscated".to_string()
+    ".protegido".to_string()
 }
 
 fn default_font_size() -> String {
