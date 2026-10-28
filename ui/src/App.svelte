@@ -281,14 +281,26 @@
     }, 4000);
   }
 
+  // Notificación Toast flotante global para interceptación de Portapapeles (Watch)
+  let clipboardToast = null;
+  let clipboardToastTimer = null;
+  function showClipboardToast(message, count = 0, isDeobfuscate = false) {
+    if (clipboardToastTimer) clearTimeout(clipboardToastTimer);
+    clipboardToast = { message, count, isDeobfuscate };
+    clipboardToastTimer = setTimeout(() => {
+      clipboardToast = null;
+      clipboardToastTimer = null;
+    }, 3500);
+  }
+
   // Mejoras Ergonómicas y Funcionales de Studio (v2.1)
   let autoCopyToClipboard = true;
   let sessionHistory = [];
   let showSessionHistoryModal = false;
   let activeSensitivityProfile = localStorage.getItem("sensitivity_profile") || "all"; // "all" | "devops" | "gdpr"
   let showTokenBadges = true;
-  let studioInputViewMode = "editor"; // "editor" | "markdown"
-  let studioOutputViewMode = "editor"; // "editor" | "markdown"
+  let toolbarButtonStyle = localStorage.getItem("toolbar_button_style") || "both"; // "both" | "icons_only" | "text_only"
+  let studioUnifiedViewMode = "editor"; // "editor" | "markdown"
 
   // Estado de Depuración y Logs
   let debugMode = false;
@@ -1936,7 +1948,7 @@
   function toggleWatchMode() {
     isWatching = !isWatching;
     if (isWatching) {
-      statusMessage = `👀 Monitorización del portapapeles activada (${watchDirection === 'obfuscate' ? 'Ofuscación' : 'Desofuscación'}).`;
+      statusMessage = `👀 Monitorización del portapapeles activada (${watchDirection === 'obfuscate' ? 'Protección' : 'Restauración'}).`;
       startWatchPolling();
     } else {
       if (watchPollInterval) clearInterval(watchPollInterval);
@@ -1979,7 +1991,7 @@
                 ...clipboardEvents.slice(0, 49)
               ];
 
-              triggerClipboardNotification(`Portapapeles ofuscado (${detectedTokens.length} tokens detectados)`);
+              triggerClipboardNotification(`Portapapeles ofuscado (${detectedTokens.length} tokens detectados)`, detectedTokens.length, false);
               scheduleAutoClearIfNeeded();
             } else {
               // Texto copiado sin tokens confidenciales reconocidos
@@ -1995,7 +2007,7 @@
                 },
                 ...clipboardEvents.slice(0, 49)
               ];
-              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos");
+              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos", 0, false);
             }
           } else {
             const res = await invokeTauri("deobfuscate_content", {
@@ -2023,7 +2035,7 @@
                 ...clipboardEvents.slice(0, 49)
               ];
 
-              triggerClipboardNotification(`Portapapeles desofuscado (${detectedTokens.length} tokens restaurados)`);
+              triggerClipboardNotification(`Portapapeles desofuscado (${detectedTokens.length} tokens restaurados)`, detectedTokens.length, true);
               scheduleAutoClearIfNeeded();
             } else {
               // Texto copiado sin tokens seudónimos para revertir
@@ -2039,7 +2051,7 @@
                 },
                 ...clipboardEvents.slice(0, 49)
               ];
-              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos");
+              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos", 0, true);
             }
           }
         }
@@ -2050,11 +2062,13 @@
     }, 300);
   }
 
-  function triggerClipboardNotification(msg) {
+  function triggerClipboardNotification(msg, count = 0, isDeobfuscate = false) {
+    statusMessage = `📋 ${msg}`;
+    if (count > 0) {
+      showClipboardToast(msg, count, isDeobfuscate);
+    }
     const notifyType = appConfig?.gui?.clipboard?.notification_type || "toast";
-    if (notifyType === "toast") {
-      statusMessage = `📋 ${msg}`;
-    } else if (notifyType === "visual_flash") {
+    if (notifyType === "visual_flash") {
       clipboardFlash = true;
       setTimeout(() => { clipboardFlash = false; }, 400);
     }
@@ -2137,7 +2151,8 @@
     } else if (activeTab === "vaults") {
       return `lexishield vault list`;
     } else if (activeTab === "watch") {
-      return `lexishield watch -d ${watchDirection} -f ${selectedFormat}${vaultArg}`;
+      const cliDir = watchDirection === "obfuscate" ? "protect" : "restore";
+      return `lexishield watch -d ${cliDir} -f ${selectedFormat}${vaultArg}`;
     } else if (activeTab === "config") {
       return `lexishield config show`;
     }
@@ -2172,8 +2187,10 @@
         <button
           on:click={() => (activeTab = "studio")}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'studio' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Studio (Transformación y Desglose)"
         >
-          <span>✨</span> Studio
+          {#if toolbarButtonStyle !== 'text_only'}<span>✨</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Studio</span>{/if}
         </button>
       {/if}
 
@@ -2181,8 +2198,10 @@
         <button
           on:click={() => { activeTab = "pairs"; loadPairsForVault(vaultPath); }}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'pairs' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Pares de sustitución y seudónimos"
         >
-          <span>📑</span> Pares ({vaultMappings.length})
+          {#if toolbarButtonStyle !== 'text_only'}<span>📑</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Pares ({vaultMappings.length})</span>{/if}
         </button>
       {/if}
 
@@ -2190,8 +2209,10 @@
         <button
           on:click={() => { activeTab = "vaults"; refreshVaultsList(); }}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'vaults' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Gestión de Bóvedas Lexi"
         >
-          <span>🗄️</span> Bóvedas Lexi
+          {#if toolbarButtonStyle !== 'text_only'}<span>🗄️</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Bóvedas</span>{/if}
         </button>
       {/if}
 
@@ -2199,13 +2220,15 @@
         <button
           on:click={() => (activeTab = "watch")}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'watch' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Monitorización activa de portapapeles"
         >
-          <span>📋</span> Portapapeles
+          {#if toolbarButtonStyle !== 'text_only'}<span>📋</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Portapapeles</span>{/if}
         </button>
       {/if}
     </nav>
 
-    <!-- ACCIONES DE CABECERA -->
+    <!-- ACCIONES DE CABECERA (TIER 1 UNIVERSAL) -->
     <div class="flex items-center gap-2">
       <!-- Indicador de Bóveda Activa y Desbloqueo -->
       <button
@@ -2224,53 +2247,31 @@
       <!-- Botón Configuración -->
       <button
         on:click={() => (activeTab = "config")}
-        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {activeTab === 'config' ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
-        title="Configuración general"
+        class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {activeTab === 'config' ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+        title="Configuración general del sistema"
       >
-        <span>⚙️</span>
-      </button>
-
-      <!-- Botón Modo DEBUG y Logs -->
-      <button
-        on:click={openLogsModal}
-        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
-        title="Registro de depuración (Logs)"
-      >
-        <span>🐞</span>
-      </button>
-
-      <!-- Botón Modo Privacidad / Desenfoque de Pantalla -->
-      <button
-        on:click={() => {
-          appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
-          saveSettings();
-        }}
-        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
-        title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados (Pasa el cursor por encima para verlos)" : "Activar Modo Privacidad (Desenfocar datos originales para compartir pantalla)"}
-      >
-        <span>{privacyBlur ? "🙈" : "👁️"}</span>
-      </button>
-
-      <!-- Botón Insignias / Badges de Tokens -->
-      <button
-        on:click={toggleTokenBadges}
-        class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {showTokenBadges ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
-        title={showTokenBadges ? "Insignias (Badges) ACTIVAS: Tokens resaltados visualmente (Clic para desactivar)" : "Activar Insignias (Badges) en tokens confidenciales"}
-      >
-        <span>🏷️</span>
+        {#if toolbarButtonStyle !== 'text_only'}<span>⚙️</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>Opciones</span>{/if}
       </button>
 
       <!-- Botón Tema Claro/Oscuro -->
       <button
         on:click={toggleTheme}
-        class="w-8 h-8 rounded-xl text-sm bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center transition"
+        class="px-2.5 py-1 rounded-xl text-xs bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center gap-1.5 transition font-semibold"
         title="Alternar Tema Claro / Oscuro"
       >
-        {#if darkMode}
-          <span>☀️</span>
-        {:else}
-          <span>🌙</span>
-        {/if}
+        {#if toolbarButtonStyle !== 'text_only'}<span>{darkMode ? "☀️" : "🌙"}</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>{darkMode ? "Claro" : "Oscuro"}</span>{/if}
+      </button>
+
+      <!-- Botón Ayuda Global Contextual Fijo (A la derecha del todo) -->
+      <button
+        on:click={() => openHelp(activeTab)}
+        class="px-2.5 py-1 rounded-xl text-xs bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center gap-1.5 transition font-semibold"
+        title="Ayuda y documentación contextual de la vista activa"
+      >
+        {#if toolbarButtonStyle !== 'text_only'}<span>❔</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>Ayuda</span>{/if}
       </button>
     </div>
   </header>
@@ -2288,15 +2289,19 @@
               type="button"
               on:click={() => (studioSubView = "transform")}
               class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'transform' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+              title="Vista de Transformación y Editor Bidireccional"
             >
-              <span>✨</span> Transformación
+              {#if toolbarButtonStyle !== 'text_only'}<span>✨</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Transformación</span>{/if}
             </button>
             <button
               type="button"
               on:click={() => (studioSubView = "audit")}
               class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'audit' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+              title="Vista de Desglose y Auditoría de Tokens"
             >
-              <span>🔍</span> Desglose y Auditoría
+              {#if toolbarButtonStyle !== 'text_only'}<span>🔍</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Desglose y Auditoría</span>{/if}
               {#if visibleDetectedItems.length > 0}
                 <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
                   {visibleDetectedItems.length}
@@ -2305,9 +2310,58 @@
             </button>
           </div>
 
-          <!-- Grupo Derecho: Acciones de Sesión y Ergonomía -->
+          <!-- Centro: Conmutador Global Editor / Markdown (cuando está en Transformación) -->
+          {#if studioSubView === "transform"}
+            <div class="flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-[11px]">
+              <button
+                type="button"
+                on:click={() => (studioUnifiedViewMode = "editor")}
+                class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'editor' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                title="Modo Editor (texto editable en ambos paneles)"
+              >
+                {#if toolbarButtonStyle !== 'text_only'}<span>📄</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Editor</span>{/if}
+              </button>
+              <button
+                type="button"
+                on:click={() => (studioUnifiedViewMode = "markdown")}
+                class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                title="Modo Markdown (vista previa formateada en ambos paneles)"
+              >
+                {#if toolbarButtonStyle !== 'text_only'}<span>👁️</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Markdown</span>{/if}
+              </button>
+            </div>
+          {/if}
+
+          <!-- Grupo Derecho: Acciones de Sesión y Ergonomía (Tier 2 Contextual de Studio) -->
           <div class="flex items-center gap-2">
-            <!-- Botón Conmutable de Auto-copiado (estilo toggle con cambio de icono 📋 / 📄) -->
+            <!-- Botón Modo Privacidad / Desenfoque de Pantalla (Tier 2 Studio) -->
+            <button
+              type="button"
+              on:click={() => {
+                appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
+                saveSettings();
+              }}
+              class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+              title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados (Pasa el cursor por encima para verlos)" : "Activar Modo Privacidad (Desenfocar datos originales para compartir pantalla)"}
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>{privacyBlur ? "🙈" : "👁️"}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
+            </button>
+
+            <!-- Botón Insignias / Badges de Tokens (Confinado a Studio) -->
+            <button
+              type="button"
+              on:click={toggleTokenBadges}
+              class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {showTokenBadges ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
+              title={showTokenBadges ? "Insignias (Badges) ACTIVAS: Tokens resaltados visualmente (Clic para desactivar)" : "Activar Insignias (Badges) en tokens confidenciales"}
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>🏷️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Insignias</span>{/if}
+            </button>
+
+            <!-- Botón Conmutable de Auto-copiado -->
             <button
               type="button"
               on:click={() => {
@@ -2316,36 +2370,27 @@
                   ? "📋 Auto-copiado al portapapeles ACTIVADO."
                   : "📄 Auto-copiado al portapapeles DESACTIVADO.";
               }}
-              class="w-8 h-8 rounded-xl text-sm flex items-center justify-center transition border {autoCopyToClipboard ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
+              class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {autoCopyToClipboard ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
               title={autoCopyToClipboard ? "Auto-copiar ACTIVO: Copia el resultado automáticamente al proteger o restaurar (Clic para desactivar)" : "Auto-copiar DESACTIVADO: Clic para activar copiado automático"}
             >
-              <span>{autoCopyToClipboard ? "📋" : "📄"}</span>
+              {#if toolbarButtonStyle !== 'text_only'}<span>{autoCopyToClipboard ? "📋" : "📄"}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Auto-copiar</span>{/if}
             </button>
 
             <!-- Botón Historial de Sesión -->
             <button
               type="button"
               on:click={() => (showSessionHistoryModal = true)}
-              class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs"
+              class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs text-xs"
               title="Ver historial temporal de sesiones en memoria RAM"
             >
-              <span>⏱️</span>
-              <span class="hidden sm:inline">Historial</span>
+              {#if toolbarButtonStyle !== 'text_only'}<span>⏱️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Historial</span>{/if}
               {#if sessionHistory.length > 0}
                 <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
                   {sessionHistory.length}
                 </span>
               {/if}
-            </button>
-
-            <!-- Botón Ayuda (con atajos integrados) -->
-            <button
-              on:click={() => openHelp('studio')}
-              class="px-2.5 py-1 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1 shadow-xs"
-              title="Ver guía de uso de Studio y atajos de teclado"
-            >
-              <span>❔</span>
-              <span class="hidden sm:inline">Ayuda</span>
             </button>
           </div>
         </div>
@@ -2390,24 +2435,6 @@
                   <span class="text-[10px] font-mono text-slate-400">
                     {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
                   </span>
-                  <div class="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-900/60 p-0.5 rounded-lg border border-slate-200 dark:border-white/5 text-[11px]">
-                    <button
-                      type="button"
-                      on:click={() => (studioInputViewMode = "editor")}
-                      class="px-2 py-0.5 rounded font-semibold transition {studioInputViewMode === 'editor' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                      title="Vista editor editable"
-                    >
-                      📄 Editor
-                    </button>
-                    <button
-                      type="button"
-                      on:click={() => (studioInputViewMode = "markdown")}
-                      class="px-2 py-0.5 rounded font-semibold transition {studioInputViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                      title="Vista previa Markdown formateada"
-                    >
-                      👁️ Markdown
-                    </button>
-                  </div>
                   <button
                     on:click={copyInputWithFeedback}
                     disabled={!inputText}
@@ -2423,12 +2450,12 @@
                 </div>
               </div>
               <div class="flex-1 min-w-0 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
-                {#if studioInputViewMode === "markdown"}
-                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words">
+                {#if studioUnifiedViewMode === "markdown"}
+                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words smooth-scroll-tokens">
                     {@html renderMarkdownPreview(inputText)}
                   </div>
                 {:else if showTokenBadges && inputText.trim()}
-                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''}">
+                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens">
                     {@html renderHighlightedTokens(inputText, false)}
                   </div>
                 {:else}
@@ -2444,7 +2471,7 @@
                     on:focus={() => { if (inputText.trim()) studioDirection = "obfuscate"; }}
                     on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
                     placeholder="Pega o escribe aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
-                    class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''}"
+                    class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens"
                   ></textarea>
                 {/if}
               </div>
@@ -2456,31 +2483,31 @@
                 <button
                   on:click={handleObfuscate}
                   disabled={loading || !inputText.trim()}
-                  class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
-                  title="Proteger datos (Ctrl+Enter)"
+                  class="px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-sm"
+                  title="Proteger datos confidenciales (Ctrl+Enter)"
+                  aria-label="Proteger datos confidenciales"
                 >
                   {#if loading}
                     <span class="animate-spin">⏳</span>
                   {:else}
-                    <span>🛡️</span>
+                    <span class="text-base">🛡️</span>
                   {/if}
-                  <span>Proteger</span>
                   <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
                 </button>
               {:else}
                 <button
                   on:click={handleDeobfuscate}
                   disabled={loading || !outputText.trim()}
-                  class="px-3.5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-xs"
-                  title="Restaurar datos (Ctrl+Enter)"
+                  class="px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-sm"
+                  title="Restaurar datos protegidos (Ctrl+Enter)"
+                  aria-label="Restaurar datos protegidos"
                 >
                   {#if loading}
                     <span class="animate-spin">⏳</span>
                   {:else}
                     <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
                   {/if}
-                  <span>Restaurar</span>
-                  <span>🔄</span>
+                  <span class="text-base">🔄</span>
                 </button>
               {/if}
             </div>
@@ -2497,24 +2524,6 @@
                   <span class="text-[10px] font-mono text-slate-400">
                     {outputLinesCount} lín · {outputCharCount} car · {outputSizeKB}
                   </span>
-                  <div class="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-900/60 p-0.5 rounded-lg border border-slate-200 dark:border-white/5 text-[11px]">
-                    <button
-                      type="button"
-                      on:click={() => (studioOutputViewMode = "editor")}
-                      class="px-2 py-0.5 rounded font-semibold transition {studioOutputViewMode === 'editor' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                      title="Vista editor editable"
-                    >
-                      📄 Editor
-                    </button>
-                    <button
-                      type="button"
-                      on:click={() => (studioOutputViewMode = "markdown")}
-                      class="px-2 py-0.5 rounded font-semibold transition {studioOutputViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                      title="Vista previa Markdown formateada para prompts de IA"
-                    >
-                      👁️ Markdown
-                    </button>
-                  </div>
                   <button
                     on:click={copyOutputWithFeedback}
                     disabled={!outputText}
@@ -2530,12 +2539,12 @@
                 </div>
               </div>
               <div class="flex-1 min-w-0 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
-                {#if studioOutputViewMode === "markdown"}
-                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words">
+                {#if studioUnifiedViewMode === "markdown"}
+                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words smooth-scroll-tokens">
                     {@html renderMarkdownPreview(outputText)}
                   </div>
                 {:else if showTokenBadges && outputText.trim()}
-                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words">
+                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words smooth-scroll-tokens">
                     {@html renderHighlightedTokens(outputText, true)}
                   </div>
                 {:else}
@@ -2551,7 +2560,7 @@
                     on:focus={() => { if (outputText.trim()) studioDirection = "deobfuscate"; }}
                     on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
                     placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
-                    class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre"
+                    class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre smooth-scroll-tokens"
                   ></textarea>
                 {/if}
               </div>
@@ -2583,29 +2592,31 @@
                 <button
                   on:click={handleObfuscate}
                   disabled={loading || !inputText.trim()}
-                  class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
+                  class="px-5 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-sm font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center justify-center gap-1.5 disabled:opacity-50 group"
                   title="Proteger datos y auto-copiar (Ctrl+Enter)"
+                  aria-label="Proteger datos y auto-copiar"
                 >
                   {#if loading}
                     <span class="animate-spin">⏳</span>
                   {:else}
-                    <span>🛡️</span>
+                    <span class="text-base">🛡️</span>
                   {/if}
-                  Proteger datos ➔
+                  <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
                 </button>
               {:else}
                 <button
                   on:click={handleDeobfuscate}
                   disabled={loading || !outputText.trim()}
-                  class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
+                  class="px-5 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-sm font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center justify-center gap-1.5 disabled:opacity-50 group"
                   title="Restaurar datos y auto-copiar (Ctrl+Enter)"
+                  aria-label="Restaurar datos y auto-copiar"
                 >
                   {#if loading}
                     <span class="animate-spin">⏳</span>
                   {:else}
-                    <span>🔄</span>
+                    <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
                   {/if}
-                  ⮜ Restaurar datos
+                  <span class="text-base">🔄</span>
                 </button>
               {/if}
             </div>
@@ -2757,7 +2768,7 @@
                     class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold rounded-lg border border-emerald-500/20 transition flex items-center gap-1"
                     title="Reactivar ofuscación"
                   >
-                    <span>🛡️</span> Ofuscar {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+                    <span>🛡️</span> Proteger {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
                   </button>
                 </div>
 
@@ -2782,7 +2793,7 @@
               </div>
             {/if}
 
-            <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
+            <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 smooth-scroll-tokens">
               <table class="w-full text-left font-mono {editorFontSizeClass}">
                 <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
                   <tr>
@@ -2821,7 +2832,7 @@
                           </span>
                         {:else}
                           <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
-                            🛡️ Ofuscado
+                            🛡️ Protegido
                           </span>
                         {/if}
                       </td>
@@ -2840,7 +2851,7 @@
                           on:click={() => toggleSingleScanOmit(item)}
                           class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition {item.omitted ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20'}"
                         >
-                          {item.omitted ? '✓ Ofuscar' : '🚫 Omitir'}
+                          {item.omitted ? '✓ Proteger' : '🚫 Omitir'}
                         </button>
                       </td>
                     </tr>
@@ -2891,14 +2902,6 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <button
-              on:click={() => openHelp('pairs')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-              title="Ver guía sobre gestión de tokens"
-            >
-              <span>❔</span> Ayuda
-            </button>
-
             <!-- Selector de Bóveda -->
             <select
               bind:value={pairsSelectedVault}
@@ -2911,10 +2914,24 @@
             </select>
 
             <button
-              on:click={() => (showAddPairModal = true)}
-              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1"
+              on:click={() => {
+                appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
+                saveSettings();
+              }}
+              class="px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+              title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados en la tabla" : "Activar Modo Privacidad (Desenfocar valores originales en la tabla)"}
             >
-              <span>➕</span> Añadir Par
+              {#if toolbarButtonStyle !== 'text_only'}<span>{privacyBlur ? "🙈" : "👁️"}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
+            </button>
+
+            <button
+              on:click={() => (showAddPairModal = true)}
+              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
+              title="Añadir nuevo par de sustitución a la bóveda"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>➕</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Añadir Par</span>{/if}
             </button>
 
             <button
@@ -2923,38 +2940,43 @@
                 const name = targetVault.split('/').pop();
                 handleRestoreVaultBak(name);
               }}
-              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1"
+              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1.5"
               title="Recuperar la última copia de seguridad automática (.bak) de esta bóveda"
             >
-              <span>↺</span> Restaurar .bak
+              {#if toolbarButtonStyle !== 'text_only'}<span>↺</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar .bak</span>{/if}
             </button>
 
             {#if selectedPairKeys.length > 0}
               <button
                 on:click={() => handleBatchOmitPairs(true)}
-                class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-xl border border-amber-500/30 transition flex items-center gap-1"
+                class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-xl border border-amber-500/30 transition flex items-center gap-1.5"
                 title="Configurar los elementos seleccionados como ignorados/omitidos"
               >
-                <span>🚫</span> Omitir ({selectedPairKeys.length})
+                {#if toolbarButtonStyle !== 'text_only'}<span>🚫</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Omitir ({selectedPairKeys.length})</span>{/if}
               </button>
               <button
                 on:click={() => handleBatchOmitPairs(false)}
-                class="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl border border-emerald-500/30 transition flex items-center gap-1"
+                class="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl border border-emerald-500/30 transition flex items-center gap-1.5"
                 title="Reactivar ofuscación para los seleccionados"
               >
-                <span>✓</span> Reactivar ({selectedPairKeys.length})
+                {#if toolbarButtonStyle !== 'text_only'}<span>✓</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Reactivar ({selectedPairKeys.length})</span>{/if}
               </button>
               <button
                 on:click={deleteSelectedPairs}
-                class="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-500/30 transition flex items-center gap-1"
+                class="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-500/30 transition flex items-center gap-1.5"
+                title="Eliminar permanentemente los pares seleccionados"
               >
-                <span>🗑️</span> Borrar ({selectedPairKeys.length})
+                {#if toolbarButtonStyle !== 'text_only'}<span>🗑️</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Borrar ({selectedPairKeys.length})</span>{/if}
               </button>
             {/if}
           </div>
         </div>
 
-        <!-- Filtros de Pares -->
+        <!-- Filtros y Selección de Pares -->
         <div class="mb-4 flex items-center gap-3">
           <input
             type="text"
@@ -2962,16 +2984,36 @@
             placeholder="Filtrar por original o seudónimo..."
             class="flex-1 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
-          <button
-            on:click={toggleSelectAllPairs}
-            class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs rounded-xl border border-slate-300 dark:border-white/10 font-semibold"
-          >
-            {selectedPairKeys.length === filteredPairs.length && filteredPairs.length > 0 ? "Deseleccionar Todos" : "Seleccionar Todos"}
-          </button>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              on:click={() => {
+                selectedPairKeys = filteredPairs.map(p => p.original);
+              }}
+              disabled={filteredPairs.length === 0 || selectedPairKeys.length === filteredPairs.length}
+              class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Seleccionar todos los pares visibles"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>☑️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Seleccionar todos</span>{/if}
+            </button>
+            <button
+              type="button"
+              on:click={() => {
+                selectedPairKeys = [];
+              }}
+              disabled={selectedPairKeys.length === 0}
+              class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Deseleccionar todos los pares marcados"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>⬜</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Deseleccionar todos</span>{/if}
+            </button>
+          </div>
         </div>
 
         <!-- Tabla de Pares -->
-        <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
+        <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 smooth-scroll-tokens">
           <table class="w-full text-left text-xs font-mono">
             <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
               <tr>
@@ -3093,42 +3135,40 @@
 
           <div class="flex items-center gap-2">
             <button
-              on:click={() => openHelp('vaults')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-              title="Ver guía sobre bóvedas criptográficas"
-            >
-              <span>❔</span> Ayuda
-            </button>
-            <button
               on:click={() => openHelp('password_why')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 transition"
+              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1.5 transition"
               title="¿Por qué es obligatoria la contraseña en las bóvedas?"
             >
-              <span>🔐</span> ¿Por qué contraseña?
+              {#if toolbarButtonStyle !== 'text_only'}<span>🔐</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>¿Por qué contraseña?</span>{/if}
             </button>
             <button
               on:click={() => (showCreateVaultModal = true)}
-              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1"
+              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
             >
-              <span>➕</span> Nueva Bóveda
+              {#if toolbarButtonStyle !== 'text_only'}<span>➕</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Nueva Bóveda</span>{/if}
             </button>
             <button
               on:click={handleImportVault}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1"
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5"
             >
-              <span>📥</span> Importar Bóveda
+              {#if toolbarButtonStyle !== 'text_only'}<span>📥</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Importar Bóveda</span>{/if}
             </button>
             <button
               on:click={() => (showBackupModal = true)}
-              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1"
+              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1.5"
             >
-              <span>📦</span> Copia de Seguridad Bzip2
+              {#if toolbarButtonStyle !== 'text_only'}<span>📦</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Copia Bzip2</span>{/if}
             </button>
             <button
               on:click={handleRestoreBackup}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1"
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5"
             >
-              <span>♻️</span> Restaurar Copia
+              {#if toolbarButtonStyle !== 'text_only'}<span>♻️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar Copia</span>{/if}
             </button>
           </div>
         </div>
@@ -3234,7 +3274,7 @@
                 <span class="text-base">💡</span>
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Monitorización del Portapapeles (Watch Mode)</p>
-                  <p>Al activar la escucha, cada vez que copies texto con Ctrl+C (o Cmd+C), LexiShield interceptará los tokens sensibles, los ofuscará en segundo plano con tu bóveda y colocará el texto seguro listo para pegar en IAs o chats. Si copias una respuesta de una IA, puedes poner la dirección en "Desofuscar" para recuperar los valores reales al instante.</p>
+                  <p>Al activar la escucha, cada vez que copies texto con Ctrl+C (o Cmd+C), LexiShield interceptará los tokens sensibles, los protegerá en segundo plano con tu bóveda y colocará el texto seguro listo para pegar en IAs o chats. Si copias una respuesta de una IA, puedes poner la dirección en "Restaurar" para recuperar los valores reales al instante.</p>
                 </div>
               </div>
               <button on:click={() => dismissTip('watch')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
@@ -3251,17 +3291,24 @@
             
             <div class="flex items-center gap-2">
               <button
-                on:click={() => openHelp('watch')}
-                class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-                title="Ver guía de monitorización de portapapeles"
+                type="button"
+                on:click={() => {
+                  appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
+                  saveSettings();
+                }}
+                class="px-3 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados en los eventos" : "Activar Modo Privacidad (Desenfocar valores originales capturados)"}
               >
-                <span>❔</span> Ayuda
+                {#if toolbarButtonStyle !== 'text_only'}<span>{privacyBlur ? "🙈" : "👁️"}</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
               </button>
+
               <button
                 on:click={handleClearClipboard}
                 class="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
               >
-                <span>🧹</span> Vaciar Portapapeles
+                {#if toolbarButtonStyle !== 'text_only'}<span>🧹</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Vaciar Portapapeles</span>{/if}
               </button>
             </div>
           </div>
@@ -3278,18 +3325,79 @@
           {/if}
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dirección de Transformación</span>
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dirección de Transformación</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full {watchDirection === 'obfuscate' ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'}">
+                  {watchDirection === 'obfuscate' ? 'Modo Proteger' : 'Modo Restaurar'}
+                </span>
+              </div>
               
-              <div class="space-y-2 text-xs">
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" bind:group={watchDirection} value="obfuscate" class="accent-primary-500" />
-                  <span>Ofuscar automáticamente (Original -> Seudónimo)</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" bind:group={watchDirection} value="deobfuscate" class="accent-primary-500" />
-                  <span>Desofuscar automáticamente (Seudónimo -> Original)</span>
-                </label>
+              <!-- Selector de Tarjetas Táctiles Interactivas -->
+              <div class="grid grid-cols-2 gap-3">
+                <!-- Tarjeta: Proteger -->
+                <button
+                  type="button"
+                  on:click={() => {
+                    watchDirection = 'obfuscate';
+                    if (isWatching) {
+                      statusMessage = "👀 Monitorización del portapapeles activa (Protección).";
+                    }
+                  }}
+                  class="p-3 rounded-xl border text-left transition duration-150 flex flex-col justify-between gap-2 cursor-pointer {watchDirection === 'obfuscate' ? 'bg-primary-500/15 border-primary-500/50 shadow-md ring-2 ring-primary-500/20 text-slate-900 dark:text-white' : 'bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-600 dark:text-slate-400'}"
+                  title="Proteger automáticamente: Detecta datos confidenciales y los reemplaza por seudónimos antes de enviar a IAs o chats"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    {#if toolbarButtonStyle !== 'text_only'}
+                      <div class="flex items-center gap-1 text-base font-bold text-primary-600 dark:text-primary-400">
+                        <span>🛡️</span>
+                        <span class="text-xs">➔</span>
+                      </div>
+                    {/if}
+                    <span class="w-2.5 h-2.5 rounded-full {watchDirection === 'obfuscate' ? 'bg-primary-500 ring-2 ring-primary-500/40' : 'bg-slate-300 dark:bg-white/10'}"></span>
+                  </div>
+
+                  <div>
+                    {#if toolbarButtonStyle !== 'icons_only'}
+                      <p class="text-xs font-bold leading-tight">Proteger</p>
+                    {/if}
+                    <p class="text-[10px] font-mono mt-0.5 text-slate-500 dark:text-slate-400">
+                      Original ➔ Seudónimo
+                    </p>
+                  </div>
+                </button>
+
+                <!-- Tarjeta: Restaurar -->
+                <button
+                  type="button"
+                  on:click={() => {
+                    watchDirection = 'deobfuscate';
+                    if (isWatching) {
+                      statusMessage = "👀 Monitorización del portapapeles activa (Restauración).";
+                    }
+                  }}
+                  class="p-3 rounded-xl border text-left transition duration-150 flex flex-col justify-between gap-2 cursor-pointer {watchDirection === 'deobfuscate' ? 'bg-indigo-500/15 border-indigo-500/50 shadow-md ring-2 ring-indigo-500/20 text-slate-900 dark:text-white' : 'bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-600 dark:text-slate-400'}"
+                  title="Restaurar automáticamente: Recupera los valores originales a partir de los seudónimos devueltos por la IA"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    {#if toolbarButtonStyle !== 'text_only'}
+                      <div class="flex items-center gap-1 text-base font-bold text-indigo-600 dark:text-indigo-400">
+                        <span class="text-xs">⮜</span>
+                        <span>🔄</span>
+                      </div>
+                    {/if}
+                    <span class="w-2.5 h-2.5 rounded-full {watchDirection === 'deobfuscate' ? 'bg-indigo-500 ring-2 ring-indigo-500/40' : 'bg-slate-300 dark:bg-white/10'}"></span>
+                  </div>
+
+                  <div>
+                    {#if toolbarButtonStyle !== 'icons_only'}
+                      <p class="text-xs font-bold leading-tight">Restaurar</p>
+                    {/if}
+                    <p class="text-[10px] font-mono mt-0.5 text-slate-500 dark:text-slate-400">
+                      Seudónimo ➔ Original
+                    </p>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -3327,14 +3435,14 @@
               {/if}
             </div>
 
-            <div class="overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 p-3 space-y-2.5 max-h-64 min-h-[160px]">
+            <div class="overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 p-3 space-y-2.5 max-h-64 min-h-[160px] smooth-scroll-tokens">
               {#each clipboardEvents as ev (ev.id)}
                 <div class="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm space-y-2">
                   <div class="flex items-center justify-between text-xs">
                     <div class="flex items-center gap-2 font-mono">
                       <span class="text-slate-400 text-[11px]">{ev.timestamp}</span>
                       <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {ev.direction === 'obfuscate' ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'}">
-                        {ev.direction === 'obfuscate' ? 'Ofuscación' : 'Desofuscación'}
+                        {ev.direction === 'obfuscate' ? 'Protección' : 'Restauración'}
                       </span>
                     </div>
                     <span class="text-[11px] font-medium text-slate-500">{ev.tokens.length} entidades reconocidas</span>
@@ -3426,14 +3534,6 @@
               </h2>
               <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Personaliza la ergonomía de la interfaz, comportamiento del portapapeles y persistencia.</p>
             </div>
-
-            <button
-              on:click={() => openHelp('config')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-              title="Ver guía de configuración"
-            >
-              <span>❔</span> Ayuda
-            </button>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3675,6 +3775,23 @@
                   </select>
                 </div>
 
+                <div>
+                  <label for="config-toolbar-style-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Estilo de botones en barras de herramientas:</label>
+                  <select
+                    id="config-toolbar-style-select"
+                    bind:value={toolbarButtonStyle}
+                    on:change={() => localStorage.setItem("toolbar_button_style", toolbarButtonStyle)}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                  >
+                    <option value="both">1. ✨ Icono y texto (Completo)</option>
+                    <option value="icons_only">2. 🎨 Solo icono (Minimalista)</option>
+                    <option value="text_only">3. 📝 Solo texto (Clásico)</option>
+                  </select>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    Controla si los botones de toda la aplicación muestran iconos y texto, exclusivamente el icono, o únicamente su etiqueta de texto.
+                  </p>
+                </div>
+
                 <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs space-y-2">
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" bind:checked={appConfig.gui.privacy_blur} class="rounded accent-primary-500" />
@@ -3708,6 +3825,51 @@
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                   Al activarse, LexiShield descarga de la memoria RAM la contraseña y los mapeos si no se detecta actividad del usuario.
                 </p>
+              </div>
+            </div>
+
+            <!-- Diagnóstico y Depuración (Exclusivo en Opciones) -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4 md:col-span-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Diagnóstico y Depuración</span>
+              
+              <div class="flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div class="space-y-1 max-w-xl">
+                  <p class="font-medium text-slate-800 dark:text-slate-200">
+                    Captura y registro de trazas operativas internas
+                  </p>
+                  <p class="text-slate-500 dark:text-slate-400 text-[11px]">
+                    Permite registrar eventos detallados en memoria para depuración de reglas y resolución de incidencias sin exponer iconos en la cabecera principal.
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    on:click={async () => {
+                      try {
+                        debugMode = await invokeTauri("set_debug_mode_command", { enabled: !debugMode });
+                        statusMessage = debugMode ? "Modo depuración activado." : "Modo depuración desactivado.";
+                        if (debugMode) fetchDebugLogs();
+                      } catch (e) {
+                        statusMessage = "Error al cambiar depuración: " + e;
+                      }
+                    }}
+                    class="px-3 py-1.5 rounded-xl border text-xs font-semibold transition flex items-center gap-1.5 {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/10'}"
+                  >
+                    {#if toolbarButtonStyle !== 'text_only'}<span>{debugMode ? '🐞' : '⚙️'}</span>{/if}
+                    {#if toolbarButtonStyle !== 'icons_only'}<span>{debugMode ? 'Depuración: ACTIVA' : 'Depuración: INACTIVA'}</span>{/if}
+                  </button>
+
+                  <button
+                    type="button"
+                    on:click={openLogsModal}
+                    class="px-3 py-1.5 rounded-xl border text-xs font-semibold bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/10 transition flex items-center gap-1.5"
+                    title="Abrir visor de trazas y eventos registrados"
+                  >
+                    {#if toolbarButtonStyle !== 'text_only'}<span>📋</span>{/if}
+                    {#if toolbarButtonStyle !== 'icons_only'}<span>Ver Registro de Logs</span>{/if}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -3787,10 +3949,12 @@
         </div>
       {/if}
 
-      <!-- Modo de Privacidad -->
-      <div class="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Modo de privacidad visual (desenfoque)">
-        <span>{privacyBlur ? '🕶️ Protegido' : '👁️ Normal'}</span>
-      </div>
+      <!-- Modo de Privacidad (Exclusivo en vistas con tokens: Studio, Pares, Portapapeles) -->
+      {#if activeTab === 'studio' || activeTab === 'pairs' || activeTab === 'watch'}
+        <div class="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Modo de privacidad visual (desenfoque)">
+          <span>{privacyBlur ? '🕶️ Protegido' : '👁️ Normal'}</span>
+        </div>
+      {/if}
 
       <!-- Codificación y Versión -->
       <div class="px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5 text-slate-500 dark:text-slate-400">
@@ -3927,7 +4091,7 @@
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
         <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <span>➕</span> Añadir Par de Ofuscación
+          <span>➕</span> Añadir Par de Sustitución
         </h3>
         
         <form on:submit|preventDefault={handleAddPairSubmit} class="space-y-3 text-xs">
@@ -3943,7 +4107,7 @@
           </div>
 
           <div>
-            <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Seudónimo Ofuscado (o '=' para omitir):</label>
+            <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Seudónimo Protegido (o '=' para omitir):</label>
             <input
               id="add-pair-pseudo-input"
               type="text"
@@ -4187,7 +4351,7 @@
           </div>
         </div>
 
-        <div class="flex-1 p-3 overflow-auto bg-slate-950 font-mono text-[11px] text-slate-300 space-y-1 select-text">
+        <div class="flex-1 p-3 overflow-auto bg-slate-950 font-mono text-[11px] text-slate-300 space-y-1 select-text smooth-scroll-tokens">
           {#each debugLogs.filter(l => (logFilterLevel === 'all' || l.level.toLowerCase() === logFilterLevel) && (!logSearch || l.message.toLowerCase().includes(logSearch.toLowerCase()))) as log}
             <div class="flex items-start gap-2 leading-relaxed hover:bg-white/5 p-0.5 rounded">
               <span class="text-slate-500 shrink-0">{log.timestamp}</span>
@@ -4290,7 +4454,7 @@
         </div>
 
         <!-- Contenido Específico del Tema -->
-        <div class="flex-1 p-6 overflow-auto text-xs text-slate-700 dark:text-slate-300 space-y-4 select-text leading-relaxed">
+        <div class="flex-1 p-6 overflow-auto text-xs text-slate-700 dark:text-slate-300 space-y-4 select-text leading-relaxed smooth-scroll-tokens">
           {#if activeHelpTab === "studio"}
             <div class="space-y-3">
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -4780,7 +4944,7 @@
         </div>
 
         <!-- Lista de tarjetas de historial -->
-        <div class="flex-1 overflow-auto p-4 space-y-3">
+        <div class="flex-1 overflow-auto p-4 space-y-3 smooth-scroll-tokens">
           {#if sessionHistory.length === 0}
             <div class="p-10 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-center space-y-2">
               <div class="text-3xl mb-2">📭</div>
@@ -4863,6 +5027,37 @@
           </button>
         </div>
       </div>
+    </div>
+  {/if}
+
+  <!-- TOAST FLOTANTE GLOBAL DE CAPTURA DEL PORTAPAPELES (ESQUINA SUPERIOR DERECHA) -->
+  {#if clipboardToast}
+    <div
+      in:slide={{ duration: 180 }}
+      out:fade={{ duration: 150 }}
+      class="fixed top-16 right-5 z-50 max-w-sm w-full p-3.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border {clipboardToast.isDeobfuscate ? 'border-primary-500/40 shadow-primary-500/10' : 'border-indigo-500/40 shadow-indigo-500/10'} shadow-2xl flex items-center justify-between gap-3 text-xs"
+    >
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-xl {clipboardToast.isDeobfuscate ? 'bg-primary-500/15 text-primary-500' : 'bg-indigo-500/15 text-indigo-500'} flex items-center justify-center text-lg shrink-0">
+          {clipboardToast.isDeobfuscate ? '🔄' : '⚡'}
+        </div>
+        <div class="min-w-0">
+          <p class="font-bold text-slate-900 dark:text-white truncate">
+            {clipboardToast.isDeobfuscate ? 'Portapapeles Restaurado' : 'Portapapeles Protegido'}
+          </p>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+            {clipboardToast.message}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        on:click={() => (clipboardToast = null)}
+        class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg text-xs"
+        title="Cerrar notificación"
+      >
+        ✕
+      </button>
     </div>
   {/if}
 
