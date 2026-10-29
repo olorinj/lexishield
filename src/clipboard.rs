@@ -13,29 +13,165 @@ use std::time::Duration;
 
 /// Obtiene el texto actual del portapapeles del sistema.
 pub fn get_clipboard_text() -> Result<String, String> {
-    let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {e}"))?;
-    clipboard
-        .get_text()
-        .map_err(|e| format!("Error al leer texto del portapapeles: {e}"))
+    let err = match Clipboard::new() {
+        Ok(mut clipboard) => match clipboard.get_text() {
+            Ok(text) => return Ok(text),
+            Err(e) => format!("Error al leer texto del portapapeles: {e}"),
+        },
+        Err(e) => format!("Error al inicializar el portapapeles: {e}"),
+    };
+
+    #[cfg(target_os = "linux")]
+    {
+        get_clipboard_text_linux_fallback(&err)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Err(err)
+    }
 }
 
 /// Escribe texto en el portapapeles del sistema.
 pub fn set_clipboard_text(text: &str) -> Result<(), String> {
-    let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {e}"))?;
-    clipboard
-        .set_text(text.to_string())
-        .map_err(|e| format!("Error al escribir texto en el portapapeles: {e}"))
+    let err = match Clipboard::new() {
+        Ok(mut clipboard) => match clipboard.set_text(text.to_string()) {
+            Ok(()) => return Ok(()),
+            Err(e) => format!("Error al escribir texto en el portapapeles: {e}"),
+        },
+        Err(e) => format!("Error al inicializar el portapapeles: {e}"),
+    };
+
+    #[cfg(target_os = "linux")]
+    {
+        set_clipboard_text_linux_fallback(text, &err)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Err(err)
+    }
 }
 
 /// Vacía de forma explícita el contenido del portapapeles del sistema.
 pub fn clear_clipboard() -> Result<(), String> {
-    let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Error al inicializar el portapapeles: {e}"))?;
-    clipboard
-        .set_text(String::new())
-        .map_err(|e| format!("Error al vaciar texto del portapapeles: {e}"))
+    set_clipboard_text("")
+}
+
+#[cfg(target_os = "linux")]
+fn get_clipboard_text_linux_fallback(arboard_err: &str) -> Result<String, String> {
+    // 1. Wayland: wl-paste (herramienta estándar para entornos Wayland)
+    if let Ok(output) = std::process::Command::new("wl-paste")
+        .arg("--no-newline")
+        .output()
+        && output.status.success()
+    {
+        return String::from_utf8(output.stdout)
+            .map_err(|e| format!("Error de codificación UTF-8 en wl-paste: {e}"));
+    }
+
+    // 2. KDE Klipper vía D-Bus (qdbus6 o qdbus)
+    for qdbus_bin in &["qdbus6", "qdbus"] {
+        if let Ok(output) = std::process::Command::new(qdbus_bin)
+            .args(["org.kde.klipper", "/klipper", "getClipboardContents"])
+            .output()
+            && output.status.success()
+        {
+            let text = String::from_utf8_lossy(&output.stdout)
+                .trim_end_matches('\n')
+                .to_string();
+            return Ok(text);
+        }
+    }
+
+    // 3. X11: xclip
+    if let Ok(output) = std::process::Command::new("xclip")
+        .args(["-selection", "clipboard", "-o"])
+        .output()
+        && output.status.success()
+    {
+        return String::from_utf8(output.stdout)
+            .map_err(|e| format!("Error de codificación UTF-8 en xclip: {e}"));
+    }
+
+    // 4. X11: xsel
+    if let Ok(output) = std::process::Command::new("xsel")
+        .args(["-b", "-o"])
+        .output()
+        && output.status.success()
+    {
+        return String::from_utf8(output.stdout)
+            .map_err(|e| format!("Error de codificación UTF-8 en xsel: {e}"));
+    }
+
+    Err(format!(
+        "No se pudo acceder al portapapeles en Linux ({arboard_err}). En Wayland instala 'wl-clipboard' (sudo apt install wl-clipboard) o activa Klipper; en X11 instala 'xclip'."
+    ))
+}
+
+#[cfg(target_os = "linux")]
+fn set_clipboard_text_linux_fallback(text: &str, arboard_err: &str) -> Result<(), String> {
+    use std::io::Write;
+
+    // 1. Wayland: wl-copy
+    if let Ok(mut child) = std::process::Command::new("wl-copy")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        if let Ok(status) = child.wait()
+            && status.success()
+        {
+            return Ok(());
+        }
+    }
+
+    // 2. KDE Klipper vía D-Bus (qdbus6 o qdbus)
+    for qdbus_bin in &["qdbus6", "qdbus"] {
+        if let Ok(status) = std::process::Command::new(qdbus_bin)
+            .args(["org.kde.klipper", "/klipper", "setClipboardContents", text])
+            .status()
+            && status.success()
+        {
+            return Ok(());
+        }
+    }
+
+    // 3. X11: xclip
+    if let Ok(mut child) = std::process::Command::new("xclip")
+        .args(["-selection", "clipboard"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        if let Ok(status) = child.wait()
+            && status.success()
+        {
+            return Ok(());
+        }
+    }
+
+    // 4. X11: xsel
+    if let Ok(mut child) = std::process::Command::new("xsel")
+        .args(["-b", "-i"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        if let Ok(status) = child.wait()
+            && status.success()
+        {
+            return Ok(());
+        }
+    }
+
+    Err(format!(
+        "No se pudo escribir en el portapapeles en Linux ({arboard_err}). En Wayland instala 'wl-clipboard' (sudo apt install wl-clipboard); en X11 instala 'xclip'."
+    ))
 }
 
 /// Dirección de monitorización para el comando watch.
@@ -80,13 +216,25 @@ pub fn watch_clipboard_loop(
 
     let mut last_seen = get_clipboard_text().unwrap_or_default();
 
-    let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Error al inicializar acceso a portapapeles: {e}"))?;
+    let mut clipboard = match Clipboard::new() {
+        Ok(cb) => Some(cb),
+        Err(e) => {
+            log::warn!(
+                "No se pudo inicializar arboard directamente ({e}); usando respaldo del sistema."
+            );
+            None
+        }
+    };
 
     while running.load(Ordering::SeqCst) {
         thread::sleep(Duration::from_millis(250));
 
-        if let Ok(current_text) = clipboard.get_text() {
+        let read_result = match &mut clipboard {
+            Some(cb) => cb.get_text().or_else(|_| get_clipboard_text()),
+            None => get_clipboard_text(),
+        };
+
+        if let Ok(current_text) = read_result {
             let trimmed = current_text.trim();
             if !trimmed.is_empty() && current_text != last_seen {
                 match direction {
@@ -103,7 +251,12 @@ pub fn watch_clipboard_loop(
                                     report.replacements_applied
                                 );
                                 last_seen.clone_from(&obfuscated);
-                                let _ = clipboard.set_text(obfuscated);
+                                let _ = match &mut clipboard {
+                                    Some(cb) => cb
+                                        .set_text(obfuscated.clone())
+                                        .or_else(|_| set_clipboard_text(&obfuscated)),
+                                    None => set_clipboard_text(&obfuscated),
+                                };
 
                                 if let Some(map_path) = mappings_file {
                                     let current_maps = engine.manager.get_mappings();
@@ -128,7 +281,12 @@ pub fn watch_clipboard_loop(
                                     report.replacements_applied
                                 );
                                 last_seen.clone_from(&deobfuscated);
-                                let _ = clipboard.set_text(deobfuscated);
+                                let _ = match &mut clipboard {
+                                    Some(cb) => cb
+                                        .set_text(deobfuscated.clone())
+                                        .or_else(|_| set_clipboard_text(&deobfuscated)),
+                                    None => set_clipboard_text(&deobfuscated),
+                                };
                             }
                         }
                     }

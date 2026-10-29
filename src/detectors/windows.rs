@@ -1,6 +1,7 @@
 //! Detectores específicos para identificadores de Windows (SIDs, Logon IDs, Hex IDs).
 
 use crate::models::DetectorType;
+use crate::stopwords::is_protected_sid;
 use rand::Rng;
 use regex::Regex;
 use std::sync::LazyLock;
@@ -29,6 +30,7 @@ impl WindowsSidDetector {
     pub fn find_matches<'a>(&self, text: &'a str) -> Vec<(usize, usize, &'a str)> {
         SID_REGEX
             .find_iter(text)
+            .filter(|m| !is_protected_sid(m.as_str()))
             .map(|m| (m.start(), m.end(), m.as_str()))
             .collect()
     }

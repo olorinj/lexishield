@@ -21,8 +21,21 @@ fn main() {
         res.set("OriginalFilename", "lexishield.exe");
         res.set("LegalCopyright", "Copyright (C) 2026");
         res.set("CompanyName", "Julio C. Semper");
-        res.set("FileVersion", "2.0.0.0");
-        res.set("ProductVersion", "2.0.0.0");
+        let pkg_version =
+            std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "2.0.0".to_string());
+        let mut ver_parts: Vec<&str> = pkg_version
+            .split('-')
+            .next()
+            .unwrap_or("2.0.0")
+            .split('.')
+            .collect();
+        while ver_parts.len() < 4 {
+            ver_parts.push("0");
+        }
+        let win_ver = ver_parts[..4].join(".");
+
+        res.set("FileVersion", &win_ver);
+        res.set("ProductVersion", &pkg_version);
 
         if target.contains("gnu") && !cfg!(target_os = "windows") {
             res.set_windres_path("x86_64-w64-mingw32-windres");

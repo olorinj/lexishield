@@ -17,7 +17,7 @@ static CREDIT_CARD_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static PHONE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:(?:\+|00)34[\s.-]?|\b)[6789]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}\b")
+    Regex::new(r"(?:(?:\+|00)34[\s.-]?|\b)(?:[89]\d[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}|[6789]\d{2}[\s.-]?(?:\d{3}[\s.-]?\d{3}|\d{2}[\s.-]?\d{2}[\s.-]?\d{2})|[6789]\d{8})\b")
         .expect("Regex Phone inválida")
 });
 
@@ -595,6 +595,28 @@ mod tests {
         // Falso positivo adjunto a palabra
         let matches_attached = detector.find_matches("identificador+34694185579");
         assert_eq!(matches_attached.len(), 0);
+
+        // Formatos estándar españoles: 2-3-2-2 (ej. Madrid 91) y 3-2-2-2 (ej. móvil)
+        let sample =
+            "Hola goterón y user_j ¿Cómo vais? 91 555 55 55 http://service-fae35c24.example.com";
+        let matches_user = detector.find_matches(sample);
+        assert_eq!(matches_user.len(), 1);
+        assert_eq!(matches_user[0].2, "91 555 55 55");
+
+        let pseudo_user = detector.generate_pseudonym("91 555 55 55");
+        assert_eq!(pseudo_user.len(), "91 555 55 55".len());
+        let parts: Vec<&str> = pseudo_user.split_whitespace().collect();
+        assert_eq!(parts.len(), 4);
+        assert_eq!(parts[0].len(), 2);
+        assert_eq!(parts[1].len(), 3);
+        assert_eq!(parts[2].len(), 2);
+        assert_eq!(parts[3].len(), 2);
+
+        // Móvil 3-2-2-2
+        let matches_mobile = detector.find_matches("Móvil: 612 34 56 78 y fijo 91-555-55-55");
+        assert_eq!(matches_mobile.len(), 2);
+        assert_eq!(matches_mobile[0].2, "612 34 56 78");
+        assert_eq!(matches_mobile[1].2, "91-555-55-55");
     }
 
     #[test]

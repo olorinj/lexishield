@@ -105,6 +105,7 @@ ignored_extensions = [
 [gui]
 default_tab = "studio"
 show_cli_dock = true
+show_token_badges = true # Mostrar insignias y badges coloreados en tokens por defecto
 
 [gui.tabs]
 show_studio = true
@@ -362,6 +363,7 @@ impl Default for GuiClipboardConfig {
 
 /// Configuración de la interfaz gráfica y ergonomía de usuario.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct GuiConfig {
     #[serde(default = "default_default_tab")]
     pub default_tab: String,
@@ -371,10 +373,81 @@ pub struct GuiConfig {
     pub tabs: GuiTabsConfig,
     #[serde(default)]
     pub clipboard: GuiClipboardConfig,
+    #[serde(default = "default_file_selection_mode")]
+    pub file_selection_mode: String,
+    #[serde(default = "default_true")]
+    pub close_to_tray: bool,
+    #[serde(default = "default_close_action")]
+    pub close_action: String,
+    #[serde(default = "default_output_suffix")]
+    pub output_suffix: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: String,
+    #[serde(default)]
+    pub privacy_blur: bool,
+    #[serde(default = "default_true")]
+    pub show_token_badges: bool,
+    #[serde(default)]
+    pub auto_lock_minutes: u32,
+    #[serde(default = "default_theme")]
+    pub theme: String,
+    #[serde(default = "default_accent_color")]
+    pub accent_color: String,
 }
 
 fn default_default_tab() -> String {
     "studio".to_string()
+}
+
+fn default_file_selection_mode() -> String {
+    "ambos".to_string()
+}
+
+fn default_close_action() -> String {
+    "tray".to_string()
+}
+
+fn default_output_suffix() -> String {
+    ".protegido".to_string()
+}
+
+fn default_font_size() -> String {
+    "medium".to_string()
+}
+
+fn default_theme() -> String {
+    "system".to_string()
+}
+
+fn default_accent_color() -> String {
+    "cyan".to_string()
+}
+
+impl GuiConfig {
+    /// Devuelve el modo de selección asegurando que al menos una opción esté siempre activa ("ambos", "arrastrar" o "botones").
+    pub fn validated_file_selection_mode(&self) -> &str {
+        match self.file_selection_mode.as_str() {
+            "arrastrar" => "arrastrar",
+            "botones" => "botones",
+            _ => "ambos",
+        }
+    }
+
+    /// Resuelve la acción al pulsar [X] ("tray", "taskbar" o "close"), manteniendo compatibilidad con configuraciones previas basadas en `close_to_tray`.
+    pub fn resolved_close_action(&self) -> &str {
+        match self.close_action.as_str() {
+            "taskbar" => "taskbar",
+            "close" => "close",
+            "tray" => "tray",
+            _ => {
+                if self.close_to_tray {
+                    "tray"
+                } else {
+                    "close"
+                }
+            }
+        }
+    }
 }
 
 impl Default for GuiConfig {
@@ -384,6 +457,16 @@ impl Default for GuiConfig {
             show_cli_dock: true,
             tabs: GuiTabsConfig::default(),
             clipboard: GuiClipboardConfig::default(),
+            file_selection_mode: default_file_selection_mode(),
+            close_to_tray: true,
+            close_action: default_close_action(),
+            output_suffix: default_output_suffix(),
+            font_size: default_font_size(),
+            privacy_blur: false,
+            show_token_badges: true,
+            auto_lock_minutes: 0,
+            theme: default_theme(),
+            accent_color: default_accent_color(),
         }
     }
 }

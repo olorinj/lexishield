@@ -2,55 +2,43 @@
 
 Este documento explica cómo configurar el entorno de desarrollo y compilar LexiShield para múltiples plataformas.
 
-## 🛠️ Desarrollo Remoto y Compilación Cruzada Multiplataforma
+## 🛠️ Compilación y Empaquetado Oficial (`dev-forge`)
 
-Dada la exigencia de generar binarios nativos sin alertar a los EDR (antivirus) y la necesidad de compilación cruzada hacia Windows y macOS desde entornos aislados, **el único método oficial de compilación es mediante Vagrant**.
+LexiShield delega todo su ciclo de compilación, construcción nativa y empaquetado multiplataforma a la herramienta universal **[`dev-forge`](../../dev-forge)**.
 
-Se ha integrado un sistema de compilación automatizado y aislado que arranca una máquina virtual de Ubuntu, monta un disco ultrarrápido y realiza la generación de los tres binarios (`.exe` de Windows con metadatos incrustados, Linux ELF y macOS Mach-O). 
+Todas las compilaciones (tanto locales como aisladas en máquinas virtuales para evadir alertas de antivirus/EDRs) se gestionan a través de `dev-forge` desde la raíz del proyecto:
 
-Para compilar el proyecto en todos los sistemas operativos simultáneamente de forma segura, solo tienes que ejecutar:
-
-**En Linux / macOS:**
+### 1. Compilación Rápida en el Sistema Actual (Modo Nativo)
+Para compilar los binarios de la CLI directamente con el toolchain de Rust del anfitrión:
 ```bash
-./compilar.sh --all
+dev-forge build --native
 ```
 
-**En Windows:**
-```powershell
-.\compilar.ps1 -All
+### 2. Compilación Multiplataforma Aislada (Linux, Windows y macOS)
+Para compilar de forma aislada y reproducible para todas las plataformas soportadas sin ensuciar el sistema anfitrión:
+```bash
+dev-forge build --all
 ```
 
-### Opciones de los Scripts de Compilación
+### 3. Compilación por Plataforma Específica
+```bash
+# Compilar únicamente para Linux (x86_64)
+dev-forge build --linux
 
-Los scripts (`compilar.sh` y `compilar.ps1`) aceptan los siguientes argumentos para personalizar qué y cómo se compila en Vagrant:
+# Compilar para Windows (x86_64 con MSVC en entorno aislado)
+dev-forge build --windows
 
-| Opción Linux | Opción Windows | Descripción |
-| :--- | :--- | :--- |
-| `-i`, `--menu` | `-Interactive`, `-menu` | **Abre el menú interactivo guiado** para seleccionar fácilmente el escenario deseado (también se abre por defecto al ejecutar sin argumentos). |
-| `-l`, `--linux` | `-Linux` | Compila solo para Linux (x86_64). |
-| `-w`, `--windows` | `-Windows` | Compila para Windows (x86_64). |
-| `-m`, `--mac` | `-Mac` | Compila para macOS (x86_64 y ARM64 con Docker). |
-| `-g`, `--gui` | `-Gui` | Compila la interfaz gráfica (GUI) con Tauri y el frontend web. |
-| `-a`, `--all` | `-All` | Realiza una compilación completa (todas las plataformas). |
-| `-u`, `--provision` | `-Update` | **Fuerza la actualización de dependencias y aprovisionamiento en Vagrant.** |
-| `-c`, `--clean` | `-Clean` | Realiza una limpieza de compilaciones anteriores (`cargo clean`). |
-| `-k`, `--keep-vm` | `-KeepVm` | Mantiene las máquinas virtuales encendidas tras compilar para ahorrar tiempo en ejecuciones sucesivas. |
-| `--native` | `-Native` | Ejecuta la compilación de forma nativa en el sistema anfitrión actual (sin usar Vagrant). |
-
-### 💡 Ergonomía de Terminal: Starship Prompt y Vagrantfile
-
-Si utilizas [Starship](https://starship.rs/) como prompt en tu terminal, por defecto intentará consultar la versión de Vagrant cada vez que entres al directorio del repositorio o ejecutes un comando debido a la presencia del `Vagrantfile`. Dado que el arranque de Vagrant (basado en Ruby y carga de plugins) toma entre 1.5 y 2 segundos y supera el límite de espera predeterminado de Starship (500 ms), se producirán advertencias de tiempo de espera:
-```text
-[WARN] - (starship::utils): Executing command "/usr/bin/vagrant" timed out.
+# Compilar para macOS (Intel x86_64 y Apple Silicon ARM64 con Docker/osxcross)
+dev-forge build --mac
 ```
 
-Para evitar este retraso y mantener la terminal ágil e instantánea, se desactiva el módulo de Vagrant en la configuración de usuario (`~/.config/starship.toml`):
-
-```toml
-# ~/.config/starship.toml
-[vagrant]
-disabled = true
+### 4. Compilación de la Interfaz Gráfica (Desktop Tauri GUI)
+Para compilar la aplicación de escritorio nativa (.deb, .rpm, .msi, etc.):
+```bash
+dev-forge build --gui
 ```
+
+Los artefactos finales compilados se depositan automáticamente en la carpeta `dist/` en la raíz del proyecto.
 
 ## 🧪 Flujo de Calidad Obligatorio (Quality Gate)
 
@@ -124,12 +112,12 @@ Una vez tu código esté en GitHub, generar instaladores para tus usuarios es ta
 
 **En Linux / macOS:**
 ```bash
-./publicar_version.sh v2.0.0
+./publicar_version.sh v2.1.0
 ```
 
 **En Windows (PowerShell):**
 ```powershell
-.\publicar_version.ps1 v2.0.0
+.\publicar_version.ps1 v2.1.0
 ```
 
-Estos scripts se asegurarán de que tu código esté limpio, crearán una etiqueta git (`v2.0.0`) y la subirán. Inmediatamente después, los servidores de GitHub Actions arrancarán y compilarán los instaladores gráficos para todos los sistemas operativos, depositándolos en la pestaña "Releases" (Lanzamientos) de tu repositorio.
+Estos scripts se asegurarán de que tu código esté limpio, crearán una etiqueta git (`v2.1.0`) y la subirán. Inmediatamente después, los servidores de GitHub Actions arrancarán y compilarán los instaladores gráficos para todos los sistemas operativos, depositándolos en la pestaña "Releases" (Lanzamientos) de tu repositorio.

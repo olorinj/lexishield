@@ -42,31 +42,41 @@ impl SyntaxValidator {
         original: &str,
         obfuscated: &str,
     ) -> Result<ValidationReport, ObfuscationError> {
-        let orig_val: Value = match serde_json::from_str(original) {
-            Ok(v) => v,
-            Err(_) => {
-                // Si el original no era JSON válido, no validamos claves
-                return Ok(ValidationReport {
-                    syntax_valid: true,
-                    schema_keys_intact: true,
-                    original_keys_count: 0,
-                    obfuscated_keys_count: 0,
-                    issues: Vec::new(),
-                });
-            }
-        };
+        let orig_stream =
+            crate::format_adapters::json_adapter::JsonAdapter::parse_json_stream(original);
+        if orig_stream.is_empty() {
+            // Si el original no era JSON válido, no validamos claves
+            return Ok(ValidationReport {
+                syntax_valid: true,
+                schema_keys_intact: true,
+                original_keys_count: 0,
+                obfuscated_keys_count: 0,
+                issues: Vec::new(),
+            });
+        }
 
-        let obf_val: Value = serde_json::from_str(obfuscated).map_err(|e| {
-            ObfuscationError::ValidationError(format!(
-                "El JSON ofuscado quedó sintácticamente inválido: {e}"
-            ))
-        })?;
+        let obf_stream =
+            crate::format_adapters::json_adapter::JsonAdapter::parse_json_stream(obfuscated);
+        if obf_stream.len() != orig_stream.len() {
+            return Err(ObfuscationError::ValidationError(format!(
+                "El flujo JSON ofuscado contiene {} elementos pero el original contenía {}",
+                obf_stream.len(),
+                orig_stream.len()
+            )));
+        }
 
         let mut orig_keys = HashSet::new();
         let mut obf_keys = HashSet::new();
 
-        Self::collect_json_keys(&orig_val, "", &mut orig_keys);
-        Self::collect_json_keys(&obf_val, "", &mut obf_keys);
+        for (idx, (orig_val, obf_val)) in orig_stream.iter().zip(obf_stream.iter()).enumerate() {
+            let prefix = if orig_stream.len() > 1 {
+                format!("[{idx}]")
+            } else {
+                String::new()
+            };
+            Self::collect_json_keys(orig_val, &prefix, &mut orig_keys);
+            Self::collect_json_keys(obf_val, &prefix, &mut obf_keys);
+        }
 
         let mut issues = Vec::new();
         let schema_intact = orig_keys == obf_keys;

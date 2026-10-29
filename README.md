@@ -1,6 +1,6 @@
 # LexiShield - Motor de ofuscación semántica para consultas de IA y gestión de mapeos
 
-## 📖 Una historia técnica: Aria, los modelos de IA y el escudo de privacidad
+## Una historia técnica: Aria, los modelos de IA y el escudo de privacidad
 
 En la era dorada de los Modelos de Inteligencia Artificial (LLMs), **Aria** trabajaba como analista de sistemas y desarrolladora en una gran corporación de telecomunicaciones. Su día a día consistía en resolver complejos errores en los servidores de la empresa. Para acelerar su trabajo, Aria utilizaba asistentes de IA, pasándoles volcados de bases de datos, fragmentos de código, archivos de configuración de Active Directory y archivos de log gigantescos para que la IA le explicara los fallos y sugiriera parches.
 
@@ -22,35 +22,35 @@ Aria integró LexiShield como su puente local y seguro hacia la Inteligencia Art
 
 ---
 
-## 🚀 Descripción General
+## Descripción general
 
 **LexiShield** es una herramienta de consola ultrarrápida desarrollada en **Rust** (con binarios independientes libres de dependencias) diseñada para la ofuscación y desofuscación semántica de datos sensibles en archivos de texto estructurado y no estructurado. Su objetivo primordial es actuar como pasarela de anonimización local y segura para compartir contextos con servicios externos sin riesgo de fugas de información.
 
 El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendimiento y un bajo consumo de memoria gracias a las características intrínsecas de Rust.
 
-### ✨ Características Principales
+### Características principales
 * **Paralelización Multihilo Extrema:** Aprovecha todos los núcleos de tu CPU usando `rayon` para escanear directorios enteros en tiempo récord.
 * **Telemetría y Observabilidad Estructurada:** Ejecución silenciosa por defecto y modo de depuración detallada (`-v`) integrado para diagnósticos completos.
 * **Robusto (Fuzz-Tested):** Motor de parsing blindado y tolerante a fallos, verificado bajo escenarios de estrés (Fuzzing).
 * **Motor Híbrido (Formatos y Reglas Custom):** Soporta XML, JSON, texto plano y permite inyectar reglas regex propias vía configuración TOML.
 
-### Flujo de Operación (Arquitectura)
+### Flujo de operación (arquitectura)
 
 ```mermaid
 flowchart TD
     subgraph Local["Entorno Local (Seguro)"]
-        A[Datos Sensibles Originales\nLogs / JSON / XML] -->|lexishield obfuscate| B(LexiShield Engine)
-        B -->|Genera| C[Texto Ofuscado]
-        B -->|Guarda| D[(Diccionario de Mapeos JSON)]
+        A[Datos Sensibles Originales\nLogs / JSON / XML] -->|lexishield protect / obfuscate| B(LexiShield Engine)
+        B -->|Genera| C[Texto Protegido con Tokens]
+        B -->|Guarda| D[(Bóveda de Mapeos .lexi)]
     end
 
     subgraph Nube["Servicios de IA (Inseguro)"]
-        C -->|Petición| E(Chatgpt / Claude / etc.)
-        E -->|Respuesta| F[Solución Ofuscada]
+        C -->|Petición| E(ChatGPT / Claude / Gemini)
+        E -->|Respuesta| F[Solución con Seudónimos]
     end
     
     subgraph Restauración["Entorno Local (Seguro)"]
-        F -->|lexishield deobfuscate| G(LexiShield Engine)
+        F -->|lexishield restore / deobfuscate| G(LexiShield Engine)
         D -.->|Lee mapeos| G
         G --> H[Respuesta Final con\nDatos Reales Restaurados]
     end
@@ -58,19 +58,19 @@ flowchart TD
 
 ---
 
-## 🖥️ Interfaz Gráfica de Usuario (LexiShield GUI)
+## Interfaz gráfica de usuario (LexiShield GUI)
 
 Además de la potente herramienta de consola, LexiShield incluye una aplicación de escritorio nativa multiplataforma (Linux, Windows, macOS) desarrollada con **Tauri v2**, **Svelte 4** y **TailwindCSS**, diseñada para proporcionar la máxima ergonomía, velocidad visual y seguridad local.
 
-### Flujo de Interacción en la GUI
+### Flujo de interacción en la GUI
 
 ```mermaid
 flowchart LR
     subgraph Usuario["Flujo de Trabajo del Usuario"]
-        U1["Pega texto o abre archivo confidencial"] --> S["✨ Studio"]
-        S -->|Ofuscar| O["Texto Sanitizado con Tokens"]
+        U1["Pega texto o abre archivo confidencial"] --> S["✨ Transformación"]
+        S -->|Proteger| O["Texto Sanitizado con Tokens"]
         O -->|Copiar| AI["🤖 Modelo de IA\n(ChatGPT, Claude, Gemini)"]
-        AI -->|Respuesta con Tokens| D["📥 Desofuscar"]
+        AI -->|Respuesta con Tokens| D["📥 Restaurar"]
         D --> R["Texto Final con Datos Reales"]
     end
 
@@ -80,47 +80,48 @@ flowchart LR
     end
 ```
 
-### Pestañas y Capacidades Principales
+### Pestañas y capacidades principales
 
-1. **✨ Studio (Protección para IAs y Consultas Externas):**
-   * **Ofuscación Contextual:** Oculta nombres, correos, documentos de identidad (DNI/NIE), tarjetas bancarias, IPs o tokens de acceso sustituyéndolos por seudónimos sintéticos coherentes.
-   * **Selector de Formato Estructurado:** Preserva intacta la sintaxis en archivos `JSON`, `XML`, `Logs`, `Markdown` o `Texto Plano`.
-   * **Exportación a Markdown con Pandoc:** Convierte automáticamente documentos estructurados a Markdown (.md) conservando tablas y jerarquías con el menor consumo de tokens para el modelo de IA.
-   * **Desofuscación Inmediata:** Pega la respuesta devuelta por la IA y pulsa *Desofuscar* para restaurar los valores originales con correspondencia biyectiva 1:1.
+1. **Transformación (Protección Bidireccional y Auditoría Preventiva):**
+   * **Paneles Bidireccionales Editables:** Vistas simétricas de *Texto claro* y *Texto protegido* con detección inteligente de flujo (`Texto claro ➔ Texto protegido` para Proteger y `Texto protegido ➔ Texto claro` para Restaurar datos).
+   * **Puente Direccional Dinámico:** Conmutador central interactivo (`[ 🛡️ Proteger ➔ ]` / `[ ⮜ Restaurar datos 🔄 ]`) entre paneles.
+   * **Sub-vista de Auditoría y Desglose:** Análisis no destructivo de entidades confidenciales agrupadas por categorías semánticas (Red 🌐, Identidad 🪪, Sistemas 🖥️ y Contacto/Claves 💳) con barra de distribución cromática y opción de omitir falsos positivos antes de guardarlos.
+   * **Arrastrar y Soltar (*Drag & Drop*) Dividido:** Arrastra archivos individuales o carpetas sobre la zona izquierda para proteger o sobre la derecha para restaurar datos con la bóveda.
+   * **Modo Markdown con Ofuscación Automática:** Conmutador `[ Editor / Markdown ]` que dispara la protección automática y previsualiza el resultado estructurado.
+   * **Auto-copiado Conmutable:** Conmutador rápido (`📋` / `📄`) para copiar automáticamente el resultado de la transformación al portapapeles.
+   * **Historial de Sesión en Memoria RAM:** Recuperación instantánea de estados anteriores con un solo clic sin persistencia en disco (Zero-Knowledge).
 
-2. **🔍 Escáner (Auditoría Preventiva):**
-   * Análisis pasivo y no destructivo de archivos individuales o árboles de directorios enteros.
-   * Respeta de forma nativa los archivos `.gitignore` y `.lexiignore`, omitiendo automáticamente artefactos pesados (`target`, `node_modules`, `.git`, binarios).
-   * Progreso en vivo con recuento de archivos escaneados y tokens detectados en tiempo real.
-
-3. **📑 Pares de Tokens (Biyectividad 1:1):**
-   * Visualización y administración directa del diccionario activo de correspondencias.
+2. **Pares de Tokens (Biyectividad 1:1 y Privacidad):**
+   * Visualización y administración directa del diccionario activo de correspondencias en la bóveda.
+   * Campo de búsqueda y filtrado interactivo con botón `✕` de vaciado instantáneo.
    * Permite añadir pares manuales personalizados, editar sustituciones y marcar tokens a **Omitir** (`=`) para evitar reemplazos indeseados.
-   * Recuperación instantánea desde la última copia de seguridad automática (`.bak`).
+   * **Modo Privacidad Blindado:** Desenfoque automático de valores confidenciales en la tabla y en el modal de adición para compartir pantalla con total seguridad.
 
-4. **🗄️ Bóvedas Lexi y Copias Bzip2:**
+3. **Bóvedas Lexi y Copias de Seguridad:**
    * Creación, renombramiento, exportación e importación de contenedores criptográficos aislados (`.lexi`).
-   * Generación de copias de seguridad completas de perfil comprimidas con **Bzip2** y opcionalmente cifradas con AES-256.
+   * Generación y restauración de copias de seguridad de perfil completas (**Backup LexiShield** y **Restaurar LexiShield**) comprimidas con **Bzip2** y opcionalmente cifradas con AES-256.
    * **Arquitectura Zero-Knowledge:** Las bóvedas se protegen con contraseña maestra; la clave se deriva mediante **Argon2id** en memoria de sesión y los datos se sellan con **ChaCha20-Poly1305**.
 
-5. **📋 Portapapeles (Watch Mode):**
-   * Monitorización continua en segundo plano del portapapeles (`Ctrl+C` / `Cmd+C`).
-   * Ofuscación o desofuscación automática al vuelo con vista previa instantánea del texto capturado frente al transformado.
-   * Notificación explícita de *"0 tokens reconocidos"* cuando el texto no contiene secretos.
+4. **Portapapeles (Watch Mode Multiplataforma):**
+   * Monitorización continua en segundo plano del portapapeles (`Ctrl+C` / `Cmd+C`) activable con un clic (`Monitorizar` / `Detener`).
+   * **Compatibilidad Total en Linux:** Cadena de respaldo híbrida automática con soporte nativo para Wayland (`wl-paste`/`wl-copy`), KDE Plasma (Klipper vía D-Bus) y X11 (`xclip`/`xsel`).
+   * Diagnóstico activo en interfaz y notificaciones explícitas de estado ante errores de conexión.
    * Vaciado seguro del portapapeles manual o temporizado para máxima higiene en el sistema operativo.
 
-6. **⚙️ Configuración y 🐞 Logs:**
+5. **Configuración y Logs:**
+   * **Perfiles de Sensibilidad Persistentes:** Selección de perfiles de detección (*Completo*, *DevOps & Red*, *RGPD & Identidad*) con guardado automático entre sesiones.
+   * **Atajos de Teclado Centralizados:** Acceso inmediato a la guía de atajos de teclado (`⌨️`) desde el modal de Ayuda (`?`) o desde cualquier vista.
    * Selección de pestaña predeterminada al arrancar, personalización de pestañas visibles en la barra superior y barra CLI docking en vivo.
    * Consola de telemetría y diagnóstico en vivo con niveles de filtrado (`INFO`, `WARN`, `ERROR`, `DEBUG`).
 
-### Ergonomía Visual y Accesibilidad
+### Ergonomía visual y accesibilidad
 * **Modo Claro / Modo Oscuro:** Conmutador de tema con paleta de alto contraste acorde a los más exigentes estándares de diseño de interfaces.
 * **Ayuda Contextual Integrada (`❔ Ayuda`):** Manual navegable disponible en cualquier momento desde todas las pestañas.
 * **Tarjetas de Onboarding:** Consejos de primer uso guiados y descartables de forma permanente.
 
 ---
 
-## 💻 Interfaz de línea de comandos (CLI)
+## Interfaz de línea de comandos (la CLI)
 
 El binario `lexishield` proporciona una interfaz por consola directa y eficiente. A diferencia de versiones anteriores, esta versión en Rust centraliza las operaciones en tres comandos principales.
 
@@ -134,8 +135,8 @@ lexishield [GLOBAL_OPTIONS] <COMMAND> [OPTIONS]
 #  --config <PATH>  Ruta a un archivo TOML de configuración personalizado
 ```
 
-### 1. Comando: `obfuscate`
-Ofusca un archivo, texto directo o el portapapeles.
+### 1. Comando: `protect` (o `obfuscate`)
+Protege u ofusca un archivo, texto directo o el portapapeles reemplazando los datos confidenciales por seudónimos.
 
 * **`-i, --input <FILE>`**: Archivo de entrada a procesar.
 * **`-o, --output <FILE>`**: Archivo de salida donde guardar el resultado.
@@ -148,20 +149,20 @@ Ofusca un archivo, texto directo o el portapapeles.
 
 *Ejemplos:*
 ```bash
-# Ofuscar archivo y guardar mapeos cifrados con contraseña
-lexishield obfuscate -i server_logs.json -o logs_seguros.json -s mapeos.lexi -p "MiContraseña123!"
+# Proteger archivo y guardar mapeos cifrados con contraseña
+lexishield protect -i server_logs.json -o logs_seguros.json -s mapeos.lexi -p "MiContraseña123!"
 
-# Ofuscar directamente lo que tienes copiado en el portapapeles (One-Shot)
-lexishield obfuscate -c
+# Proteger directamente lo que tienes copiado en el portapapeles (One-Shot)
+lexishield protect -c
 ```
 
-### 2. Comando: `deobfuscate`
-Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado).
+### 2. Comando: `restore` (o `deobfuscate`)
+Restaura o desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado).
 
-* **`-i, --input <FILE>`**: Archivo de entrada a desofuscar.
+* **`-i, --input <FILE>`**: Archivo de entrada a restaurar.
 * **`-o, --output <FILE>`**: Archivo de salida.
-* **`-t, --text <STRING>`**: Texto directo a desofuscar.
-* **`-c, --clipboard`**: Desofusca el texto copiado en el portapapeles y lo reemplaza con el texto real.
+* **`-t, --text <STRING>`**: Texto directo a restaurar.
+* **`-c, --clipboard`**: Restaura el texto copiado en el portapapeles y lo reemplaza con el texto real.
 * **`-m, --mappings <FILE>`**: Archivo con los mapeos a aplicar (detecta automáticamente si está cifrado o en texto plano).
 * **`-p, --password <PASSWORD>`**: Contraseña de descifrado (si el archivo está protegido).
 * **`--ask-password`**: Pide la contraseña por consola. Si el archivo está cifrado y no pasas contraseña, te la pedirá automáticamente.
@@ -169,7 +170,7 @@ Desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guarda
 
 *Ejemplo:*
 ```bash
-lexishield deobfuscate -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi -p "MiContraseña123!"
+lexishield restore -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi -p "MiContraseña123!"
 ```
 
 ### 3. Comando: `scan`
@@ -199,7 +200,7 @@ lexishield scan -i /var/log/app/ -s mapeos.lexi --ask-password
 lexishield scan -c -s mapeos.json -y
 ```
 
-### 4. Comando: `watch` (Monitorización en Tiempo Real)
+### 4. Comando: `watch` (monitorización en tiempo real)
 Monitoriza continuamente el portapapeles mediante eventos nativos del sistema operativo y supresión de eco. Cada vez que pulses `Ctrl+C` para copiar un texto, LexiShield lo transformará automáticamente.
 
 * **`-d, --direction <DIRECTION>`**: Dirección de transformación: `obfuscate` (por defecto) o `deobfuscate`.
@@ -223,7 +224,7 @@ Gestiona diccionarios de mapeos (soporta tanto JSON plano como bóvedas cifradas
 * **`lexishield dict add -o "usuario.real" -p "user0001" -m mapeos.lexi -p "pwd"`**: Inyecta un par en la bóveda.
 * **`lexishield dict clear -m mapeos.lexi -p "pwd"`**: Vacía el diccionario cifrado.
 
-### 6. Comando: `config` (Configuración y Reglas TOML)
+### 6. Comando: `config` (configuración y reglas TOML)
 Permite inspeccionar, ubicar y restablecer la configuración global del usuario (`~/.lexishield/config.toml`) y el archivo modular de reglas (`~/.lexishield/rules.toml`), donde se pueden definir parámetros de escaneo, exclusiones y **reglas de detección personalizadas** (Custom Regex):
 
 * **`lexishield config show`**: Muestra en consola el contenido del archivo de configuración activo.
@@ -252,7 +253,7 @@ pattern = '(?i)\b(ghp|glpat|npm)_[a-zA-Z0-9]{20,}\b'
 strategy = "mask"
 ```
 
-### 7. Soporte para Tuberías Unix (Pipes & `stdin`)
+### 7. Soporte para tuberías Unix (pipes y `stdin`)
 LexiShield garantiza pureza estricta de CLI (la telemetría se emite exclusivamente por `stderr`), lo que permite encadenar comandos en pipelines de Unix sin corromper la salida:
 
 ```bash
@@ -266,10 +267,10 @@ tail -f /var/log/nginx/access.log | lexishield obfuscate -i -
 echo "Contacto: soporte@empresa.com" | lexishield scan --stdin
 ```
 
-### 8. Filtrado de Archivos y Soporte `.lexiignore`
+### 8. Filtrado de archivos y soporte `.lexiignore`
 Durante escaneos recursivos de directorios (`lexishield scan -i /ruta/`), LexiShield ignora automáticamente archivos binarios (`.pdf`, `.exe`, `.jpg`, `.zip`), metadirectorios (`.git`, `node_modules`, `target`, `dist`) y respeta archivos `.gitignore` y **`.lexiignore`** personalizados dentro de tus carpetas.
 
-### 9. Comando: `completions` (Autocompletado Nativo)
+### 9. Comando: `completions` (autocompletado nativo)
 Genera scripts de autocompletado nativo para la terminal:
 
 ```bash
@@ -288,10 +289,9 @@ lexishield completions fish > ~/.config/fish/completions/lexishield.fish
 
 ---
 
-## 📚 Documentación Técnica para Desarrolladores
+## Documentación técnica para desarrolladores
 
 Si te interesa conocer las entrañas de LexiShield, cómo funciona el motor, o quieres compilar el proyecto tú mismo, hemos separado toda la información técnica en los siguientes documentos:
 
 * **[Arquitectura y Motor de Mapeo (docs/architecture.md)](docs/architecture.md)**: Explicación detallada de los detectores, la inyectividad de los diccionarios, y el tratamiento de JSON/XML.
-* **[Guía de Compilación Multiplataforma (docs/contributing.md)](docs/contributing.md)**: Instrucciones para usar el entorno aislado con Vagrant y compilar los binarios de Windows, Linux y macOS de forma segura evadiendo EDRs.
-* **[Entorno de Integración Continua (docs/gitlab-ci.md)](docs/gitlab-ci.md)**: Documentación sobre cómo usar la VM preconfigurada para ejecutar pipelines automatizados de GitLab CI/CD.
+* **[Guía de Compilación Oficial con DevForge (docs/contributing.md)](docs/contributing.md)**: Instrucciones para compilar en modo nativo o generar binarios multiplataforma aislados (Windows, Linux, macOS) mediante dev-forge.

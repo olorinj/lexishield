@@ -44,13 +44,44 @@ impl ObfuscatorEngine {
     pub fn scan_and_register_mappings_with_cb(
         &mut self,
         content: &str,
-        on_found: Option<&mut dyn FnMut(&Mapping)>,
+        mut on_found: Option<&mut dyn FnMut(&Mapping)>,
     ) -> Result<Vec<Mapping>, ObfuscationError> {
+        let mut contextual_mappings = Vec::new();
+
+        // Si el contenido es JSON válido, extraer primero los mapeos guiados por clave/ruta
+        if crate::format_adapters::json_adapter::JsonAdapter::is_valid_json(content) {
+            let json_stream =
+                crate::format_adapters::json_adapter::JsonAdapter::parse_json_stream(content);
+            for json_val in &json_stream {
+                let extracted = self.format_orchestrator.json.extract_contextual_mappings(
+                    json_val,
+                    &self.detectors.hostname,
+                    &self.detectors.sid,
+                    &self.detectors.domain,
+                );
+                for m in extracted {
+                    if let Some(ref mut cb) = on_found {
+                        cb(&m);
+                    }
+                    contextual_mappings.push(m);
+                }
+            }
+        }
+
+        // Cargar mapeos contextuales en el manager primero para que sirvan de salvaguarda o prioridad
+        let mut newly_added = Vec::new();
+        if !contextual_mappings.is_empty() {
+            newly_added = self.manager.load_mappings(contextual_mappings)?;
+        }
+
         let mut detected = self.detectors.scan_text(
             content,
             &self.config.detector_priority_order,
             self.config.min_token_length(),
-            on_found,
+            match &mut on_found {
+                Some(f) => Some(&mut **f),
+                None => None,
+            },
         );
 
         // Garantizar que ningún seudónimo colisione con mapeos previamente registrados en el manager
@@ -69,7 +100,8 @@ impl ObfuscatorEngine {
             }
         }
 
-        let newly_added = self.manager.load_mappings(detected)?;
+        let more_added = self.manager.load_mappings(detected)?;
+        newly_added.extend(more_added);
         Ok(newly_added)
     }
 
