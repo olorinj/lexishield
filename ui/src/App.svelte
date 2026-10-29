@@ -1299,7 +1299,7 @@
 
         detectedItems = (res.items || []).map(item => ({
           ...item,
-          file: "[Texto del Studio]"
+          file: "[Texto de Transformación]"
         }));
 
         auditSummary = {
@@ -1344,7 +1344,7 @@
 
       detectedItems = (res.items || []).map(item => ({
         ...item,
-        file: "[Texto del Studio]"
+        file: "[Texto de Transformación]"
       }));
 
       auditSummary = {
@@ -1438,7 +1438,7 @@
     selectedScanOriginals = [];
     activeTab = "studio";
     studioSubView = "transform";
-    statusMessage = "📋 Texto transferido al editor de Studio.";
+    statusMessage = "📋 Texto transferido al editor de Transformación.";
   }
 
   async function handleDroppedPath(droppedPath, targetPanel = "deobfuscated") {
@@ -3540,7 +3540,7 @@
                   bind:value={appConfig.gui.default_tab}
                   class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                 >
-                  <option value="studio">✨ Studio</option>
+                  <option value="studio">✨ Transformación</option>
                   <option value="pairs">📑 Pares de Tokens</option>
                   <option value="vaults">🗄️ Bóvedas Lexi</option>
                   <option value="watch">📋 Portapapeles</option>
@@ -3551,7 +3551,7 @@
                 <span class="block font-medium text-slate-600 dark:text-slate-400">Pestañas Visibles en Barra Superior:</span>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_studio} class="rounded accent-primary-500" />
-                  <span>Studio</span>
+                  <span>Transformación</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_pairs} class="rounded accent-primary-500" />
@@ -3614,9 +3614,9 @@
               </div>
             </div>
 
-            <!-- Studio y Perfil de Sensibilidad -->
+            <!-- Transformación y Perfil de Sensibilidad -->
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Studio y Sensibilidad</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Transformación y Sensibilidad</span>
               
               <div>
                 <label for="config-sensitivity-profile-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Perfil de Sensibilidad de Auditoría:</label>
@@ -3634,7 +3634,7 @@
                   <option value="gdpr">🪪 Perfil: RGPD & Identidad (Emails, Nombres, DNI/NIE, Tarjetas)</option>
                 </select>
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
-                  Filtra los tipos de entidades analizadas y mostradas en la auditoría de Studio. La preferencia se guarda automáticamente entre sesiones.
+                  Filtra los tipos de entidades analizadas y mostradas en la auditoría de Transformación. La preferencia se guarda automáticamente entre sesiones.
                 </p>
               </div>
             </div>
@@ -3655,7 +3655,7 @@
                   <option value="botones">🔘 Solo Botones de Selección</option>
                 </select>
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
-                  Configura cómo interactuar con archivos en Studio y Escáner. Exige que al menos una opción permanezca activa en todo momento.
+                  Configura cómo interactuar con archivos en Transformación. Exige que al menos una opción permanezca activa en todo momento.
                 </p>
               </div>
             </div>
@@ -3665,7 +3665,7 @@
               <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Escritorio y Salida de Archivos</span>
               
               <div>
-                <label for="config-output-suffix-input" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sufijo para copias procesadas en Studio:</label>
+                <label for="config-output-suffix-input" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sufijo para copias procesadas en Transformación:</label>
                 <input
                   id="config-output-suffix-input"
                   type="text"
@@ -4399,7 +4399,7 @@
             on:click={() => (activeHelpTab = "studio")}
             class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'studio' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
           >
-            ✨ Studio & Auditoría
+            ✨ Transformación
           </button>
           <button
             on:click={() => (activeHelpTab = "pairs")}
@@ -4452,14 +4452,15 @@
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>✨</span> Cómo proteger texto para usar en Inteligencia Artificial o compartir datos
               </h4>
-              <p>El objetivo principal del Studio es permitirte interactuar de forma segura con modelos de lenguaje (como ChatGPT, Claude, Gemini o IAs locales), o compartir documentos con personas que no deben conocer información confidencial (nombres de clientes, DNI, IBAN, contraseñas, direcciones IP o números de tarjeta).</p>
+              <p>El objetivo principal de la Transformación es permitirte interactuar de forma segura con modelos de lenguaje (como ChatGPT, Claude, Gemini o IAs locales), o compartir documentos con personas que no deben conocer información confidencial (nombres de clientes, DNI, IBAN, contraseñas, direcciones IP o números de tarjeta).</p>
               
               <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
                 <p class="font-bold text-slate-900 dark:text-white">Flujo de Trabajo Recomendado:</p>
                 <ol class="list-decimal list-inside space-y-1.5 pl-1">
-                  <li><strong>Pega o escribe el contenido</strong> en el panel <em>Texto claro</em> (o arrastra y suelta un archivo o carpeta directamente encima).</li>
+                  <li><strong>Pega el contenido</strong> en el panel <em>Texto claro</em> (o arrastra y suelta un archivo o carpeta directamente encima).</li>
                   <li><strong>Detección automática:</strong> El motor identifica automáticamente la estructura sintáctica (JSON, XML, Logs o texto plano) sin que tengas que configurarlo.</li>
-                  <li><strong>Pulsa "Proteger":</strong> LexiShield reemplazará cada dato confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
+                  <li><strong>Pulsa "Proteger":</strong> El botón direccional central reemplazará cada dato confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
+                  <li><strong>Modo Markdown reactivo:</strong> Si pulsas el conmutador <em>"Markdown"</em> en la barra superior, LexiShield ofuscará automáticamente el texto en claro y mostrará la vista previa formateada en ambos paneles.</li>
                   <li><strong>Usa el texto en la IA:</strong> Copia el <em>Texto protegido</em> y envíalo con total tranquilidad a cualquier modelo de IA o tercero.</li>
                   <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en <em>Texto protegido</em> y pulsa <strong>"Restaurar"</strong> para recuperar al 100% los valores reales.</li>
                 </ol>
@@ -4474,7 +4475,7 @@
                 <p class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <span>🔍</span> Desglose y Auditoría de Tokens:
                 </p>
-                <p>Puedes cambiar a la sub-vista <em>"Desglose y Auditoría"</em> o pulsar <em>"Auditar"</em> en cualquier momento. LexiShield analizará tu texto o carpetas completas sin tocarlas, clasificando los tokens por Red, Identidad, Sistemas o Claves, y permitiéndote omitir falsos positivos antes de guardarlos en tu bóveda.</p>
+                <p>Al arrastrar o escanear archivos y carpetas, se abre automáticamente la pantalla de <em>Desglose y Auditoría</em>. LexiShield analiza los elementos clasificando los tokens por Red, Identidad, Sistemas o Claves, y permitiéndote omitir falsos positivos antes de guardarlos en tu bóveda. Al guardar o pulsar <em>"Limpiar Resultados"</em>, regresas automáticamente a Transformación.</p>
               </div>
 
               <div class="p-3 bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-white/5 rounded-xl flex items-center justify-between gap-3">
@@ -4502,8 +4503,9 @@
                 <p><strong>Operaciones Principales:</strong></p>
                 <ul class="list-disc list-inside space-y-1 pl-1">
                   <li><strong>Añadir Par:</strong> Permite precargar asociaciones personalizadas (ej. tu nombre con un seudónimo elegido por ti).</li>
+                  <li><strong>Búsqueda y Limpieza Rápida:</strong> Filtra por original o seudónimo y pulsa el botón <code>✕</code> para vaciar el buscador al instante.</li>
                   <li><strong>Omitir Token:</strong> Si una palabra clave o término técnico no debe sustituirse nunca, selecciónalo y pulsa "Omitir".</li>
-                  <li><strong>Restaurar .bak:</strong> Si cometes un error masivo, puedes recuperar la última copia automática de seguridad de la bóveda con un solo clic.</li>
+                  <li><strong>Copias de Seguridad (.bak):</strong> Las copias automáticas generadas al modificar pares se pueden restaurar de forma individual desde la tabla de Bóvedas.</li>
                 </ul>
               </div>
             </div>
@@ -4511,13 +4513,13 @@
           {:else if activeHelpTab === "vaults"}
             <div class="space-y-3">
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🗄️</span> Gestión de Bóvedas Lexi y Copias Bzip2
+                <span>🗄️</span> Gestión de Bóvedas Lexi y Copias de Seguridad
               </h4>
               <p>Las bóvedas (<code class="font-mono">.lexi</code>) son archivos binarios herméticos donde residen tus tokens y correspondencias. Puedes crear múltiples bóvedas para separar tus clientes, proyectos o entornos personales.</p>
               
               <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
-                <p class="font-bold text-slate-900 dark:text-white">Copias de Seguridad Comprimidas con Bzip2:</p>
-                <p>La herramienta de backup empaqueta toda tu carpeta <code class="font-mono">~/.lexishield/</code> (incluyendo reglas TOML personalizadas y todas las bóvedas) en un único archivo comprimido con el estándar Bzip2 y opcionalmente protegido con cifrado AES-256 para almacenamiento seguro fuera de línea.</p>
+                <p class="font-bold text-slate-900 dark:text-white">Backup y Restauración de LexiShield:</p>
+                <p>El botón <strong>"Backup LexiShield"</strong> empaqueta toda tu configuración y bóvedas en un único archivo comprimido con Bzip2 (opcionalmente cifrado con AES-256). Con <strong>"Restaurar LexiShield"</strong> puedes recuperar cualquier copia de seguridad (.tar.bz2 o .lexibak) de forma integral.</p>
               </div>
             </div>
 
@@ -4531,9 +4533,10 @@
               <div class="space-y-2">
                 <p><strong>Características de Ergonomía y Seguridad:</strong></p>
                 <ul class="list-disc list-inside space-y-1 pl-1">
+                  <li><strong>Control en Smartbar Tier 2:</strong> Pulsa <em>"Monitorizar"</em> en la barra superior para activar la escucha y <em>"Detener"</em> para pausarla.</li>
                   <li><strong>Notificación Transparente:</strong> Cuando copias texto sin secretos, se informa claramente de <em>"0 tokens reconocidos"</em> para que sepas que el texto no fue modificado innecesariamente.</li>
                   <li><strong>Vista Previa Inmediata:</strong> El historial muestra en tiempo real tanto el texto capturado como el texto transformado colocado en el portapapeles.</li>
-                  <li><strong>Vaciado Seguro:</strong> Puedes pulsar <em>"Vaciar Portapapeles"</em> o activar en Configuración el borrado automático tras N segundos para que ningún secreto permanezca en la memoria del sistema operativo.</li>
+                  <li><strong>Vaciado Seguro:</strong> Puedes pulsar <em>"Vaciar Portapapeles"</em> en la barra superior o programar auto-vaciado en Configuración tras N segundos.</li>
                 </ul>
               </div>
             </div>
@@ -4543,7 +4546,7 @@
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>⚙️</span> Configuración y Ergonomía
               </h4>
-              <p>LexiShield se adapta a tu flujo de trabajo. Puedes personalizar qué pestañas se muestran en la barra superior si solo usas el Studio o el Escáner, elegir tu pestaña predeterminada al abrir el programa y conmutar la barra de comandos CLI equivalentes en vivo.</p>
+              <p>LexiShield se adapta a tu flujo de trabajo. Puedes personalizar qué pestañas se muestran en la barra superior si solo usas la Transformación o el Escáner, elegir tu pestaña predeterminada al abrir el programa y conmutar la barra de comandos CLI equivalentes en vivo.</p>
               <p class="text-[11px] text-slate-400">Todos los ajustes se guardan siguiendo las mejores prácticas de SO en <code class="font-mono">~/.lexishield/config.toml</code> con capacidad de restablecimiento automático en cualquier momento.</p>
             </div>
 
@@ -4976,7 +4979,7 @@
                     <button
                       on:click={() => restoreHistoryItem(item)}
                       class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold text-xs rounded-xl transition shadow-md shadow-primary-500/20 flex items-center gap-1"
-                      title="Cargar estos textos directamente en los paneles de Studio"
+                      title="Cargar estos textos directamente en los paneles de Transformación"
                     >
                       <span>📥</span> Cargar en Editores
                     </button>

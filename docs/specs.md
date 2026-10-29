@@ -119,7 +119,7 @@ lexishield scan-file auditoria_2026.docx --format table
 ```
 
 ### 4.2 Integración en la Interfaz Gráfica (GUI)
-1. **Zona de Arrastre (*Drag & Drop*)**: El usuario puede arrastrar archivos `.docx`, `.xlsx` o `.pptx` a la pestaña **Studio**.
+1. **Zona de Arrastre (*Drag & Drop*)**: El usuario puede arrastrar archivos `.docx`, `.xlsx` o `.pptx` a la pestaña **Transformación**.
 2. **Visor de Resumen Previo**:
    * Recuento de tablas y párrafos procesados.
    * Lista desglosada de entidades sensibles detectadas con opción de omitir falsos positivos.

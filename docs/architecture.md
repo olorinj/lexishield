@@ -215,7 +215,7 @@ La capa gráfica de LexiShield adopta una arquitectura desacoplada basada en **T
 ```mermaid
 flowchart TD
     subgraph Frontend["Frontend SPA (Svelte 4 + TailwindCSS)"]
-        UI["Vistas (Studio, Scanner, Pairs, Vaults, Watch, Config, Logs)"]
+        UI["Vistas (Transformación, Scanner, Pairs, Vaults, Watch, Config, Logs)"]
         State["Estado Reactivo Local (localStorage, Svelte Stores)"]
         A11y["Componentes Accesibles (Modales, Help Dialogs)"]
     end
