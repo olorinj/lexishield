@@ -1,6 +1,6 @@
 [package]
 name = "lexishield-gui"
-version = "2.0.0"
+version = "2.1.0"
 description = "Interfaz Grafica de Usuario (GUI) de LexiShield"
 authors = ["Julio C. Semper"]
 edition = "2024"
@@ -10,7 +10,7 @@ tauri-build = { version = "2.0", features = [] }
 
 [dependencies]
 lexishield = { path = ".." }
-tauri = { version = "2.0", features = ["image-png"] }
+tauri = { version = "2.0", features = ["image-png", "tray-icon"] }
 tauri-plugin-opener = "2.0"
 tauri-plugin-dialog = "2.0"
 serde = { version = "1.0", features = ["derive"] }

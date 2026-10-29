@@ -38,36 +38,23 @@ impl OfficeAdapter {
     /// Detecta el tipo de documento Office analizando la estructura interna del contenedor ZIP.
     pub fn detect_office_type(bytes: &[u8]) -> OfficeType {
         let cursor = Cursor::new(bytes);
-        let Ok(mut archive) = ZipArchive::new(cursor) else {
+        let Ok(archive) = ZipArchive::new(cursor) else {
             return OfficeType::Unknown;
         };
 
-        let mut has_word = false;
-        let mut has_excel = false;
-        let mut has_ppt = false;
-
-        for i in 0..archive.len() {
-            if let Ok(file) = archive.by_index(i) {
-                let name = file.name();
-                if name.starts_with("word/") || name == "word/document.xml" {
-                    has_word = true;
-                } else if name.starts_with("xl/") || name == "xl/workbook.xml" {
-                    has_excel = true;
-                } else if name.starts_with("ppt/") || name == "ppt/presentation.xml" {
-                    has_ppt = true;
-                }
+        for name in archive.file_names() {
+            if name.starts_with("word/") || name == "word/document.xml" {
+                return OfficeType::Word;
+            }
+            if name.starts_with("xl/") || name == "xl/workbook.xml" {
+                return OfficeType::Excel;
+            }
+            if name.starts_with("ppt/") || name == "ppt/presentation.xml" {
+                return OfficeType::PowerPoint;
             }
         }
 
-        if has_word {
-            OfficeType::Word
-        } else if has_excel {
-            OfficeType::Excel
-        } else if has_ppt {
-            OfficeType::PowerPoint
-        } else {
-            OfficeType::Unknown
-        }
+        OfficeType::Unknown
     }
 
     /// Comprueba si el archivo XML interno contiene texto legible por el usuario que deba ser sanitizado.

@@ -62,11 +62,22 @@ sequenceDiagram
     end
 ```
 
-### 📖 Tratamiento de Caracteres Especiales y Formatos Estructurados (XML/JSON)
+### 📖 Tratamiento de Caracteres Especiales y Formatos Estructurados (XML/JSON/SIEM)
 
-Para que LexiShield funcione correctamente sin importar cómo estén escritos los archivos, la versión de Rust implementa adaptadores de formato (`json_adapter`, `xml_adapter`, `log_adapter`). 
+Para que LexiShield funcione correctamente sin importar cómo estén estructurados los archivos, la versión de Rust implementa adaptadores de formato (`json_adapter`, `xml_adapter`, `log_adapter`, `office_adapter`). 
 
-Cuando se analiza un archivo JSON o XML, el sistema no escanea ciegamente todo el texto rompiendo la estructura de etiquetas. En su lugar, analiza semánticamente los campos de datos y ofusca su contenido preservando estrictamente el esqueleto y la sintaxis del archivo original. Así, puedes subir un JSON ofuscado a una IA y devolverá un JSON completamente válido que luego puedes deserializar en tu código real.
+Cuando se analiza un archivo JSON o XML, el sistema no escanea ciegamente todo el texto rompiendo la estructura de etiquetas. En su lugar, analiza semánticamente los campos de datos y ofusca su contenido preservando estrictamente el esqueleto y la sintaxis del archivo original.
+
+#### Adaptador Jerárquico JSON y Perfil de Eventos de Seguridad (SIEM / Wazuh / Sysmon)
+A partir de la versión **v2.0.1**, `json_adapter.rs` incorpora un analizador por **rutas jerárquicas (JSON Path)** consciente del contexto del evento:
+* **Discriminación de Contexto**: Evalúa si los campos residen en rutas de seguridad (`win`, `eventdata`, `system`, `wazuh`, `agent`, `manager`, `sysmon`, `winlog`).
+* **Protección de Máscaras y Claves Técnicas**: Los valores asociados a claves como `keywords`, `targetLogonId`, `subjectLogonId`, o máscaras hexadecimales (`0x...`) quedan protegidos contra sustituciones accidentales en eventos de seguridad, pero se procesan normalmente si aparecen en JSONs de negocio (evitando falsos negativos).
+* **Mapeo Forzado de Entidades**: Reconoce identidades de infraestructura y Windows (`agent.name`, `manager.name`, `workstationName`, `targetUserName`, `targetDomainName`, `targetUserSid`), categorizándolas de inmediato en el almacén de mapeos.
+* **Ofuscación Total de Active Directory (AD) vs. Proveedores Públicos**:
+  - **Dominios de Active Directory y Redes Privadas**: Todo FQDN o dominio corporativo (`.local`, `.corp`, `.internal`, `.lan`, `.priv`, `.intranet` o dominios privados empresariales como `acme.local`, `miempresa.es`) es **ofuscado al 100%**. En nombres de equipo con dominio (ej: `PC01.corp.acme.local`), se descompone y ofusca tanto el host (`host-anon-xxxx`) como el dominio (`service-yyyy.example.com`), registrando ambos de forma biyectiva. En campos `targetDomainName`, los dominios NetBIOS corporativos (ej. `CORP`) se convierten en `DOMAIN_XXXX`.
+  - **Proveedores de Software Conocidos e Infraestructura Pública**: Dominios públicos de proveedores (`microsoft.com`, `windows.net`, `office.com`, `azure.com`, `google.com`, `amazonaws.com`, `cloudflare.com`, `wazuh.com`, etc.) y autoridades del sistema (`NT AUTHORITY`, `BUILTIN`, `WORKGROUP`) se preservan sin ofuscar (`=`) para no alterar telemetría estándar ni referencias neutras.
+* **Anonimización RFC 5322 (`InternetMessageId`)**: Transforma los identificadores únicos de correo ofuscando completamente los servidores y dominios corporativos (`MSGID_...@[service-xxxxxxxx.example.com]`), preservando únicamente la base de proveedores conocidos (`outlook.com`).
+* **Protección Universal de SIDs**: Los identificadores de seguridad conocidos de Windows (`S-1-0-0`, `S-1-1-0`, `S-1-5-18`, etc.) se excluyen automáticamente de cualquier ofuscación.
 
 ---
 
@@ -204,7 +215,7 @@ La capa gráfica de LexiShield adopta una arquitectura desacoplada basada en **T
 ```mermaid
 flowchart TD
     subgraph Frontend["Frontend SPA (Svelte 4 + TailwindCSS)"]
-        UI["Vistas (Studio, Scanner, Pairs, Vaults, Watch, Config, Logs)"]
+        UI["Vistas (Transformación, Scanner, Pairs, Vaults, Watch, Config, Logs)"]
         State["Estado Reactivo Local (localStorage, Svelte Stores)"]
         A11y["Componentes Accesibles (Modales, Help Dialogs)"]
     end

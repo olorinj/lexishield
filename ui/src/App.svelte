@@ -1,15 +1,19 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { fade, slide } from "svelte/transition";
   import { invoke } from "@tauri-apps/api/core";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
+  import packageInfo from "../package.json";
+
+  const appVersion = packageInfo.version || "2.0.0";
 
   // Control de Tema Claro / Oscuro
   let darkMode = true;
 
   // Control de Pestañas Activas
-  let activeTab = "studio"; // "studio" | "scanner" | "pairs" | "vaults" | "watch" | "config"
+  let activeTab = "studio"; // "studio" | "pairs" | "vaults" | "watch" | "config"
 
   // Configuración de la Aplicación y Ergonomía
   let appConfig = {
@@ -18,7 +22,6 @@
       show_cli_dock: true,
       tabs: {
         show_studio: true,
-        show_scanner: true,
         show_pairs: true,
         show_vaults: true,
         show_watch: true,
@@ -28,12 +31,179 @@
         auto_clear_enabled: false,
         auto_clear_seconds: 5,
       },
+      file_selection_mode: "ambos",
+      close_to_tray: true,
+      close_action: "tray",
+      output_suffix: ".protegido",
+      font_size: "medium",
+      privacy_blur: false,
+      show_token_badges: true,
+      auto_lock_minutes: 0,
+      theme: "system",
+      accent_color: "cyan",
     },
   };
 
+  let inputGutterEl;
+  let outputGutterEl;
+  let copiedOutputFlash = false;
+  let deobfuscateSuccessFlash = false;
+
+  $: fileSelectionMode = appConfig?.gui?.file_selection_mode || "ambos";
+  $: allowDragDrop = fileSelectionMode === "ambos" || fileSelectionMode === "arrastrar";
+  $: showFileButtons = fileSelectionMode === "ambos" || fileSelectionMode === "botones";
+  $: copySuffix = appConfig?.gui?.output_suffix || ".protegido";
+  $: privacyBlur = appConfig?.gui?.privacy_blur || false;
+  $: showTokenBadges = appConfig?.gui?.show_token_badges !== undefined ? appConfig.gui.show_token_badges : true;
+  $: editorFontSizeClass =
+    appConfig?.gui?.font_size === "small"
+      ? "text-[11px]"
+      : appConfig?.gui?.font_size === "large"
+      ? "text-sm"
+      : "text-xs";
+
+  $: inputLinesCount = inputText ? inputText.split("\n").length : 1;
+  $: outputLinesCount = outputText ? outputText.split("\n").length : 1;
+  $: inputCharCount = inputText.length;
+  $: outputCharCount = outputText.length;
+  $: inputSizeKB = (new TextEncoder().encode(inputText).length / 1024).toFixed(1) + " KB";
+  $: outputSizeKB = (new TextEncoder().encode(outputText).length / 1024).toFixed(1) + " KB";
+  $: inputGutterText = Array.from({ length: Math.min(inputLinesCount, 5000) }, (_, i) => i + 1).join("\n");
+  $: outputGutterText = Array.from({ length: Math.min(outputLinesCount, 5000) }, (_, i) => i + 1).join("\n");
+
+  $: detectedInputFormat = (() => {
+    if (selectedFormat && selectedFormat !== "auto") return selectedFormat.toUpperCase();
+    const trimmed = inputText.trim();
+    if (!trimmed) return "AUTO";
+    if (trimmed.startsWith("{") && (trimmed.includes('"wazuh"') || trimmed.includes('"rule"') || trimmed.includes('"agent"'))) return "JSON WAZUH";
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) return "JSON";
+    if (trimmed.startsWith("<") && trimmed.endsWith(">")) return "XML / HTML";
+    if (/^(?:\w{3}\s+\d+|\d{4}-\d{2}-\d{2})/.test(trimmed) || trimmed.includes("INFO") || trimmed.includes("ERROR") || trimmed.includes("WARN")) return "LOG / SYSLOG";
+    return "TEXTO PLANO";
+  })();
+
+  // Acción Svelte para autofoco confiable con reintentos para WebViews
+  function autofocus(node) {
+    const focusAndSelect = () => {
+      try {
+        if (document.activeElement !== node) {
+          node.focus();
+        }
+        if (typeof node.select === "function") {
+          node.select();
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    focusAndSelect();
+    const t1 = setTimeout(focusAndSelect, 50);
+    const t2 = setTimeout(focusAndSelect, 150);
+    const t3 = setTimeout(focusAndSelect, 300);
+
+    return {
+      destroy() {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      },
+    };
+  }
+
+  function getDetectorCategory(detectorType) {
+    const dt = (detectorType || "").toLowerCase();
+    if (dt.includes("ip") || dt.includes("mac") || dt.includes("domain") || dt.includes("url") || dt.includes("host") || dt.includes("red")) {
+      return { name: "Red", icon: "🌐", color: "bg-blue-500", text: "text-blue-500", border: "border-blue-500/30", bgBadge: "bg-blue-500/10" };
+    }
+    if (dt.includes("dni") || dt.includes("nie") || dt.includes("user") || dt.includes("usuario") || dt.includes("nombre") || dt.includes("ident")) {
+      return { name: "Identidad", icon: "🪪", color: "bg-purple-500", text: "text-purple-500", border: "border-purple-500/30", bgBadge: "bg-purple-500/10" };
+    }
+    if (dt.includes("path") || dt.includes("ruta") || dt.includes("file") || dt.includes("sistema") || dt.includes("sys") || dt.includes("process")) {
+      return { name: "Sistemas", icon: "🖥️", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-500/30", bgBadge: "bg-emerald-500/10" };
+    }
+    return { name: "Contacto / Claves", icon: "💳", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-500/30", bgBadge: "bg-amber-500/10" };
+  }
+
+  $: visibleDetectedItems = filterItemsByProfile(detectedItems, activeSensitivityProfile);
+
+  $: categoryStats = (() => {
+    if (!visibleDetectedItems || visibleDetectedItems.length === 0) return null;
+    const counts = { Red: 0, Identidad: 0, Sistemas: 0, "Contacto / Claves": 0 };
+    for (const item of visibleDetectedItems) {
+      const cat = getDetectorCategory(item.detector_type);
+      counts[cat.name] = (counts[cat.name] || 0) + 1;
+    }
+    const total = visibleDetectedItems.length;
+    return {
+      total,
+      red: { count: counts.Red, pct: ((counts.Red / total) * 100).toFixed(1) },
+      identidad: { count: counts.Identidad, pct: ((counts.Identidad / total) * 100).toFixed(1) },
+      sistemas: { count: counts.Sistemas, pct: ((counts.Sistemas / total) * 100).toFixed(1) },
+      claves: { count: counts["Contacto / Claves"], pct: ((counts["Contacto / Claves"] / total) * 100).toFixed(1) },
+    };
+  })();
+
+  async function copyOutputWithFeedback() {
+    if (!outputText) return;
+    try {
+      await navigator.clipboard.writeText(outputText);
+      copiedOutputFlash = true;
+      statusMessage = "📋 Copiado al portapapeles.";
+      setTimeout(() => {
+        copiedOutputFlash = false;
+      }, 2000);
+    } catch (e) {
+      statusMessage = "❌ Error al copiar: " + e;
+    }
+  }
+
+  let copiedInputFlash = false;
+  async function copyInputWithFeedback() {
+    if (!inputText) return;
+    try {
+      await navigator.clipboard.writeText(inputText);
+      copiedInputFlash = true;
+      statusMessage = "📋 Texto restaurado copiado al portapapeles.";
+      setTimeout(() => {
+        copiedInputFlash = false;
+      }, 2000);
+    } catch (e) {
+      statusMessage = "❌ Error al copiar: " + e;
+    }
+  }
+
   // Estado del Studio
+  let studioSubView = "transform"; // "transform" (Editor Bidireccional) | "audit" (Desglose y Auditoría)
   let inputText = "";
   let outputText = "";
+  let isEditingInput = false;
+  let isEditingOutput = false;
+  let inputTextAreaEl = null;
+  let outputTextAreaEl = null;
+
+  async function focusInputEditor() {
+    isEditingInput = true;
+    await tick();
+    if (inputTextAreaEl) {
+      inputTextAreaEl.focus();
+    }
+  }
+
+  async function focusOutputEditor() {
+    isEditingOutput = true;
+    await tick();
+    if (outputTextAreaEl) {
+      outputTextAreaEl.focus();
+    }
+  }
+
+  async function selectMarkdownViewMode() {
+    studioUnifiedViewMode = "markdown";
+    if (inputText.trim()) {
+      await handleObfuscate();
+    }
+  }
   let selectedFormat = "auto";
   let vaultPath = "";
   let password = "";
@@ -41,27 +211,39 @@
   let statusMessage = "Listo. Pega tu texto o selecciona un archivo para procesarlo.";
   let lastReport = null;
   let vaultMappings = [];
+  let studioDirection = "obfuscate"; // "obfuscate" (Texto claro -> Texto protegido) | "deobfuscate" (Texto protegido -> Texto claro)
+  let studioDragTarget = "deobfuscated"; // "deobfuscated" | "obfuscated"
 
-  // Opciones de Ofuscación
-  let copyMode = false;
-  let copySuffix = "_obfuscated";
+  function toggleStudioDirection() {
+    studioDirection = studioDirection === "obfuscate" ? "deobfuscate" : "obfuscate";
+    statusMessage = studioDirection === "obfuscate"
+      ? "Dirección activa: Proteger (Texto claro ➔ Texto protegido)"
+      : "Dirección activa: Restaurar (Texto protegido ➔ Texto claro)";
+  }
+
+  // Opciones de Protección
+  let copyMode = true; // Por defecto guardar en copia sufijada
   let cleanCache = false;
   let hasPandoc = false;
   let exportMarkdown = false;
 
-  // Estado del Escáner
+  // Estado del Escáner y Drag & Drop
   let detectedItems = [];
   let auditSummary = null;
   let recursiveScan = false;
   let noGitIgnoreScan = true;
   let isScanningDirectory = false;
+  let showTextScanPanel = false;
+  let textToAudit = "";
+  let isDragging = false;
+  let unlistenDragDrop = null;
   let scanCurrentFile = "";
   let scanFilesCount = 0;
   let scanFilesIgnored = 0;
   let scanEntitiesCount = 0;
   let scanPollTimer = null;
 
-  // Estado de la Pestaña Pares de Ofuscación
+  // Estado de la Pestaña Pares de Sustitución / Tokens
   let pairsSelectedVault = "";
   let pairSearch = "";
   let pairTypeFilter = "all";
@@ -104,13 +286,48 @@
   let clipboardFlash = false;
   let autoClearTimer = null;
   let clipboardEvents = [];
+  let clipboardError = null;
 
   // Estado de Ayuda Contextual y Onboarding
-  let activeHelpTab = null; // "studio" | "scanner" | "pairs" | "vaults" | "watch" | "config" | "logs" | "password_why"
+  let activeHelpTab = null; // "studio" | "pairs" | "vaults" | "watch" | "config" | "logs" | "password_why"
   let dismissedTips = JSON.parse(localStorage.getItem("dismissed_tips") || "{}");
 
   // Estado de Notificación / Modal de Acción Completada
   let actionResultModal = null; // { title: string, message: string, details?: Array<{label: string, value: string}>, type?: "success" | "info" }
+  let studioDropModal = null; // { path: string, name: string, isDir: boolean, isReverse: boolean, copyMode: boolean, suffix: string, saveSuffixDefault: boolean, cleanCache: boolean, exportMarkdown: boolean }
+
+  // Notificación Toast flotante para acciones de Studio
+  let studioToast = null;
+  let studioToastTimer = null;
+  function showStudioToast(message, type = "success", copied = false) {
+    if (studioToastTimer) clearTimeout(studioToastTimer);
+    studioToast = { message, type, copied };
+    studioToastTimer = setTimeout(() => {
+      studioToast = null;
+      studioToastTimer = null;
+    }, 4000);
+  }
+
+  // Notificación Toast flotante global para interceptación de Portapapeles (Watch)
+  let clipboardToast = null;
+  let clipboardToastTimer = null;
+  function showClipboardToast(message, count = 0, isDeobfuscate = false) {
+    if (clipboardToastTimer) clearTimeout(clipboardToastTimer);
+    clipboardToast = { message, count, isDeobfuscate };
+    clipboardToastTimer = setTimeout(() => {
+      clipboardToast = null;
+      clipboardToastTimer = null;
+    }, 3500);
+  }
+
+  // Mejoras Ergonómicas y Funcionales de Studio (v2.1)
+  let autoCopyToClipboard = true;
+  let sessionHistory = [];
+  let showSessionHistoryModal = false;
+  let activeSensitivityProfile = localStorage.getItem("sensitivity_profile") || "all"; // "all" | "devops" | "gdpr"
+  let showTokenBadges = true;
+  let toolbarButtonStyle = localStorage.getItem("toolbar_button_style") || "both"; // "both" | "icons_only" | "text_only"
+  let studioUnifiedViewMode = "editor"; // "editor" | "markdown"
 
   // Estado de Depuración y Logs
   let debugMode = false;
@@ -134,6 +351,7 @@
       darkMode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     }
     updateThemeClass();
+    applyAccentFromConfig();
 
     // 2. Cargar configuración
     await loadSettings();
@@ -165,16 +383,86 @@
     } catch (err) {
       console.warn("No se pudieron registrar eventos de Tauri:", err);
     }
+
+    // 5. Escucha de eventos Drag & Drop de Tauri para arrastrar ficheros o carpetas
+    try {
+      const webview = getCurrentWebview();
+      unlistenDragDrop = await webview.onDragDropEvent(async (event) => {
+        if (!allowDragDrop) {
+          isDragging = false;
+          return;
+        }
+        if (event.payload.type === "enter" || event.payload.type === "over") {
+          isDragging = true;
+          if (event.payload.position && typeof window !== "undefined") {
+            const clientX = event.payload.position.x / (window.devicePixelRatio || 1);
+            if (activeTab === "studio") {
+              studioDragTarget = clientX < (window.innerWidth / 2) ? "deobfuscated" : "obfuscated";
+            }
+          }
+        } else if (event.payload.type === "leave") {
+          isDragging = false;
+        } else if (event.payload.type === "drop") {
+          isDragging = false;
+          const paths = event.payload.paths;
+          if (paths && paths.length > 0) {
+            let targetPanel = studioDragTarget;
+            if (event.payload.position && typeof window !== "undefined") {
+              const clientX = event.payload.position.x / (window.devicePixelRatio || 1);
+              if (activeTab === "studio") {
+                targetPanel = clientX < (window.innerWidth / 2) ? "deobfuscated" : "obfuscated";
+              }
+            }
+            await handleDroppedPath(paths[0], targetPanel);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn("Listener de Drag & Drop de Tauri no disponible:", err);
+    }
+
     window.addEventListener("keydown", handleKeydown);
+    window.addEventListener("keydown", resetInactivityTimer);
+    window.addEventListener("mousemove", resetInactivityTimer);
+    window.addEventListener("click", resetInactivityTimer);
   });
 
   onDestroy(() => {
     window.removeEventListener("keydown", handleKeydown);
+    window.removeEventListener("keydown", resetInactivityTimer);
+    window.removeEventListener("mousemove", resetInactivityTimer);
+    window.removeEventListener("click", resetInactivityTimer);
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    if (unlistenDragDrop) unlistenDragDrop();
     if (scanPollTimer) clearInterval(scanPollTimer);
     if (watchPollInterval) clearInterval(watchPollInterval);
     if (logPollingInterval) clearInterval(logPollingInterval);
     if (autoClearTimer) clearTimeout(autoClearTimer);
   });
+
+  let inactivityTimer = null;
+
+  function resetInactivityTimer() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    const mins = Number(appConfig?.gui?.auto_lock_minutes) || 0;
+    if (mins > 0 && isVaultUnlocked) {
+      inactivityTimer = setTimeout(lockSessionByInactivity, mins * 60 * 1000);
+    }
+  }
+
+  function lockSessionByInactivity() {
+    password = "";
+    isVaultUnlocked = false;
+    inputText = "";
+    outputText = "";
+    textToAudit = "";
+    detectedItems = [];
+    if (isVaultEncrypted) {
+      unlockTargetVault = vaultPath;
+      showUnlockModal = true;
+    }
+    statusMessage = "🔒 Bóveda y sesión bloqueadas automáticamente por inactividad.";
+  }
 
   function handleKeydown(e) {
     if (e.key === "Escape") {
@@ -182,14 +470,327 @@
         closeHelp();
       } else if (actionResultModal) {
         actionResultModal = null;
+      } else if (studioDropModal) {
+        studioDropModal = null;
+      } else if (showSessionHistoryModal) {
+        showSessionHistoryModal = false;
+      }
+      return;
+    }
+
+    // Atajo: Ctrl+Enter o Cmd+Enter para Proteger o Restaurar en Studio
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      if (activeTab === "studio" && studioSubView === "transform" && !loading) {
+        e.preventDefault();
+        if (studioDirection === "obfuscate") {
+          if (inputText.trim()) handleObfuscate();
+        } else {
+          if (outputText.trim()) handleDeobfuscate();
+        }
+      }
+      return;
+    }
+
+    // Atajo: Ctrl+Shift+C para copiar resultado al portapapeles
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "C" || e.key === "c")) {
+      if (activeTab === "studio") {
+        e.preventDefault();
+        if (studioDirection === "obfuscate") {
+          copyOutputWithFeedback();
+        } else {
+          copyInputWithFeedback();
+        }
+      }
+      return;
+    }
+
+    // Atajo: Ctrl+Shift+X para alternar sentido de transformación (⇄)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "X" || e.key === "x")) {
+      if (activeTab === "studio") {
+        e.preventDefault();
+        toggleStudioDirection();
+      }
+      return;
+    }
+
+    // Atajo: Ctrl+Shift+A para auditar texto actual en Studio
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "A" || e.key === "a")) {
+      if (activeTab === "studio" && !loading) {
+        e.preventDefault();
+        scanCurrentStudioText();
+      }
+      return;
+    }
+
+    // Atajo: Ctrl+Shift+L para limpiar ambos paneles con guardado previo en historial
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "L" || e.key === "l")) {
+      if (activeTab === "studio") {
+        e.preventDefault();
+        if (inputText || outputText) {
+          pushToSessionHistory("clear");
+          inputText = "";
+          outputText = "";
+          statusMessage = "Ambos paneles han sido limpiados (guardado en historial de sesión).";
+        }
+      }
+      return;
+    }
+
+    // Atajo: ? para abrir la ayuda con la pestaña de atajos si no se está escribiendo en un input/textarea
+    if (e.key === "?" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+      e.preventDefault();
+      openHelp("shortcuts");
+    }
+  }
+
+  // Funciones Auxiliares para Mejoras de Studio
+  function formatRelativeTime(dateObj) {
+    if (!dateObj) return "";
+    const seconds = Math.floor((new Date() - dateObj) / 1000);
+    if (seconds < 60) return "hace un momento";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `hace ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    return `hace ${hours} h`;
+  }
+
+  function pushToSessionHistory(actionType, reportData = null) {
+    if (!inputText.trim() && !outputText.trim()) return;
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    sessionHistory = [
+      {
+        id: Date.now(),
+        timestamp: timeStr,
+        dateObj: now,
+        direction: studioDirection,
+        actionType: actionType, // "obfuscate" | "deobfuscate" | "clear"
+        inputText: inputText,
+        outputText: outputText,
+        tokensCount: reportData?.replacements_applied ?? (lastReport?.replacements_applied ?? 0),
+        vaultUsed: vaultPath ? vaultPath.split('/').pop() : "Predeterminada"
+      },
+      ...sessionHistory
+    ].slice(0, 10);
+  }
+
+  function restoreHistoryItem(item) {
+    inputText = item.inputText;
+    outputText = item.outputText;
+    studioDirection = item.direction;
+    studioSubView = "transform";
+    showSessionHistoryModal = false;
+    statusMessage = `⏱️ Sesión recuperada de las ${item.timestamp}`;
+  }
+
+  function filterItemsByProfile(items, profile) {
+    if (!items || items.length === 0) return [];
+    if (profile === "all") return items;
+    if (profile === "devops") {
+      return items.filter(it => {
+        const cat = getDetectorCategory(it.detector_type);
+        return cat.name === "Red" || cat.name === "Sistemas";
+      });
+    }
+    if (profile === "gdpr") {
+      return items.filter(it => {
+        const cat = getDetectorCategory(it.detector_type);
+        return cat.name === "Identidad" || cat.name === "Contacto / Claves";
+      });
+    }
+    return items;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function renderHighlightedTokens(text, isProtected = false, customItems = null) {
+    if (!text) return "";
+
+    if (isProtected) {
+      const searchList = (customItems && customItems.length > 0) ? customItems : vaultMappings;
+      if (!searchList || searchList.length === 0) {
+        return escapeHtml(text);
+      }
+
+      // Filtrar términos no vacíos y deduplicar por seudónimo
+      const terms = [];
+      const seen = new Set();
+      for (const item of searchList) {
+        if (!item.pseudonym || item.pseudonym === "=" || item.pseudonym.trim().length < 2) continue;
+        if (!seen.has(item.pseudonym)) {
+          seen.add(item.pseudonym);
+          terms.push({
+            pseudonym: item.pseudonym,
+            original: item.original,
+            detector_type: item.detector_type
+          });
+        }
+      }
+
+      if (terms.length === 0) {
+        return escapeHtml(text);
+      }
+
+      // Ordenar de mayor a menor longitud para priorizar coincidencias más específicas
+      terms.sort((a, b) => b.pseudonym.length - a.pseudonym.length);
+
+      const pseudoMap = new Map();
+      const escapedTerms = [];
+      for (const t of terms) {
+        pseudoMap.set(t.pseudonym, t);
+        escapedTerms.push(t.pseudonym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      }
+
+      const combinedRegex = new RegExp(`(${escapedTerms.join('|')})`, 'g');
+      let result = "";
+      let lastIdx = 0;
+      let match;
+
+      while ((match = combinedRegex.exec(text)) !== null) {
+        if (match.index > lastIdx) {
+          result += escapeHtml(text.slice(lastIdx, match.index));
+        }
+        const matchedStr = match[0];
+        const itemInfo = pseudoMap.get(matchedStr);
+        const detType = itemInfo?.detector_type || "Token";
+        const cat = getDetectorCategory(detType);
+        const origTooltip = itemInfo?.original ? `Original: ${itemInfo.original} (${cat.name})` : `Token seudonimizado (${cat.name})`;
+        result += `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(origTooltip)}">${escapeHtml(matchedStr)}</mark>`;
+        lastIdx = combinedRegex.lastIndex;
+      }
+
+      if (lastIdx < text.length) {
+        result += escapeHtml(text.slice(lastIdx));
+      }
+
+      return result;
+    }
+
+    // Para texto claro: búsqueda exacta en una sola pasada lineal sobre el string bruto original
+    const knownItems = (customItems && customItems.length > 0) ? customItems : ((detectedItems && detectedItems.length > 0) ? detectedItems : vaultMappings);
+    if (!knownItems || knownItems.length === 0) {
+      return escapeHtml(text);
+    }
+
+    // Filtrar términos no vacíos y deduplicar
+    const terms = [];
+    const seen = new Set();
+    for (const item of knownItems) {
+      if (!item.original || item.original.trim().length < 2) continue;
+      if (!seen.has(item.original)) {
+        seen.add(item.original);
+        terms.push({
+          original: item.original,
+          detector_type: item.detector_type
+        });
       }
     }
+
+    if (terms.length === 0) {
+      return escapeHtml(text);
+    }
+
+    // Ordenar de mayor a menor longitud para priorizar coincidencias más específicas
+    terms.sort((a, b) => b.original.length - a.original.length);
+
+    const termMap = new Map();
+    const escapedTerms = [];
+    for (const t of terms) {
+      termMap.set(t.original, t.detector_type);
+      escapedTerms.push(t.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    }
+
+    const combinedRegex = new RegExp(`(${escapedTerms.join('|')})`, 'g');
+    let result = "";
+    let lastIdx = 0;
+    let match;
+
+    while ((match = combinedRegex.exec(text)) !== null) {
+      if (match.index > lastIdx) {
+        result += escapeHtml(text.slice(lastIdx, match.index));
+      }
+      const matchedStr = match[0];
+      const detType = termMap.get(matchedStr) || "Token";
+      const cat = getDetectorCategory(detType);
+      const title = `Detectado como ${cat.name} (${detType})`;
+      result += `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(title)}">${escapeHtml(matchedStr)}</mark>`;
+      lastIdx = combinedRegex.lastIndex;
+    }
+
+    if (lastIdx < text.length) {
+      result += escapeHtml(text.slice(lastIdx));
+    }
+
+    return result;
+  }
+
+  function renderMarkdownPreview(rawText) {
+    if (!rawText) return "<p class='text-slate-400 italic text-xs'>Sin contenido para previsualizar.</p>";
+    let escaped = rawText
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    escaped = escaped.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+      return `<pre class="my-2.5 p-3 bg-slate-900 dark:bg-slate-950 text-slate-100 rounded-xl font-mono text-xs overflow-x-auto border border-slate-700 dark:border-white/10"><code>${code.trim()}</code></pre>`;
+    });
+
+    escaped = escaped.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-primary-600 dark:text-primary-300 font-mono text-xs">$1</code>');
+    escaped = escaped.replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold text-slate-900 dark:text-white mt-3 mb-1">$1</h3>');
+    escaped = escaped.replace(/^## (.*$)/gim, '<h2 class="text-base font-bold text-slate-900 dark:text-white mt-4 mb-1.5 pb-1 border-b border-slate-200 dark:border-white/10">$1</h2>');
+    escaped = escaped.replace(/^# (.*$)/gim, '<h1 class="text-lg font-extrabold text-slate-900 dark:text-white mt-4 mb-2 pb-1.5 border-b border-slate-300 dark:border-white/15">$1</h1>');
+    escaped = escaped.replace(/^\> (.*$)/gim, '<blockquote class="my-2 pl-3 border-l-4 border-primary-500 text-slate-600 dark:text-slate-300 italic text-xs">$1</blockquote>');
+    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>');
+    escaped = escaped.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
+    escaped = escaped.replace(/^[\*\-] (.*$)/gim, '<li class="ml-4 list-disc text-xs text-slate-700 dark:text-slate-300 my-0.5">$1</li>');
+    escaped = escaped.replace(/\n\n/g, '<br/><br/>').replace(/\n/g, '<br/>');
+
+    escaped = escaped.replace(/&lt;([A-Za-z0-9_]+)&gt;/g, (match, tokenName) => {
+      const cat = getDetectorCategory(tokenName);
+      return `<mark class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs" title="Token protegido &lt;${tokenName}&gt;">&lt;${tokenName}&gt;</mark>`;
+    });
+
+    return escaped;
+  }
+
+  function applyThemeFromConfig() {
+    const t = appConfig?.gui?.theme || "system";
+    if (t === "dark") {
+      darkMode = true;
+    } else if (t === "light") {
+      darkMode = false;
+    } else {
+      darkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    updateThemeClass();
+  }
+
+  function applyAccentFromConfig() {
+    const c = appConfig?.gui?.accent_color || "cyan";
+    document.documentElement.setAttribute("data-accent", c);
   }
 
   function toggleTheme() {
     darkMode = !darkMode;
-    localStorage.setItem("theme", darkMode ? "dark" : "light");
+    appConfig.gui.theme = darkMode ? "dark" : "light";
+    localStorage.setItem("theme", appConfig.gui.theme);
     updateThemeClass();
+    saveSettings();
+  }
+
+  function toggleTokenBadges() {
+    if (!appConfig.gui) appConfig.gui = {};
+    showTokenBadges = !showTokenBadges;
+    appConfig.gui.show_token_badges = showTokenBadges;
+    saveSettings();
   }
 
   function openHelp(tabKey) {
@@ -217,7 +818,32 @@
     try {
       const cfg = await invokeTauri("get_app_settings");
       if (cfg && cfg.gui) {
+        if (!["ambos", "arrastrar", "botones"].includes(cfg.gui.file_selection_mode)) {
+          cfg.gui.file_selection_mode = "ambos";
+        }
+        if (!["tray", "taskbar", "close"].includes(cfg.gui.close_action)) {
+          cfg.gui.close_action = cfg.gui.close_to_tray === false ? "close" : "tray";
+        }
+        cfg.gui.close_to_tray = (cfg.gui.close_action === "tray");
+        if (!cfg.gui.output_suffix) {
+          cfg.gui.output_suffix = ".protegido";
+        }
+        if (!["small", "medium", "large"].includes(cfg.gui.font_size)) {
+          cfg.gui.font_size = "medium";
+        }
+        if (!["system", "dark", "light"].includes(cfg.gui.theme)) {
+          cfg.gui.theme = "system";
+        }
+        if (!["cyan", "emerald", "cobalt", "purple", "amber"].includes(cfg.gui.accent_color)) {
+          cfg.gui.accent_color = "cyan";
+        }
+        if (cfg.gui.show_token_badges === undefined) {
+          cfg.gui.show_token_badges = true;
+        }
+        showTokenBadges = cfg.gui.show_token_badges;
         appConfig = cfg;
+        applyThemeFromConfig();
+        applyAccentFromConfig();
         if (cfg.gui.default_tab && cfg.gui.tabs[`show_${cfg.gui.default_tab}`] !== false) {
           activeTab = cfg.gui.default_tab;
         }
@@ -229,6 +855,21 @@
 
   async function saveSettings() {
     try {
+      if (!["ambos", "arrastrar", "botones"].includes(appConfig?.gui?.file_selection_mode)) {
+        appConfig.gui.file_selection_mode = "ambos";
+      }
+      if (!appConfig?.gui?.output_suffix) {
+        appConfig.gui.output_suffix = ".protegido";
+      }
+      if (!["small", "medium", "large"].includes(appConfig?.gui?.font_size)) {
+        appConfig.gui.font_size = "medium";
+      }
+      if (!["system", "dark", "light"].includes(appConfig?.gui?.theme)) {
+        appConfig.gui.theme = "system";
+      }
+      if (!["cyan", "emerald", "cobalt", "purple", "amber"].includes(appConfig?.gui?.accent_color)) {
+        appConfig.gui.accent_color = "cyan";
+      }
       await invokeTauri("save_app_settings", { config: appConfig });
       statusMessage = "✅ Configuración guardada en ~/.lexishield/config.toml";
     } catch (e) {
@@ -295,6 +936,13 @@
     } catch (err) {
       unlockError = String(err);
       statusMessage = "❌ " + err;
+      setTimeout(() => {
+        const el = document.getElementById("unlock-pwd-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
     }
   }
 
@@ -302,6 +950,13 @@
     const pwd = initVaultPassword.trim();
     if (!pwd) {
       alert("⚠️ Es obligatorio proporcionar una contraseña para inicializar y proteger la bóveda.");
+      setTimeout(() => {
+        const el = document.getElementById("init-vault-pwd");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     try {
@@ -318,12 +973,26 @@
       await checkAndLoadVault(created, pwd);
     } catch (e) {
       alert("Error al inicializar bóveda: " + e);
+      setTimeout(() => {
+        const el = document.getElementById("init-vault-pwd");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
     }
   }
 
   async function handleUnlockVaultSubmit() {
     if (!unlockPassword) {
       unlockError = "Por favor ingrese la contraseña de la bóveda";
+      setTimeout(() => {
+        const el = document.getElementById("unlock-pwd-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     password = unlockPassword;
@@ -355,7 +1024,7 @@
   // Operaciones del Studio
   async function handleObfuscate() {
     if (!inputText.trim()) {
-      statusMessage = "Por favor ingresa texto para ofuscar.";
+      statusMessage = "Por favor ingresa texto en el panel 'Texto claro' para proteger.";
       return;
     }
     loading = true;
@@ -369,78 +1038,90 @@
       outputText = res.obfuscated_text;
       lastReport = res.report;
       vaultMappings = res.mappings || [];
-      statusMessage = `✅ Ofuscación exitosa: ${res.report.replacements_applied} tokens reemplazados en ${res.report.elapsed_ms.toFixed(2)}ms`;
-      actionResultModal = {
-        title: "Ofuscación Finalizada con Éxito",
-        type: "success",
-        message: `El texto ha sido transformado para proteger tus datos confidenciales antes de enviarlo a la IA o compartirlo con terceros.`,
-        details: [
-          { label: "Tokens Reemplazados", value: `${res.report.replacements_applied}` },
-          { label: "Tiempo de Procesamiento", value: `${res.report.elapsed_ms.toFixed(2)} ms` },
-          { label: "Formato Aplicado", value: selectedFormat.toUpperCase() },
-          { label: "Bóveda Destino", value: vaultPath ? vaultPath.split('/').pop() : "Predeterminada" }
-        ]
-      };
+      studioDirection = "obfuscate";
+      statusMessage = `✅ Datos protegidos exitosamente: ${res.report.replacements_applied} tokens seudonimizados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      if (autoCopyToClipboard && res.obfuscated_text) {
+        try {
+          await navigator.clipboard.writeText(res.obfuscated_text);
+          copiedOutputFlash = true;
+          setTimeout(() => {
+            copiedOutputFlash = false;
+          }, 2000);
+          statusMessage = `✅ Datos protegidos y copiados al portapapeles: ${res.report.replacements_applied} tokens en ${res.report.elapsed_ms.toFixed(2)}ms`;
+        } catch (e) {
+          console.warn("Auto-copy error:", e);
+        }
+      }
+      pushToSessionHistory("obfuscate", res.report);
+      const copiedMsg = autoCopyToClipboard && res.obfuscated_text ? " · ¡Copiado al portapapeles! 📋" : "";
+      showStudioToast(`🛡️ ${res.report.replacements_applied} tokens protegidos${copiedMsg}`, "success", !!copiedMsg);
       refreshVaultsList();
     } catch (err) {
-      statusMessage = "Error al ofuscar: " + err;
+      statusMessage = "Error al proteger datos: " + err;
     } finally {
       loading = false;
     }
   }
 
   async function handleDeobfuscate() {
-    if (!inputText.trim()) {
-      statusMessage = "Por favor ingresa texto para desofuscar.";
+    if (!outputText.trim()) {
+      statusMessage = "Por favor ingresa texto en el panel 'Texto protegido' para restaurar.";
       return;
     }
     loading = true;
     try {
       const res = await invokeTauri("deobfuscate_content", {
-        text: inputText,
+        text: outputText,
         formatStr: selectedFormat,
         vaultPath: vaultPath || null,
         password: password || null,
         customMappings: null
       });
-      outputText = res.deobfuscated_text;
+      inputText = res.deobfuscated_text;
       lastReport = res.report;
-      statusMessage = `✅ Desofuscación exitosa: ${res.report.replacements_applied} tokens restaurados en ${res.report.elapsed_ms.toFixed(2)}ms`;
-      actionResultModal = {
-        title: "Desofuscación Finalizada",
-        type: "success",
-        message: "Las respuestas de la IA han sido desofuscadas reconstruyendo los valores originales mediante tu bóveda local.",
-        details: [
-          { label: "Tokens Restaurados", value: `${res.report.replacements_applied}` },
-          { label: "Tiempo de Proceso", value: `${res.report.elapsed_ms.toFixed(2)} ms` }
-        ]
-      };
+      studioDirection = "deobfuscate";
+      deobfuscateSuccessFlash = true;
+      setTimeout(() => {
+        deobfuscateSuccessFlash = false;
+      }, 2000);
+      statusMessage = `✅ Datos restaurados exitosamente: ${res.report.replacements_applied} tokens recuperados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      if (autoCopyToClipboard && res.deobfuscated_text) {
+        try {
+          await navigator.clipboard.writeText(res.deobfuscated_text);
+          copiedInputFlash = true;
+          setTimeout(() => {
+            copiedInputFlash = false;
+          }, 2000);
+          statusMessage = `✅ Datos restaurados y copiados al portapapeles: ${res.report.replacements_applied} tokens en ${res.report.elapsed_ms.toFixed(2)}ms`;
+        } catch (e) {
+          console.warn("Auto-copy error:", e);
+        }
+      }
+      pushToSessionHistory("deobfuscate", res.report);
+      const copiedMsg = autoCopyToClipboard && res.deobfuscated_text ? " · ¡Copiado al portapapeles! 📋" : "";
+      showStudioToast(`🔄 ${res.report.replacements_applied} tokens restaurados${copiedMsg}`, "success", !!copiedMsg);
     } catch (err) {
-      statusMessage = "Error al desofuscar: " + err;
+      statusMessage = "Error al restaurar datos: " + err;
     } finally {
       loading = false;
     }
   }
 
-  async function openFileToProcess() {
+  async function processFilePathInStudio(selected, reverse = false, customOptions = null) {
+    if (!selected) return;
     try {
-      const selected = await open({
-        filters: [
-          { name: "Documentos y Logs", extensions: ["txt", "log", "json", "xml", "csv", "tsv", "docx", "xlsx", "pptx", "md", "markdown"] },
-          { name: "Todos los archivos", extensions: ["*"] }
-        ],
-        multiple: false
-      });
-      if (!selected) return;
-
       loading = true;
+      const useCopy = customOptions ? customOptions.copyMode : copyMode;
+      const activeSuffix = customOptions?.suffix || (reverse ? ".restaurado" : copySuffix);
+      const useMd = customOptions ? (hasPandoc && customOptions.exportMarkdown) : (hasPandoc && exportMarkdown);
+
       let outPath = selected;
-      if (copyMode) {
+      if (useCopy) {
         const dotIdx = selected.lastIndexOf(".");
         if (dotIdx !== -1) {
-          outPath = selected.substring(0, dotIdx) + copySuffix + selected.substring(dotIdx);
+          outPath = selected.substring(0, dotIdx) + activeSuffix + selected.substring(dotIdx);
         } else {
-          outPath = selected + copySuffix;
+          outPath = selected + activeSuffix;
         }
       }
 
@@ -450,45 +1131,62 @@
         formatStr: selectedFormat,
         vaultPath: vaultPath || null,
         password: password || null,
-        reverse: false,
-        exportMd: hasPandoc && exportMarkdown
+        reverse: reverse,
+        exportMd: useMd
       });
       lastReport = rep;
-      statusMessage = `✅ Archivo procesado (${rep.replacements_applied} tokens reemplazados). Guardado en: ${outPath}`;
+      const actionName = reverse ? "restaurado" : "protegido";
+      statusMessage = `✅ Archivo ${actionName} (${rep.replacements_applied} tokens procesados). Guardado en: ${outPath}`;
       actionResultModal = {
-        title: "Archivo Ofuscado con Éxito",
+        title: reverse ? "Archivo Restaurado con Éxito" : "Archivo Protegido con Éxito",
         type: "success",
-        message: `El archivo ha sido procesado y guardado con los tokens confidenciales protegidos.`,
+        message: reverse
+          ? `El archivo ha sido restaurado reconstruyendo los datos originales mediante tu bóveda local.`
+          : `El archivo ha sido procesado y guardado con los tokens confidenciales protegidos.`,
         details: [
-          { label: "Archivo Origen", value: selected.split('/').pop() },
-          { label: "Archivo Guardado", value: outPath.split('/').pop() },
-          { label: "Tokens Reemplazados", value: `${rep.replacements_applied}` },
+          { label: "Archivo Origen", value: selected.split(/[/\\]/).pop() },
+          { label: "Archivo Guardado", value: outPath.split(/[/\\]/).pop() },
+          { label: reverse ? "Tokens Restaurados" : "Tokens Seudonimizados", value: `${rep.replacements_applied}` },
           { label: "Tiempo", value: `${rep.elapsed_ms.toFixed(2)} ms` },
-          { label: "Exportado a Markdown", value: (hasPandoc && exportMarkdown) ? "Sí (.md)" : "No" }
+          { label: "Exportado a Markdown", value: useMd ? "Sí (.md)" : "No" }
         ]
       };
       refreshVaultsList();
     } catch (err) {
-      statusMessage = "Error al procesar archivo: " + err;
+      statusMessage = `Error al ${reverse ? "restaurar" : "proteger"} archivo: ` + err;
     } finally {
       loading = false;
     }
   }
 
-  // Operaciones del Escáner
-  async function openFileToAudit() {
+  async function openFileToProcess(reverse = false) {
     try {
       const selected = await open({
-        filters: [{ name: "Archivos de texto y logs", extensions: ["*"] }],
+        filters: [
+          { name: "Documentos y Logs", extensions: ["txt", "log", "json", "xml", "csv", "tsv", "docx", "xlsx", "pptx", "md", "markdown"] },
+          { name: "Todos los archivos", extensions: ["*"] }
+        ],
         multiple: false
       });
-      if (!selected) return;
+      if (selected) {
+        await processFilePathInStudio(selected, reverse);
+      }
+    } catch (err) {
+      statusMessage = "Error al abrir archivo: " + err;
+    }
+  }
+
+  // Operaciones del Escáner y Drag & Drop
+  async function auditFilePath(filePath) {
+    if (!filePath) return;
+    try {
       loading = true;
       detectedItems = [];
       auditSummary = null;
-      activeTab = "scanner";
+      activeTab = "studio";
+      studioSubView = "audit";
       const res = await invokeTauri("scan_file_command", {
-        path: selected,
+        path: filePath,
         vaultPath: pairsSelectedVault || vaultPath || null,
         password: password || null
       });
@@ -500,7 +1198,7 @@
         type: "info",
         message: `El análisis del archivo ha finalizado satisfactoriamente sin modificar su contenido original.`,
         details: [
-          { label: "Archivo Inspeccionado", value: selected.split('/').pop() },
+          { label: "Archivo Inspeccionado", value: filePath.split('/').pop() },
           { label: "Tokens Confidenciales", value: `${res.total_entities}` },
           { label: "Falsos Positivos Omitidos", value: `${(res.items || []).filter(i => i.omitted).length}` }
         ]
@@ -512,33 +1210,42 @@
     }
   }
 
-  async function openDirectoryToAudit() {
+  async function openFileToAudit() {
     try {
       const selected = await open({
-        directory: true,
+        filters: [{ name: "Archivos de texto y logs", extensions: ["*"] }],
         multiple: false
       });
-      if (!selected) return;
+      if (selected) {
+        await auditFilePath(selected);
+      }
+    } catch (err) {
+      statusMessage = "Error al abrir archivo: " + err;
+    }
+  }
 
+  async function auditDirectoryPath(dirPath) {
+    if (!dirPath) return;
+    try {
       loading = true;
       isScanningDirectory = true;
       detectedItems = [];
       auditSummary = null;
-      activeTab = "scanner";
+      activeTab = "studio";
+      studioSubView = "audit";
       scanCurrentFile = "Iniciando recorrido...";
       scanFilesCount = 0;
       scanFilesIgnored = 0;
       scanEntitiesCount = 0;
-      statusMessage = "Escaneando carpeta: " + selected;
+      statusMessage = "Escaneando carpeta: " + dirPath;
 
       const res = await invokeTauri("scan_directory_command", {
-        dirPath: selected,
+        dirPath,
         recursive: recursiveScan,
         noGitIgnore: noGitIgnoreScan,
         vaultPath: pairsSelectedVault || vaultPath || null,
         password: password || null
       });
-      // detectedItems ya se va llenando dinámicamente con los eventos 'scan-progress'
       auditSummary = res;
       statusMessage = `🔍 Directorio escaneado: ${res.files_scanned} analizados, ${res.files_ignored} omitidos, ${res.total_entities} tokens detectados.`;
       actionResultModal = {
@@ -546,7 +1253,7 @@
         type: "info",
         message: `El recorrido del directorio ha concluido con éxito. Puedes revisar o activar tokens en la tabla inferior.`,
         details: [
-          { label: "Directorio", value: selected.split('/').pop() },
+          { label: "Directorio", value: dirPath.split('/').pop() },
           { label: "Archivos Analizados", value: `${res.files_scanned}` },
           { label: "Archivos Omitidos", value: `${res.files_ignored}` },
           { label: "Tokens Confidenciales", value: `${res.total_entities}` }
@@ -558,6 +1265,257 @@
       loading = false;
       isScanningDirectory = false;
     }
+  }
+
+  async function openDirectoryToAudit() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false
+      });
+      if (selected) {
+        await auditDirectoryPath(selected);
+      }
+    } catch (err) {
+      statusMessage = "Error al abrir carpeta: " + err;
+    }
+  }
+
+  async function handleClearTextPaste() {
+    studioDirection = "obfuscate";
+    setTimeout(async () => {
+      const textToScan = inputText.trim();
+      if (!textToScan) return;
+      try {
+        loading = true;
+        detectedItems = [];
+        auditSummary = null;
+
+        const res = await invokeTauri("scan_content", {
+          content: textToScan,
+          vaultPath: pairsSelectedVault || vaultPath || null,
+          password: password || null
+        });
+
+        detectedItems = (res.items || []).map(item => ({
+          ...item,
+          file: "[Texto de Transformación]"
+        }));
+
+        auditSummary = {
+          files_scanned: 1,
+          files_ignored: 0,
+          total_entities: res.total_entities,
+          vault_used: pairsSelectedVault || "Sesión"
+        };
+
+        if (res.total_entities > 0) {
+          studioSubView = "audit";
+          showTextScanPanel = false; // Plegar automáticamente para dar máximo espacio vertical a la tabla
+          statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados. Revisa la tabla para proteger u omitir.`;
+        } else {
+          statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el texto pegado.";
+        }
+      } catch (err) {
+        statusMessage = "Error al auditar texto: " + err;
+      } finally {
+        loading = false;
+      }
+    }, 50);
+  }
+
+  async function scanCurrentStudioText() {
+    const textToScan = inputText.trim() || outputText.trim() || textToAudit.trim();
+    if (!textToScan) {
+      statusMessage = "Por favor ingresa o pega texto en los paneles para auditar.";
+      return;
+    }
+    try {
+      loading = true;
+      detectedItems = [];
+      auditSummary = null;
+      studioSubView = "audit";
+
+      const res = await invokeTauri("scan_content", {
+        content: textToScan,
+        vaultPath: pairsSelectedVault || vaultPath || null,
+        password: password || null
+      });
+
+      detectedItems = (res.items || []).map(item => ({
+        ...item,
+        file: "[Texto de Transformación]"
+      }));
+
+      auditSummary = {
+        files_scanned: 1,
+        files_ignored: 0,
+        total_entities: res.total_entities,
+        vault_used: pairsSelectedVault || "Sesión"
+      };
+
+      if (res.total_entities === 0) {
+        statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el texto.";
+      } else {
+        showTextScanPanel = false; // Plegar panel para maximizar espacio de tabla
+        statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados y clasificados en la tabla.`;
+      }
+    } catch (err) {
+      statusMessage = "Error al analizar texto: " + err;
+      actionResultModal = {
+        title: "Error al Analizar Texto",
+        type: "info",
+        message: `No se pudo analizar el texto proporcionado: ${err}`,
+        details: []
+      };
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function scanPastedText() {
+    if (!textToAudit.trim()) return;
+    try {
+      loading = true;
+      detectedItems = [];
+      auditSummary = null;
+      activeTab = "studio";
+      studioSubView = "audit";
+
+      const res = await invokeTauri("scan_content", {
+        content: textToAudit,
+        vaultPath: pairsSelectedVault || vaultPath || null,
+        password: password || null
+      });
+
+      detectedItems = (res.items || []).map(item => ({
+        ...item,
+        file: "[Texto copiado]"
+      }));
+
+      auditSummary = {
+        files_scanned: 1,
+        files_ignored: 0,
+        total_entities: res.total_entities,
+        vault_used: pairsSelectedVault || "Sesión"
+      };
+
+      if (res.total_entities === 0) {
+        statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el fragmento.";
+        showTextScanPanel = true;
+      } else {
+        statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados y listados abajo.`;
+        showTextScanPanel = false;
+      }
+    } catch (err) {
+      statusMessage = "Error al analizar texto: " + err;
+      actionResultModal = {
+        title: "Error al Analizar Texto",
+        type: "info",
+        message: `No se pudo analizar el texto proporcionado: ${err}`,
+        details: []
+      };
+    } finally {
+      loading = false;
+    }
+  }
+
+  function clearScanResults() {
+    detectedItems = [];
+    auditSummary = null;
+    selectedScanOriginals = [];
+    textToAudit = "";
+    studioSubView = "transform";
+    statusMessage = "Auditoría reiniciada. Regresando a Transformación.";
+  }
+
+  function sendPastedTextToStudio() {
+    if (!textToAudit.trim()) return;
+    inputText = textToAudit;
+    textToAudit = "";
+    detectedItems = [];
+    auditSummary = null;
+    selectedScanOriginals = [];
+    activeTab = "studio";
+    studioSubView = "transform";
+    statusMessage = "📋 Texto transferido al editor de Transformación.";
+  }
+
+  async function handleDroppedPath(droppedPath, targetPanel = "deobfuscated") {
+    if (!droppedPath) return;
+    try {
+      const isDir = await invokeTauri("is_directory", { path: droppedPath });
+      const itemName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
+      const isReverse = (targetPanel === "obfuscated");
+      const defaultSuffix = isReverse ? ".restaurado" : copySuffix;
+      studioDropModal = {
+        path: droppedPath,
+        name: itemName,
+        isDir: isDir,
+        isReverse: isReverse,
+        copyMode: true,
+        suffix: defaultSuffix,
+        saveSuffixDefault: false,
+        cleanCache: true,
+        exportMarkdown: hasPandoc && exportMarkdown
+      };
+    } catch (err) {
+      statusMessage = "Error al procesar elemento arrastrado: " + err;
+    }
+  }
+
+  function computeOutputPreview(modal) {
+    if (!modal) return "";
+    if (modal.isDir) {
+      if (!modal.copyMode) return `${modal.name} (Directorio original in-situ)`;
+      return `${modal.name}${modal.suffix || ''}/ (Copias dentro de la carpeta)`;
+    }
+    if (!modal.copyMode) return `${modal.name} (Sobrescribir archivo original)`;
+    const sfx = modal.suffix || "";
+    const dotIdx = modal.name.lastIndexOf(".");
+    if (dotIdx !== -1) {
+      return modal.name.substring(0, dotIdx) + sfx + modal.name.substring(dotIdx);
+    }
+    return modal.name + sfx;
+  }
+
+  async function confirmStudioDropModal() {
+    if (!studioDropModal) return;
+    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd } = studioDropModal;
+    studioDropModal = null;
+
+    try {
+      if (saveSuffixDefault && suffix) {
+        copySuffix = suffix;
+        if (appConfig?.gui) {
+          appConfig.gui.output_suffix = suffix;
+          await saveSettings();
+        }
+      }
+
+      if (isDir) {
+        if (cleanCache) {
+          await invokeTauri("clear_scan_cache_command");
+          statusMessage = "🧹 Cachés de sesión limpiadas antes de analizar el directorio.";
+        }
+        activeTab = "studio";
+        studioSubView = "audit";
+        await auditDirectoryPath(path);
+        statusMessage = `📁 Directorio cargado para análisis y ${isReverse ? 'restauración' : 'protección'}: ${path}`;
+      } else {
+        await processFilePathInStudio(path, isReverse, {
+          copyMode,
+          suffix,
+          exportMarkdown: expMd
+        });
+      }
+    } catch (err) {
+      statusMessage = "Error al procesar elemento: " + err;
+    }
+  }
+
+  function cancelStudioDropModal() {
+    studioDropModal = null;
   }
 
   async function cancelScan() {
@@ -590,8 +1548,8 @@
         };
       });
       statusMessage = shouldOmit
-        ? "🚫 Todas las entidades marcadas para OMITIR (no se ofuscarán)."
-        : "🛡️ Todas las entidades reactivadas para ofuscación.";
+        ? "🚫 Todas las entidades marcadas para OMITIR (no se protegerán)."
+        : "🛡️ Todas las entidades reactivadas para protección.";
     } else {
       detectedItems = detectedItems.map(it => {
         if (selectedScanOriginals.includes(it.original)) {
@@ -605,7 +1563,7 @@
       });
       statusMessage = shouldOmit
         ? `🚫 ${selectedScanOriginals.length} entidades seleccionadas marcadas para OMITIR.`
-        : `🛡️ ${selectedScanOriginals.length} entidades seleccionadas reactivadas para ofuscación.`;
+        : `🛡️ ${selectedScanOriginals.length} entidades seleccionadas reactivadas para protección.`;
       selectedScanOriginals = [];
     }
   }
@@ -655,12 +1613,13 @@
       });
 
       vaultMappings = mergedList;
-      statusMessage = `💾 ${itemsToSave.length} entidades del escaneo guardadas e integradas en '${targetVault.split('/').pop()}'.`;
+      statusMessage = `💾 ${itemsToSave.length} entidades guardadas e integradas en '${targetVault.split('/').pop()}'.`;
       
-      // Limpiar de la pantalla los elementos guardados
+      // Limpiar de la pantalla los elementos guardados y regresar a Transformación
       const savedOriginals = new Set(itemsToSave.map(it => it.original));
       detectedItems = detectedItems.filter(it => !savedOriginals.has(it.original));
       selectedScanOriginals = []; // Limpiar selección
+      studioSubView = "transform";
 
       await refreshVaultsList();
     } catch (e) {
@@ -758,7 +1717,7 @@
       });
       vaultMappings = updated;
       statusMessage = isCurrentlyOmitted
-        ? `✅ Entidad '${item.original}' reactivada para ofuscación.`
+        ? `✅ Entidad '${item.original}' reactivada para protección.`
         : `🚫 Entidad '${item.original}' configurada como ignorada/omitida.`;
     } catch (e) {
       alert("Error al cambiar estado de omisión: " + e);
@@ -784,7 +1743,7 @@
       selectedPairKeys = [];
       statusMessage = shouldOmit
         ? `🚫 Entidades seleccionadas configuradas como ignoradas/omitidas.`
-        : `✓ Entidades seleccionadas reactivadas para ofuscación.`;
+        : `✓ Entidades seleccionadas reactivadas para protección.`;
     } catch (e) {
       alert("Error al actualizar omisiones en lote: " + e);
     }
@@ -835,11 +1794,25 @@
   async function handleCreateVaultSubmit() {
     if (!newVaultName.trim()) {
       alert("Introduce un nombre para la nueva bóveda.");
+      setTimeout(() => {
+        const el = document.getElementById("create-vault-name-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     const pwd = newVaultPassword.trim();
     if (!pwd) {
       alert("⚠️ Es obligatorio configurar una contraseña para proteger la nueva bóveda.");
+      setTimeout(() => {
+        const el = document.getElementById("create-vault-pwd-input");
+        if (el) {
+          el.focus();
+          if (typeof el.select === "function") el.select();
+        }
+      }, 50);
       return;
     }
     try {
@@ -1003,7 +1976,7 @@
   function toggleWatchMode() {
     isWatching = !isWatching;
     if (isWatching) {
-      statusMessage = `👀 Monitorización del portapapeles activada (${watchDirection === 'obfuscate' ? 'Ofuscación' : 'Desofuscación'}).`;
+      statusMessage = `👀 Monitorización del portapapeles activada (${watchDirection === 'obfuscate' ? 'Protección' : 'Restauración'}).`;
       startWatchPolling();
     } else {
       if (watchPollInterval) clearInterval(watchPollInterval);
@@ -1017,6 +1990,7 @@
     watchPollInterval = setInterval(async () => {
       try {
         const text = await invokeTauri("get_system_clipboard");
+        if (clipboardError) clipboardError = null;
         if (text && text.trim() && text !== lastSeenClipboard) {
           lastSeenClipboard = text;
           if (watchDirection === "obfuscate") {
@@ -1045,7 +2019,7 @@
                 ...clipboardEvents.slice(0, 49)
               ];
 
-              triggerClipboardNotification(`Portapapeles ofuscado (${detectedTokens.length} tokens detectados)`);
+              triggerClipboardNotification(`Portapapeles protegido (${detectedTokens.length} tokens detectados)`, detectedTokens.length, false);
               scheduleAutoClearIfNeeded();
             } else {
               // Texto copiado sin tokens confidenciales reconocidos
@@ -1061,7 +2035,7 @@
                 },
                 ...clipboardEvents.slice(0, 49)
               ];
-              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos");
+              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos", 0, false);
             }
           } else {
             const res = await invokeTauri("deobfuscate_content", {
@@ -1089,7 +2063,7 @@
                 ...clipboardEvents.slice(0, 49)
               ];
 
-              triggerClipboardNotification(`Portapapeles desofuscado (${detectedTokens.length} tokens restaurados)`);
+              triggerClipboardNotification(`Portapapeles restaurado (${detectedTokens.length} tokens restaurados)`, detectedTokens.length, true);
               scheduleAutoClearIfNeeded();
             } else {
               // Texto copiado sin tokens seudónimos para revertir
@@ -1105,19 +2079,24 @@
                 },
                 ...clipboardEvents.slice(0, 49)
               ];
-              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos");
+              triggerClipboardNotification("Portapapeles verificado: 0 tokens reconocidos", 0, true);
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        clipboardError = String(e);
+        statusMessage = "⚠️ Portapapeles: " + String(e);
+      }
     }, 300);
   }
 
-  function triggerClipboardNotification(msg) {
+  function triggerClipboardNotification(msg, count = 0, isDeobfuscate = false) {
+    statusMessage = `📋 ${msg}`;
+    if (count > 0) {
+      showClipboardToast(msg, count, isDeobfuscate);
+    }
     const notifyType = appConfig?.gui?.clipboard?.notification_type || "toast";
-    if (notifyType === "toast") {
-      statusMessage = `📋 ${msg}`;
-    } else if (notifyType === "visual_flash") {
+    if (notifyType === "visual_flash") {
       clipboardFlash = true;
       setTimeout(() => { clipboardFlash = false; }, 400);
     }
@@ -1189,17 +2168,19 @@
     const pwdArg = password ? ` -p "***"` : "";
 
     if (activeTab === "studio") {
+      if (studioSubView === "audit") {
+        const recArg = recursiveScan ? " -r" : " --no-recursive";
+        const noGitArg = noGitIgnoreScan ? " --no-git-ignore" : "";
+        return `lexishield scan -i "<ruta>"${recArg}${noGitArg}${vaultArg}`;
+      }
       return `lexishield obfuscate -f ${selectedFormat}${vaultArg}${cleanArg}${copyArg}${pwdArg}`;
-    } else if (activeTab === "scanner") {
-      const recArg = recursiveScan ? " -r" : " --no-recursive";
-      const noGitArg = noGitIgnoreScan ? " --no-git-ignore" : "";
-      return `lexishield scan -i "<ruta>"${recArg}${noGitArg}${vaultArg}`;
     } else if (activeTab === "pairs") {
       return `lexishield dict list${vaultArg}`;
     } else if (activeTab === "vaults") {
       return `lexishield vault list`;
     } else if (activeTab === "watch") {
-      return `lexishield watch -d ${watchDirection} -f ${selectedFormat}${vaultArg}`;
+      const cliDir = watchDirection === "obfuscate" ? "protect" : "restore";
+      return `lexishield watch -d ${cliDir} -f ${selectedFormat}${vaultArg}`;
     } else if (activeTab === "config") {
       return `lexishield config show`;
     }
@@ -1223,7 +2204,7 @@
       <div>
         <h1 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
           LexiShield
-          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20">v2.0.0</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 border border-primary-500/20">v{appVersion}</span>
         </h1>
       </div>
     </div>
@@ -1234,17 +2215,10 @@
         <button
           on:click={() => (activeTab = "studio")}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'studio' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Transformación bidireccional y protección de datos"
         >
-          <span>✨</span> Studio
-        </button>
-      {/if}
-
-      {#if appConfig.gui.tabs.show_scanner}
-        <button
-          on:click={() => (activeTab = "scanner")}
-          class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'scanner' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
-        >
-          <span>🔍</span> Escáner
+          {#if toolbarButtonStyle !== 'text_only'}<span>✨</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Transformación</span>{/if}
         </button>
       {/if}
 
@@ -1252,8 +2226,10 @@
         <button
           on:click={() => { activeTab = "pairs"; loadPairsForVault(vaultPath); }}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'pairs' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Pares de sustitución y seudónimos"
         >
-          <span>📑</span> Pares ({vaultMappings.length})
+          {#if toolbarButtonStyle !== 'text_only'}<span>📑</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Pares ({vaultMappings.length})</span>{/if}
         </button>
       {/if}
 
@@ -1261,8 +2237,10 @@
         <button
           on:click={() => { activeTab = "vaults"; refreshVaultsList(); }}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'vaults' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Gestión de Bóvedas Lexi"
         >
-          <span>🗄️</span> Bóvedas Lexi
+          {#if toolbarButtonStyle !== 'text_only'}<span>🗄️</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Bóvedas</span>{/if}
         </button>
       {/if}
 
@@ -1270,13 +2248,15 @@
         <button
           on:click={() => (activeTab = "watch")}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'watch' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
+          title="Monitorización activa de portapapeles"
         >
-          <span>📋</span> Portapapeles
+          {#if toolbarButtonStyle !== 'text_only'}<span>📋</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Portapapeles</span>{/if}
         </button>
       {/if}
     </nav>
 
-    <!-- ACCIONES DE CABECERA -->
+    <!-- ACCIONES DE CABECERA (TIER 1 UNIVERSAL) -->
     <div class="flex items-center gap-2">
       <!-- Indicador de Bóveda Activa y Desbloqueo -->
       <button
@@ -1295,32 +2275,31 @@
       <!-- Botón Configuración -->
       <button
         on:click={() => (activeTab = "config")}
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition border {activeTab === 'config' ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
-        title="Configuración general"
+        class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {activeTab === 'config' ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
+        title="Configuración general del sistema"
       >
-        ⚙️
-      </button>
-
-      <!-- Botón Modo DEBUG y Logs -->
-      <button
-        on:click={openLogsModal}
-        class="w-8 h-8 rounded-lg flex items-center justify-center transition border {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400 animate-pulse' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
-        title="Registro de depuración (Logs)"
-      >
-        🐞
+        {#if toolbarButtonStyle !== 'text_only'}<span>⚙️</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>Opciones</span>{/if}
       </button>
 
       <!-- Botón Tema Claro/Oscuro -->
       <button
         on:click={toggleTheme}
-        class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center transition"
+        class="px-2.5 py-1 rounded-xl text-xs bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center gap-1.5 transition font-semibold"
         title="Alternar Tema Claro / Oscuro"
       >
-        {#if darkMode}
-          <span>☀️</span>
-        {:else}
-          <span>🌙</span>
-        {/if}
+        {#if toolbarButtonStyle !== 'text_only'}<span>{darkMode ? "☀️" : "🌙"}</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>{darkMode ? "Claro" : "Oscuro"}</span>{/if}
+      </button>
+
+      <!-- Botón Ayuda Global Contextual Fijo (A la derecha del todo) -->
+      <button
+        on:click={() => openHelp(activeTab)}
+        class="px-2.5 py-1 rounded-xl text-xs bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center gap-1.5 transition font-semibold"
+        title="Ayuda y documentación contextual de la vista activa"
+      >
+        {#if toolbarButtonStyle !== 'text_only'}<span>❔</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>Ayuda</span>{/if}
       </button>
     </div>
   </header>
@@ -1328,362 +2307,565 @@
   <!-- CONTENIDO DINÁMICO POR PESTAÑA -->
   <div class="flex-1 overflow-auto p-4 flex flex-col min-h-0">
     {#if activeTab === "studio"}
-      <!-- VISTA STUDIO -->
+      <!-- VISTA STUDIO UNIFICADA (TRANSFORMACIÓN + AUDITORÍA) -->
       <div in:fade={{ duration: 150 }} class="flex-1 flex flex-col gap-4 min-h-0">
-        <!-- Barra de Opciones Superiores del Studio -->
-        <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm text-xs">
-          <div class="flex items-center gap-3">
-            <label class="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <span>📐 Formato:</span>
-              <select bind:value={selectedFormat} class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-primary-500 font-medium">
-                <option value="auto" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Auto (Detección inteligente)</option>
-                <option value="json" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">JSON Estructurado</option>
-                <option value="xml" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">XML / HTML</option>
-                <option value="log" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Log Delimitado / KVP</option>
-                <option value="text" class="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Texto Plano</option>
-              </select>
-            </label>
+        <!-- Barra Superior Minimalista de Transformación con Controles Rápidos -->
+        <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 px-4 py-2 flex items-center justify-between gap-3 shadow-sm text-xs flex-wrap">
+          <!-- Grupo Izquierdo: Conmutador Editor / Markdown o Volver si está en auditoría -->
+          {#if studioSubView === "transform"}
+            <div class="flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-[11px]">
+              <button
+                type="button"
+                on:click={() => (studioUnifiedViewMode = "editor")}
+                class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'editor' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                title="Modo Editor (texto editable en ambos paneles)"
+              >
+                {#if toolbarButtonStyle !== 'text_only'}<span>📄</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Editor</span>{/if}
+              </button>
+              <button
+                type="button"
+                on:click={selectMarkdownViewMode}
+                class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                title="Modo Markdown (ofusca automáticamente texto claro y muestra vista previa formateada)"
+              >
+                {#if toolbarButtonStyle !== 'text_only'}<span>👁️</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Markdown</span>{/if}
+              </button>
+            </div>
+          {:else}
+            <button
+              type="button"
+              on:click={() => (studioSubView = "transform")}
+              class="px-3 py-1 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-500 text-slate-950 transition flex items-center gap-1.5 shadow-sm"
+              title="Volver a los paneles de transformación"
+            >
+              <span>✨</span>
+              <span>Volver a Transformación</span>
+            </button>
+          {/if}
 
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-              <input type="checkbox" bind:checked={copyMode} class="rounded accent-primary-500" />
-              <span>Guardar en copia sufijada ({copySuffix})</span>
-            </label>
-
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-              <input type="checkbox" bind:checked={cleanCache} class="rounded accent-primary-500" />
-              <span>Limpiar cachés de sesión</span>
-            </label>
-
-            {#if hasPandoc}
-              <label class="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300" title="Requiere Pandoc instalado en el sistema para convertir a Markdown">
-                <input type="checkbox" bind:checked={exportMarkdown} class="rounded accent-primary-500" />
-                <span>Guardar en Markdown (.md)</span>
-              </label>
-            {/if}
-          </div>
-
+          <!-- Grupo Derecho: Acciones de Sesión y Ergonomía (Tier 2 Contextual de Transformación) -->
           <div class="flex items-center gap-2">
+            <!-- Botón Limpiar Todo (Tier 2) -->
             <button
-              on:click={() => openHelp('studio')}
-              class="px-2.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 font-bold transition flex items-center gap-1"
-              title="Ver guía de uso de Studio"
+              type="button"
+              on:click={() => {
+                if (inputText || outputText) {
+                  pushToSessionHistory("clear");
+                  inputText = "";
+                  outputText = "";
+                  statusMessage = "Ambos paneles han sido limpiados (guardado en historial de sesión).";
+                }
+              }}
+              disabled={!inputText && !outputText}
+              class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Limpiar ambos paneles (Ctrl+Shift+L)"
             >
-              <span>❔</span> Ayuda
-            </button>
-            <button
-              on:click={openFileToProcess}
-              disabled={loading}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <span>📄</span> Procesar Archivo...
-            </button>
-            <button
-              on:click={openVaultFile}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1.5"
-            >
-              <span>📂</span> Cambiar Bóveda
-            </button>
-          </div>
-        </div>
-
-        {#if !dismissedTips.studio}
-          <div in:slide={{ duration: 150 }} class="p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
-            <div class="flex items-center gap-3">
-              <span class="text-lg">✨</span>
-              <p class="text-slate-700 dark:text-slate-300">
-                <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Ofusca texto para usarlo en motores de Inteligencia Artificial (p. ej. asistentes en la nube o LLMs locales) u ocúltalo de quien no deba conocer datos confidenciales (IPs, emails, nombres, claves). Al recibir la respuesta de la IA, usa <em>Desofuscar Original</em> para restaurar los valores reales.
-              </p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
-              <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Paneles de Entrada y Salida -->
-        <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
-          <!-- Entrada -->
-          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2">
-              <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <span>📥</span> Entrada Original
-              </span>
-              <button
-                on:click={() => (inputText = "")}
-                class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs transition"
-              >
-                Limpiar
-              </button>
-            </div>
-            <textarea
-              bind:value={inputText}
-              placeholder="Pega aquí el contenido a ofuscar o desofuscar (JSON, Logs, XML, código)..."
-              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none overflow-auto select-text"
-            ></textarea>
-          </div>
-
-          <!-- Salida -->
-          <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col min-h-0 shadow-sm">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2">
-              <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <span>📤</span> Resultado Procesado
-              </span>
-              <button
-                on:click={() => { navigator.clipboard.writeText(outputText); statusMessage = "📋 Copiado al portapapeles."; }}
-                disabled={!outputText}
-                class="text-primary-600 dark:text-primary-400 hover:underline text-xs font-semibold disabled:opacity-40 transition"
-              >
-                Copiar
-              </button>
-            </div>
-            <textarea
-              bind:value={outputText}
-              readonly
-              placeholder="El resultado sanitizado o desofuscado aparecerá aquí..."
-              class="flex-1 w-full bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 p-3 text-xs font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text"
-            ></textarea>
-          </div>
-        </div>
-
-        <!-- Botonera de Acción Principal del Studio -->
-        <div class="flex items-center justify-end gap-3">
-          <button
-            on:click={handleDeobfuscate}
-            disabled={loading || !inputText.trim()}
-            class="px-5 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold rounded-xl border border-slate-300 dark:border-white/15 transition duration-150 flex items-center gap-2 disabled:opacity-50 shadow-sm"
-          >
-            <span>🔄</span> Desofuscar Original
-          </button>
-          <button
-            on:click={handleObfuscate}
-            disabled={loading || !inputText.trim()}
-            class="px-6 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center gap-2 disabled:opacity-50"
-          >
-            {#if loading}
-              <span class="animate-spin">⏳</span>
-            {:else}
-              <span>🛡️</span>
-            {/if}
-            Ofuscar para IA
-          </button>
-        </div>
-      </div>
-
-    {:else if activeTab === "scanner"}
-      <!-- VISTA ESCÁNER -->
-      <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col min-h-0 shadow-lg">
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <div>
-            <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>🔍</span> Escáner de Entidades Confidenciales
-            </h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Escanea archivos o carpetas completas sin modificarlos. Desmarca las casillas si deseas omitir falsos positivos.</p>
-          </div>
-          
-          <div class="flex items-center gap-3">
-            <button
-              on:click={() => openHelp('scanner')}
-              class="px-2.5 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-300 rounded-xl border border-primary-500/30 text-xs font-bold transition flex items-center gap-1 shadow-sm"
-              title="Ver guía de uso del Escáner"
-            >
-              <span>❔</span> Ayuda
+              {#if toolbarButtonStyle !== 'text_only'}<span>🗑️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Limpiar todo</span>{/if}
             </button>
 
-            <label class="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-              <input type="checkbox" bind:checked={recursiveScan} class="rounded accent-primary-500" />
-              <span>Recursivo (subdirectorios)</span>
-            </label>
-
+            <!-- Botón Modo Privacidad / Desenfoque de Pantalla (Tier 2 Transformación) -->
             <button
-              on:click={openFileToAudit}
-              disabled={loading}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              type="button"
+              on:click={() => {
+                appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
+                saveSettings();
+              }}
+              class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+              title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados (Pasa el cursor por encima para verlos)" : "Activar Modo Privacidad (Desenfocar datos originales para compartir pantalla)"}
             >
-              <span>📄</span> Escanear Fichero
+              {#if toolbarButtonStyle !== 'text_only'}<span>{privacyBlur ? "🙈" : "👁️"}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
             </button>
+
+            <!-- Botón Insignias / Badges de Tokens -->
             <button
-              on:click={openDirectoryToAudit}
-              disabled={loading}
-              class="px-3 py-1.5 bg-primary-500/10 hover:bg-primary-500/20 text-primary-700 dark:text-primary-400 text-xs font-semibold rounded-xl border border-primary-500/30 transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              type="button"
+              on:click={toggleTokenBadges}
+              class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {showTokenBadges ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
+              title={showTokenBadges ? "Insignias (Badges) ACTIVAS: Tokens resaltados visualmente (Clic para desactivar)" : "Activar Insignias (Badges) en tokens confidenciales"}
             >
-              <span>📁</span> Escanear Carpeta
+              {#if toolbarButtonStyle !== 'text_only'}<span>🏷️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Insignias</span>{/if}
+            </button>
+
+            <!-- Botón Conmutable de Auto-copiado -->
+            <button
+              type="button"
+              on:click={() => {
+                autoCopyToClipboard = !autoCopyToClipboard;
+                statusMessage = autoCopyToClipboard
+                  ? "📋 Auto-copiado al portapapeles ACTIVADO."
+                  : "📄 Auto-copiado al portapapeles DESACTIVADO.";
+              }}
+              class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {autoCopyToClipboard ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
+              title={autoCopyToClipboard ? "Auto-copiar ACTIVO: Copia el resultado automáticamente al proteger o restaurar (Clic para desactivar)" : "Auto-copiar DESACTIVADO: Clic para activar copiado automático"}
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>{autoCopyToClipboard ? "📋" : "📄"}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Auto-copiar</span>{/if}
+            </button>
+
+            <!-- Botón Historial de Sesión -->
+            <button
+              type="button"
+              on:click={() => (showSessionHistoryModal = true)}
+              class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs text-xs"
+              title="Ver historial temporal de sesiones en memoria RAM"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>⏱️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Historial</span>{/if}
+              {#if sessionHistory.length > 0}
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
+                  {sessionHistory.length}
+                </span>
+              {/if}
             </button>
           </div>
         </div>
 
-        {#if !dismissedTips.scanner}
-          <div in:slide={{ duration: 150 }} class="mb-4 p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
-            <div class="flex items-center gap-3">
-              <span class="text-lg">🔍</span>
-              <p class="text-slate-700 dark:text-slate-300">
-                <strong class="text-primary-600 dark:text-primary-400">¿Cómo funciona el Escáner?</strong> Inspecciona archivos o carpetas completas en busca de tokens confidenciales (DNI, tarjetas, IPv4, emails, GUIDs) sin modificar el disco. Puedes omitir falsos positivos desmarcando casillas antes de registrar los hallazgos en tu bóveda.
-              </p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button on:click={() => openHelp('scanner')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
-              <button on:click={() => dismissTip('scanner')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white px-1">✕</button>
-            </div>
-          </div>
-        {/if}
-
-        {#if isScanningDirectory}
-          <div in:fade={{ duration: 150 }} class="mb-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
-            <div class="flex items-center gap-3 min-w-0 flex-1">
-              <div class="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-500 flex items-center justify-center animate-spin text-base">
-                ⏳
+        {#if studioSubView === "transform"}
+          {#if studioToast}
+            <div in:slide={{ duration: 150 }} out:fade={{ duration: 150 }} class="p-3 bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/40 text-emerald-800 dark:text-emerald-200 rounded-xl flex items-center justify-between gap-3 shadow-md text-xs font-semibold">
+              <div class="flex items-center gap-2">
+                <span class="text-base">✅</span>
+                <span>{studioToast.message}</span>
               </div>
-              <div class="min-w-0 flex-1">
-                <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>Escaneando carpeta en tiempo real...</span>
-                  <span class="inline-block w-2 h-2 rounded-full bg-primary-500 animate-ping"></span>
-                </div>
-                <div class="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate font-semibold" title={scanCurrentFile}>
-                  📄 {scanCurrentFile}
-                </div>
+              <button type="button" on:click={() => (studioToast = null)} class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-white px-2 py-0.5 rounded text-xs font-bold" title="Cerrar aviso">✕</button>
+            </div>
+          {/if}
+
+          {#if !dismissedTips.studio}
+            <div in:slide={{ duration: 150 }} class="p-3.5 bg-gradient-to-r from-primary-500/10 via-brand-surface/40 to-primary-500/5 rounded-2xl border border-primary-500/20 flex items-center justify-between gap-3 text-xs shadow-sm">
+              <div class="flex items-center gap-3">
+                <span class="text-base shrink-0">✨</span>
+                <p class="text-slate-700 dark:text-slate-300">
+                  <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Transformación?</strong> Pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
+                <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
               </div>
             </div>
+          {/if}
 
-            <div class="flex items-center gap-4 text-xs font-mono">
-              <span class="text-slate-700 dark:text-slate-300">Archivos: <strong class="text-primary-600 dark:text-primary-400 font-bold">{scanFilesCount}</strong></span>
-              <span class="text-slate-700 dark:text-slate-300">Entidades: <strong class="text-amber-600 dark:text-amber-400 font-bold">{scanEntitiesCount}</strong></span>
-              
-              <button
-                on:click={cancelScan}
-                class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-lg border border-rose-500/20 transition flex items-center gap-1"
-              >
-                <span>🛑</span> Cancelar
-              </button>
-            </div>
-          </div>
-        {:else if auditSummary}
-          <div class="mb-4 p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div class="flex items-center gap-2">
-              <span class="text-slate-500">Origen escaneado:</span>
-              <span class="font-mono text-slate-800 dark:text-slate-200 font-semibold truncate max-w-sm" title={auditSummary.path_analyzed}>{auditSummary.path_analyzed}</span>
-            </div>
-            <div class="flex items-center gap-4">
-              <span>Archivos analizados: <strong class="text-primary-700 dark:text-primary-400">{auditSummary.files_scanned}</strong></span>
-              <span>Archivos omitidos: <strong class="text-slate-500">{auditSummary.files_ignored}</strong></span>
-              <span>Entidades detectadas: <strong class="text-amber-600 dark:text-amber-400">{auditSummary.total_entities}</strong></span>
-            </div>
-          </div>
-        {/if}
-
-        {#if detectedItems.length > 0}
-          <!-- Barra de Acciones del Escáner (Simetría CLI/GUI) -->
-          <div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-xs">
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                on:click={() => handleBatchOmitScanItems(true)}
-                class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg border border-amber-500/20 transition flex items-center gap-1"
-                title="Marcar como omitidos (no se ofuscarán)"
-              >
-                <span>🚫</span> Omitir {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
-              </button>
-              <button
-                type="button"
-                on:click={() => handleBatchOmitScanItems(false)}
-                class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold rounded-lg border border-emerald-500/20 transition flex items-center gap-1"
-                title="Reactivar ofuscación"
-              >
-                <span>🛡️</span> Ofuscar {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
-              </button>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                on:click={handleSaveScanToVault}
-                class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold rounded-lg transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
-                title="Guardar todos los mapeos en la bóveda activa aplicando las omisiones seleccionadas"
-              >
-                <span>💾</span> Guardar en Bóveda ({detectedItems.length})
-              </button>
-            </div>
-          </div>
-        {/if}
-
-        <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
-          <table class="w-full text-left text-xs font-mono">
-            <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
-              <tr>
-                <th class="p-3 w-12 text-center">
-                  <input
-                    type="checkbox"
-                    checked={detectedItems.length > 0 && selectedScanOriginals.length === detectedItems.length}
-                    on:change={toggleSelectAllScanItems}
-                    class="rounded accent-primary-500 cursor-pointer"
-                    title="Seleccionar o desmarcar todos"
-                  />
-                </th>
-                <th class="p-3 w-32">Estado</th>
-                <th class="p-3 w-40">Tipo de Entidad</th>
-                <th class="p-3">Valor Original Confidencial</th>
-                <th class="p-3">Seudónimo / Resultado</th>
-                <th class="p-3 w-28 text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
-              {#each detectedItems as item (item.original)}
-                <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-50' : ''}">
-                  <td class="p-3 text-center">
-                    <input
-                      type="checkbox"
-                      value={item.original}
-                      bind:group={selectedScanOriginals}
-                      class="rounded accent-primary-500 cursor-pointer"
-                    />
-                  </td>
-                  <td class="p-3">
-                    {#if item.omitted || item.pseudonym === '='}
-                      <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold border border-amber-500/20">
-                        🚫 Omitido
-                      </span>
+          <!-- Paneles de Texto claro y Texto protegido con Puente Central -->
+          <div class="flex-1 min-w-0 flex flex-col md:flex-row gap-3 min-h-0 items-stretch relative">
+            <!-- Panel Izquierdo: Texto claro -->
+            <div class="flex-1 min-w-0 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {deobfuscateSuccessFlash ? 'border-emerald-500/80 ring-2 ring-emerald-500/40 shadow-emerald-500/20' : studioDirection === 'obfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📥</span> Texto claro
+                  </span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] font-mono text-slate-400">
+                    {inputLinesCount} lín · {inputCharCount} car · {inputSizeKB}
+                  </span>
+                  <button
+                    on:click={copyInputWithFeedback}
+                    disabled={!inputText}
+                    class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedInputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
+                    title="Copiar texto claro (Ctrl+Shift+C)"
+                  >
+                    {#if copiedInputFlash}
+                      <span>✓</span> ¡Copiado!
                     {:else}
-                      <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
-                        🛡️ Ofuscado
-                      </span>
+                      <span>📋</span> Copiar
                     {/if}
-                  </td>
-                  <td class="p-3">
-                    <span class="px-2 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 text-[11px] border border-primary-500/20">
-                      {item.detector_type}
-                    </span>
-                  </td>
-                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text">{item.original}</td>
-                  <td class="p-3 font-mono select-text {item.omitted ? 'text-slate-400 dark:text-slate-500' : 'text-primary-700 dark:text-primary-400'}">
-                    {item.omitted || item.pseudonym === '=' ? '=' : item.pseudonym}
-                  </td>
-                  <td class="p-3 text-center">
-                    <button
-                      type="button"
-                      on:click={() => toggleSingleScanOmit(item)}
-                      class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition {item.omitted ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20'}"
-                    >
-                      {item.omitted ? '✓ Ofuscar' : '🚫 Omitir'}
-                    </button>
-                  </td>
-                </tr>
+                  </button>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
+                {#if studioUnifiedViewMode === "markdown"}
+                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words smooth-scroll-tokens">
+                    {@html renderMarkdownPreview(inputText)}
+                  </div>
+                {:else if showTokenBadges && !isEditingInput && inputText.trim()}
+                  <!-- svelte-ignore a11y-click-events-have-key-events -->
+                  <!-- svelte-ignore a11y-no-static-element-interactions -->
+                  <div
+                    on:click={focusInputEditor}
+                    class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens cursor-text"
+                    title="Haz clic para editar texto"
+                  >
+                    {@html renderHighlightedTokens(inputText, false)}
+                  </div>
+                {:else}
+                  <pre
+                    bind:this={inputGutterEl}
+                    class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
+                    aria-hidden="true"
+                  >{inputGutterText}</pre>
+                  <textarea
+                    bind:this={inputTextAreaEl}
+                    bind:value={inputText}
+                    on:paste={handleClearTextPaste}
+                    on:input={() => { isEditingInput = true; studioDirection = "obfuscate"; }}
+                    on:focus={() => { isEditingInput = true; if (inputText.trim()) studioDirection = "obfuscate"; }}
+                    on:blur={() => { isEditingInput = false; }}
+                    on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
+                    placeholder="Pega aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
+                    class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens"
+                  ></textarea>
+                {/if}
+              </div>
+            </div>
+
+            <!-- Puente Central Direccional entre Paneles -->
+            <div class="flex md:flex-col items-center justify-center gap-2 py-1 md:py-0 shrink-0">
+              {#if studioDirection === "obfuscate"}
+                <button
+                  on:click={handleObfuscate}
+                  disabled={loading || !inputText.trim()}
+                  class="px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-sm"
+                  title="Proteger datos confidenciales (Ctrl+Enter)"
+                  aria-label="Proteger datos confidenciales"
+                >
+                  {#if loading}
+                    <span class="animate-spin">⏳</span>
+                  {:else}
+                    <span class="text-base">🛡️</span>
+                  {/if}
+                  <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
+                </button>
               {:else}
-                <tr>
-                  <td colspan="6" class="p-12 text-center text-slate-400 dark:text-slate-500">
-                    {#if isScanningDirectory || loading}
-                      <div class="text-3xl mb-2 animate-spin inline-block">⏳</div>
-                      <div class="font-medium text-primary-600 dark:text-primary-400">Escaneando archivos en curso...</div>
-                      <div class="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto truncate font-mono font-semibold">📄 {scanCurrentFile}</div>
+                <button
+                  on:click={handleDeobfuscate}
+                  disabled={loading || !outputText.trim()}
+                  class="px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-sm"
+                  title="Restaurar datos protegidos (Ctrl+Enter)"
+                  aria-label="Restaurar datos protegidos"
+                >
+                  {#if loading}
+                    <span class="animate-spin">⏳</span>
+                  {:else}
+                    <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
+                  {/if}
+                  <span class="text-base">🔄</span>
+                </button>
+              {/if}
+            </div>
+
+            <!-- Panel Derecho: Texto protegido -->
+            <div class="flex-1 min-w-0 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border {studioDirection === 'deobfuscate' ? 'border-primary-500/60 shadow-md ring-1 ring-primary-500/20' : 'border-slate-200 dark:border-white/10'} p-4 flex flex-col min-h-0 frosted-card transition duration-150">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🛡️</span> Texto protegido
+                  </span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] font-mono text-slate-400">
+                    {outputLinesCount} lín · {outputCharCount} car · {outputSizeKB}
+                  </span>
+                  <button
+                    on:click={copyOutputWithFeedback}
+                    disabled={!outputText}
+                    class="flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition {copiedOutputFlash ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30' : 'text-primary-600 dark:text-primary-400 hover:bg-primary-500/10'} disabled:opacity-40"
+                    title="Copiar texto protegido (Ctrl+Shift+C)"
+                  >
+                    {#if copiedOutputFlash}
+                      <span>✓</span> ¡Copiado!
                     {:else}
-                      <div class="text-3xl mb-2">🔍</div>
-                      <div class="font-medium text-slate-600 dark:text-slate-300">No hay entidades escaneadas todavía</div>
-                      <div class="text-xs text-slate-400 mt-1">Usa los botones superiores "Escanear Fichero" o "Escanear Carpeta".</div>
+                      <span>📋</span> Copiar
                     {/if}
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
+                  </button>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0 flex overflow-hidden rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/60 focus-within:ring-1 focus-within:ring-primary-500">
+                {#if studioUnifiedViewMode === "markdown"}
+                  <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words smooth-scroll-tokens">
+                    {@html renderMarkdownPreview(outputText)}
+                  </div>
+                {:else if showTokenBadges && !isEditingOutput && outputText.trim()}
+                  <!-- svelte-ignore a11y-click-events-have-key-events -->
+                  <!-- svelte-ignore a11y-no-static-element-interactions -->
+                  <div
+                    on:click={focusOutputEditor}
+                    class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words smooth-scroll-tokens cursor-text"
+                    title="Haz clic para editar texto"
+                  >
+                    {@html renderHighlightedTokens(outputText, true)}
+                  </div>
+                {:else}
+                  <pre
+                    bind:this={outputGutterEl}
+                    class="select-none py-3 px-2 text-right font-mono {editorFontSizeClass} leading-5 text-slate-400 dark:text-slate-600 bg-slate-100/70 dark:bg-slate-900/60 border-r border-slate-200 dark:border-white/5 overflow-hidden min-w-[2.8rem] m-0"
+                    aria-hidden="true"
+                  >{outputGutterText}</pre>
+                  <textarea
+                    bind:this={outputTextAreaEl}
+                    bind:value={outputText}
+                    on:paste={() => { studioDirection = "deobfuscate"; }}
+                    on:input={() => { isEditingOutput = true; studioDirection = "deobfuscate"; }}
+                    on:focus={() => { isEditingOutput = true; if (outputText.trim()) studioDirection = "deobfuscate"; }}
+                    on:blur={() => { isEditingOutput = false; }}
+                    on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
+                    placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
+                    class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre smooth-scroll-tokens"
+                  ></textarea>
+                {/if}
+              </div>
+            </div>
+          </div>
+
+        {:else if studioSubView === "audit"}
+          <!-- SUB-VISTA DESGLOSE Y AUDITORÍA DE TOKENS -->
+          <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-5 flex flex-col min-h-0 shadow-lg">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-3 pb-2 border-b border-slate-200 dark:border-white/5">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>🔍</span> Desglose y Auditoría de Tokens Confidenciales
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Inspecciona y clasifica tokens detectados sin modificarlos. Desmarca casillas si deseas omitir falsos positivos.</p>
+              </div>
+              
+              <div class="flex items-center gap-3">
+                <button
+                  on:click={() => (studioSubView = "transform")}
+                  class="px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+                  title="Volver a los editores de transformación"
+                >
+                  <span>✨</span> Volver a Transformación
+                </button>
+              </div>
+            </div>
+
+            {#if detectedItems.length === 0 && !isScanningDirectory}
+              <div class="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
+                <span class="text-3xl mb-2">✨</span>
+                <p class="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                  No hay tokens pendientes de revisión
+                </p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mb-4">
+                  Los tokens confidenciales detectados se desglosan aquí automáticamente al pegar texto o arrastrar archivos en la pestaña de Transformación.
+                </p>
+                <button
+                  on:click={() => (studioSubView = "transform")}
+                  class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-primary-500/20"
+                >
+                  <span>✨</span> Volver a Transformación
+                </button>
+              </div>
+            {/if}
+
+            {#if isScanningDirectory}
+              <div in:fade={{ duration: 150 }} class="mb-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                  <div class="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-500 flex items-center justify-center animate-spin text-base">
+                    ⏳
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>Escaneando carpeta en tiempo real...</span>
+                      <span class="inline-block w-2 h-2 rounded-full bg-primary-500 animate-ping"></span>
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-700 dark:text-slate-300 truncate font-semibold" title={scanCurrentFile}>
+                      📄 {scanCurrentFile}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-4 text-xs font-mono">
+                  <span class="text-slate-700 dark:text-slate-300">Archivos: <strong class="text-primary-600 dark:text-primary-400 font-bold">{scanFilesCount}</strong></span>
+                  <span class="text-slate-700 dark:text-slate-300">Entidades: <strong class="text-amber-600 dark:text-amber-400 font-bold">{scanEntitiesCount}</strong></span>
+                  
+                  <button
+                    on:click={cancelScan}
+                    class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-lg border border-rose-500/20 transition flex items-center gap-1"
+                  >
+                    <span>🛑</span> Cancelar
+                  </button>
+                </div>
+              </div>
+            {:else if auditSummary}
+              <div class="mb-4 p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-500">Origen escaneado:</span>
+                  <span class="font-mono text-slate-800 dark:text-slate-200 font-semibold truncate max-w-sm" title={auditSummary.path_analyzed}>{auditSummary.path_analyzed}</span>
+                </div>
+                <div class="flex items-center gap-4">
+                  <span>Archivos analizados: <strong class="text-primary-700 dark:text-primary-400">{auditSummary.files_scanned}</strong></span>
+                  <span>Archivos omitidos: <strong class="text-slate-500">{auditSummary.files_ignored}</strong></span>
+                  <span>Entidades detectadas: <strong class="text-amber-600 dark:text-amber-400">{auditSummary.total_entities}</strong></span>
+                </div>
+              </div>
+            {/if}
+
+            {#if detectedItems.length > 0}
+              <!-- Barra de Distribución Categórica de Entidades (Estilo GitHub Language Bar) -->
+              {#if categoryStats}
+                <div class="mb-3 p-3 bg-white dark:bg-brand-surface/80 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm frosted-card">
+                  <div class="flex items-center justify-between text-xs mb-2 font-medium flex-wrap gap-2">
+                    <span class="text-slate-600 dark:text-slate-400 font-semibold">Distribución de Entidades Detectadas ({categoryStats.total}):</span>
+                    <div class="flex items-center gap-3 text-[11px] font-mono flex-wrap">
+                      {#if categoryStats.red.count > 0}
+                        <span class="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-blue-500"></span> 🌐 Red ({categoryStats.red.count} · {categoryStats.red.pct}%)
+                        </span>
+                      {/if}
+                      {#if categoryStats.identidad.count > 0}
+                        <span class="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-purple-500"></span> 🪪 Identidad ({categoryStats.identidad.count} · {categoryStats.identidad.pct}%)
+                        </span>
+                      {/if}
+                      {#if categoryStats.sistemas.count > 0}
+                        <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 🖥️ Sistemas ({categoryStats.sistemas.count} · {categoryStats.sistemas.pct}%)
+                        </span>
+                      {/if}
+                      {#if categoryStats.claves.count > 0}
+                        <span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+                          <span class="w-2 h-2 rounded-full bg-amber-500"></span> 💳 Contacto/Claves ({categoryStats.claves.count} · {categoryStats.claves.pct}%)
+                        </span>
+                      {/if}
+                    </div>
+                  </div>
+                  <div class="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden flex">
+                    {#if categoryStats.red.count > 0}
+                      <div style="width: {categoryStats.red.pct}%" class="bg-blue-500 transition-all duration-300" title="Red: {categoryStats.red.count} ({categoryStats.red.pct}%)"></div>
+                    {/if}
+                    {#if categoryStats.identidad.count > 0}
+                      <div style="width: {categoryStats.identidad.pct}%" class="bg-purple-500 transition-all duration-300" title="Identidad: {categoryStats.identidad.count} ({categoryStats.identidad.pct}%)"></div>
+                    {/if}
+                    {#if categoryStats.sistemas.count > 0}
+                      <div style="width: {categoryStats.sistemas.pct}%" class="bg-emerald-500 transition-all duration-300" title="Sistemas: {categoryStats.sistemas.count} ({categoryStats.sistemas.pct}%)"></div>
+                    {/if}
+                    {#if categoryStats.claves.count > 0}
+                      <div style="width: {categoryStats.claves.pct}%" class="bg-amber-500 transition-all duration-300" title="Contacto/Claves: {categoryStats.claves.count} ({categoryStats.claves.pct}%)"></div>
+                    {/if}
+                  </div>
+                </div>
+              {/if}
+
+              <!-- Barra de Acciones del Desglose/Escáner -->
+              <div class="mb-3 flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-xs">
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    on:click={() => handleBatchOmitScanItems(true)}
+                    class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold rounded-lg border border-amber-500/20 transition flex items-center gap-1"
+                    title="Marcar como omitidos (no se protegerán)"
+                  >
+                    <span>🚫</span> Omitir {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+                  </button>
+                  <button
+                    type="button"
+                    on:click={() => handleBatchOmitScanItems(false)}
+                    class="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold rounded-lg border border-emerald-500/20 transition flex items-center gap-1"
+                    title="Reactivar protección"
+                  >
+                    <span>🛡️</span> Proteger {selectedScanOriginals.length > 0 ? `(${selectedScanOriginals.length})` : 'Todos'}
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    on:click={clearScanResults}
+                    class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition flex items-center gap-1"
+                    title="Limpiar los resultados y reiniciar la auditoría"
+                  >
+                    <span>🗑️</span> Limpiar Resultados
+                  </button>
+                  <button
+                    type="button"
+                    on:click={handleSaveScanToVault}
+                    class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold rounded-lg transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
+                    title="Guardar todos los mapeos en la bóveda activa aplicando las omisiones seleccionadas"
+                  >
+                    <span>💾</span> Guardar en Bóveda ({detectedItems.length})
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 smooth-scroll-tokens">
+              <table class="w-full text-left font-mono {editorFontSizeClass}">
+                <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
+                  <tr>
+                    <th class="p-3 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={visibleDetectedItems.length > 0 && selectedScanOriginals.length === visibleDetectedItems.length}
+                        on:change={toggleSelectAllScanItems}
+                        class="rounded accent-primary-500 cursor-pointer"
+                        title="Seleccionar o desmarcar todos"
+                      />
+                    </th>
+                    <th class="p-3 w-32">Estado</th>
+                    <th class="p-3 w-40">Tipo de Entidad</th>
+                    <th class="p-3">Valor Original Confidencial</th>
+                    <th class="p-3">Seudónimo / Resultado</th>
+                    <th class="p-3 w-28 text-center">Acción</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
+                  {#each visibleDetectedItems as item (item.original)}
+                    {@const cat = getDetectorCategory(item.detector_type)}
+                    <tr class="hover:bg-black/5 dark:hover:bg-white/5 transition {item.omitted ? 'opacity-50' : ''}">
+                      <td class="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          value={item.original}
+                          bind:group={selectedScanOriginals}
+                          class="rounded accent-primary-500 cursor-pointer"
+                        />
+                      </td>
+                      <td class="p-3">
+                        {#if item.omitted || item.pseudonym === '='}
+                          <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-semibold border border-amber-500/20">
+                            🚫 Omitido
+                          </span>
+                        {:else}
+                          <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+                            🛡️ Protegido
+                          </span>
+                        {/if}
+                      </td>
+                      <td class="p-3">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded {cat.bgBadge} {cat.text} text-[11px] font-semibold border {cat.border}">
+                          <span>{cat.icon}</span> {item.detector_type}
+                        </span>
+                      </td>
+                      <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
+                      <td class="p-3 font-mono select-text {item.omitted ? 'text-slate-400 dark:text-slate-500' : 'text-primary-700 dark:text-primary-400'}">
+                        {item.omitted || item.pseudonym === '=' ? '=' : item.pseudonym}
+                      </td>
+                      <td class="p-3 text-center">
+                        <button
+                          type="button"
+                          on:click={() => toggleSingleScanOmit(item)}
+                          class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition {item.omitted ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20'}"
+                        >
+                          {item.omitted ? '✓ Proteger' : '🚫 Omitir'}
+                        </button>
+                      </td>
+                    </tr>
+                  {:else}
+                    <tr>
+                      <td colspan="6" class="p-12 text-center text-slate-400 dark:text-slate-500">
+                        {#if isScanningDirectory || loading}
+                          <div class="text-3xl mb-2 animate-spin inline-block">⏳</div>
+                          <div class="font-medium text-primary-600 dark:text-primary-400">Escaneando archivos en curso...</div>
+                          <div class="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto truncate font-mono font-semibold">📄 {scanCurrentFile}</div>
+                        {:else}
+                          <div class="text-3xl mb-2">🔍</div>
+                          <div class="font-medium text-slate-600 dark:text-slate-300">No hay entidades auditadas todavía</div>
+                          <div class="text-xs text-slate-400 mt-1">Arrastra archivos o carpetas, o pulsa "Auditar Texto" desde la vista de Transformación.</div>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {/if}
       </div>
 
     {:else if activeTab === "pairs"}
@@ -1711,14 +2893,6 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <button
-              on:click={() => openHelp('pairs')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-              title="Ver guía sobre gestión de tokens"
-            >
-              <span>❔</span> Ayuda
-            </button>
-
             <!-- Selector de Bóveda -->
             <select
               bind:value={pairsSelectedVault}
@@ -1731,67 +2905,105 @@
             </select>
 
             <button
-              on:click={() => (showAddPairModal = true)}
-              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1"
+              on:click={() => {
+                appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
+                saveSettings();
+              }}
+              class="px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+              title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados en la tabla" : "Activar Modo Privacidad (Desenfocar valores originales en la tabla)"}
             >
-              <span>➕</span> Añadir Par
+              {#if toolbarButtonStyle !== 'text_only'}<span>{privacyBlur ? "🙈" : "👁️"}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
             </button>
 
             <button
-              on:click={() => {
-                const targetVault = pairsSelectedVault || vaultPath || 'default.lexi';
-                const name = targetVault.split('/').pop();
-                handleRestoreVaultBak(name);
-              }}
-              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1"
-              title="Recuperar la última copia de seguridad automática (.bak) de esta bóveda"
+              on:click={() => (showAddPairModal = true)}
+              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
+              title="Añadir nuevo par de sustitución a la bóveda"
             >
-              <span>↺</span> Restaurar .bak
+              {#if toolbarButtonStyle !== 'text_only'}<span>➕</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Añadir Par</span>{/if}
             </button>
 
             {#if selectedPairKeys.length > 0}
               <button
                 on:click={() => handleBatchOmitPairs(true)}
-                class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-xl border border-amber-500/30 transition flex items-center gap-1"
+                class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-xl border border-amber-500/30 transition flex items-center gap-1.5"
                 title="Configurar los elementos seleccionados como ignorados/omitidos"
               >
-                <span>🚫</span> Omitir ({selectedPairKeys.length})
+                {#if toolbarButtonStyle !== 'text_only'}<span>🚫</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Omitir ({selectedPairKeys.length})</span>{/if}
               </button>
               <button
                 on:click={() => handleBatchOmitPairs(false)}
-                class="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl border border-emerald-500/30 transition flex items-center gap-1"
-                title="Reactivar ofuscación para los seleccionados"
+                class="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl border border-emerald-500/30 transition flex items-center gap-1.5"
+                title="Reactivar protección para los seleccionados"
               >
-                <span>✓</span> Reactivar ({selectedPairKeys.length})
+                {#if toolbarButtonStyle !== 'text_only'}<span>✓</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Reactivar ({selectedPairKeys.length})</span>{/if}
               </button>
               <button
                 on:click={deleteSelectedPairs}
-                class="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-500/30 transition flex items-center gap-1"
+                class="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-500/30 transition flex items-center gap-1.5"
+                title="Eliminar permanentemente los pares seleccionados"
               >
-                <span>🗑️</span> Borrar ({selectedPairKeys.length})
+                {#if toolbarButtonStyle !== 'text_only'}<span>🗑️</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Borrar ({selectedPairKeys.length})</span>{/if}
               </button>
             {/if}
           </div>
         </div>
 
-        <!-- Filtros de Pares -->
+        <!-- Filtros y Selección de Pares -->
         <div class="mb-4 flex items-center gap-3">
-          <input
-            type="text"
-            bind:value={pairSearch}
-            placeholder="Filtrar por original o seudónimo..."
-            class="flex-1 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
-          <button
-            on:click={toggleSelectAllPairs}
-            class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs rounded-xl border border-slate-300 dark:border-white/10 font-semibold"
-          >
-            {selectedPairKeys.length === filteredPairs.length && filteredPairs.length > 0 ? "Deseleccionar Todos" : "Seleccionar Todos"}
-          </button>
+          <div class="relative flex-1">
+            <input
+              type="text"
+              bind:value={pairSearch}
+              placeholder="Filtrar por original o seudónimo..."
+              class="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+            {#if pairSearch}
+              <button
+                type="button"
+                on:click={() => (pairSearch = "")}
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition"
+                title="Limpiar filtro"
+              >
+                ✕
+              </button>
+            {/if}
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              on:click={() => {
+                selectedPairKeys = filteredPairs.map(p => p.original);
+              }}
+              disabled={filteredPairs.length === 0 || selectedPairKeys.length === filteredPairs.length}
+              class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Seleccionar todos los pares visibles"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>☑️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Seleccionar todos</span>{/if}
+            </button>
+            <button
+              type="button"
+              on:click={() => {
+                selectedPairKeys = [];
+              }}
+              disabled={selectedPairKeys.length === 0}
+              class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs rounded-xl border border-slate-300 dark:border-white/10 font-semibold transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Deseleccionar todos los pares marcados"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>⬜</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Deseleccionar todos</span>{/if}
+            </button>
+          </div>
         </div>
 
         <!-- Tabla de Pares -->
-        <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80">
+        <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 smooth-scroll-tokens">
           <table class="w-full text-left text-xs font-mono">
             <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
               <tr>
@@ -1830,7 +3042,7 @@
                       </span>
                     {/if}
                   </td>
-                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text">{item.original}</td>
+                  <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
                   <td class="p-3 text-primary-700 dark:text-primary-400 select-text">
                     {#if editingPairOriginal === item.original}
                       <div class="flex items-center gap-1">
@@ -1853,7 +3065,7 @@
                       <button
                         on:click={() => handleToggleOmitPair(item)}
                         class="p-1 transition font-bold {item.omitted || item.pseudonym === '=' ? 'text-emerald-500 hover:text-emerald-700' : 'text-amber-500 hover:text-amber-700'}"
-                        title={item.omitted || item.pseudonym === '=' ? "Reactivar ofuscación para esta entidad" : "Ignorar/Omitir esta entidad (mantener original)"}
+                        title={item.omitted || item.pseudonym === '=' ? "Reactivar protección para esta entidad" : "Ignorar/Omitir esta entidad (mantener original)"}
                       >
                         {item.omitted || item.pseudonym === '=' ? '✓ Reactivar' : '🚫 Ignorar'}
                       </button>
@@ -1913,42 +3125,42 @@
 
           <div class="flex items-center gap-2">
             <button
-              on:click={() => openHelp('vaults')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-              title="Ver guía sobre bóvedas criptográficas"
-            >
-              <span>❔</span> Ayuda
-            </button>
-            <button
               on:click={() => openHelp('password_why')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 transition"
+              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1.5 transition"
               title="¿Por qué es obligatoria la contraseña en las bóvedas?"
             >
-              <span>🔐</span> ¿Por qué contraseña?
+              {#if toolbarButtonStyle !== 'text_only'}<span>🔐</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>¿Por qué contraseña?</span>{/if}
             </button>
             <button
               on:click={() => (showCreateVaultModal = true)}
-              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1"
+              class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
             >
-              <span>➕</span> Nueva Bóveda
+              {#if toolbarButtonStyle !== 'text_only'}<span>➕</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Nueva Bóveda</span>{/if}
             </button>
             <button
               on:click={handleImportVault}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1"
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5"
             >
-              <span>📥</span> Importar Bóveda
+              {#if toolbarButtonStyle !== 'text_only'}<span>📥</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Importar Bóveda</span>{/if}
             </button>
             <button
               on:click={() => (showBackupModal = true)}
-              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1"
+              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1.5"
+              title="Crear un backup comprimido de todas las configuraciones y bóvedas de LexiShield"
             >
-              <span>📦</span> Copia de Seguridad Bzip2
+              {#if toolbarButtonStyle !== 'text_only'}<span>📦</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Backup LexiShield</span>{/if}
             </button>
             <button
               on:click={handleRestoreBackup}
-              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1"
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5"
+              title="Restaurar un archivo de backup de LexiShield (.tar.bz2 / .lexibak)"
             >
-              <span>♻️</span> Restaurar Copia
+              {#if toolbarButtonStyle !== 'text_only'}<span>♻️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar LexiShield</span>{/if}
             </button>
           </div>
         </div>
@@ -2046,7 +3258,7 @@
 
     {:else if activeTab === "watch"}
       <!-- VISTA PORTAPAPELES (WATCH) -->
-      <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col justify-between shadow-lg">
+      <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col shadow-lg overflow-auto">
         <div>
           {#if !dismissedTips.watch}
             <div transition:slide class="mb-4 p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
@@ -2054,7 +3266,7 @@
                 <span class="text-base">💡</span>
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Monitorización del Portapapeles (Watch Mode)</p>
-                  <p>Al activar la escucha, cada vez que copies texto con Ctrl+C (o Cmd+C), LexiShield interceptará los tokens sensibles, los ofuscará en segundo plano con tu bóveda y colocará el texto seguro listo para pegar en IAs o chats. Si copias una respuesta de una IA, puedes poner la dirección en "Desofuscar" para recuperar los valores reales al instante.</p>
+                  <p>Al activar la escucha, cada vez que copies texto con Ctrl+C (o Cmd+C), LexiShield interceptará los tokens sensibles, los protegerá en segundo plano con tu bóveda y colocará el texto seguro listo para pegar en IAs o chats. Si copias una respuesta de una IA, puedes poner la dirección en "Restaurar" para recuperar los valores reales al instante.</p>
                 </div>
               </div>
               <button on:click={() => dismissTip('watch')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
@@ -2071,34 +3283,123 @@
             
             <div class="flex items-center gap-2">
               <button
-                on:click={() => openHelp('watch')}
-                class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-                title="Ver guía de monitorización de portapapeles"
+                type="button"
+                on:click={toggleWatchMode}
+                class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm {isWatching ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/20' : 'bg-primary-600 hover:bg-primary-500 text-slate-950 shadow-primary-500/20'}"
+                title={isWatching ? "Detener monitorización activa del portapapeles" : "Iniciar monitorización activa del portapapeles"}
               >
-                <span>❔</span> Ayuda
+                {#if toolbarButtonStyle !== 'text_only'}<span>{isWatching ? '⏹️' : '▶️'}</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>{isWatching ? 'Detener' : 'Monitorizar'}</span>{/if}
               </button>
+
+              <button
+                type="button"
+                on:click={() => {
+                  appConfig.gui.privacy_blur = !appConfig.gui.privacy_blur;
+                  saveSettings();
+                }}
+                class="px-3 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
+                title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados en los eventos" : "Activar Modo Privacidad (Desenfocar valores originales capturados)"}
+              >
+                {#if toolbarButtonStyle !== 'text_only'}<span>{privacyBlur ? "🙈" : "👁️"}</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
+              </button>
+
               <button
                 on:click={handleClearClipboard}
                 class="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
               >
-                <span>🧹</span> Vaciar Portapapeles
+                {#if toolbarButtonStyle !== 'text_only'}<span>🧹</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Vaciar Portapapeles</span>{/if}
               </button>
             </div>
           </div>
 
+          {#if clipboardError}
+            <div class="mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3 text-xs text-amber-800 dark:text-amber-200">
+              <span class="text-base">⚠️</span>
+              <div class="flex-1">
+                <p class="font-bold text-slate-900 dark:text-white mb-0.5">Aviso de acceso al portapapeles de Linux</p>
+                <p class="mb-1">{clipboardError}</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Si utilizas Wayland (KDE Plasma/GNOME), instala el paquete <code class="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded font-mono">wl-clipboard</code> (<code class="font-mono">sudo apt install wl-clipboard</code> o <code class="font-mono">sudo pacman -S wl-clipboard</code>) o asegúrate de que Klipper/XWayland esté activo.</p>
+              </div>
+            </div>
+          {/if}
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dirección de Transformación</span>
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dirección de Transformación</span>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full {watchDirection === 'obfuscate' ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'}">
+                  {watchDirection === 'obfuscate' ? 'Modo Proteger' : 'Modo Restaurar'}
+                </span>
+              </div>
               
-              <div class="space-y-2 text-xs">
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" bind:group={watchDirection} value="obfuscate" class="accent-primary-500" />
-                  <span>Ofuscar automáticamente (Original -> Seudónimo)</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" bind:group={watchDirection} value="deobfuscate" class="accent-primary-500" />
-                  <span>Desofuscar automáticamente (Seudónimo -> Original)</span>
-                </label>
+              <!-- Selector de Tarjetas Táctiles Interactivas -->
+              <div class="grid grid-cols-2 gap-3">
+                <!-- Tarjeta: Proteger -->
+                <button
+                  type="button"
+                  on:click={() => {
+                    watchDirection = 'obfuscate';
+                    if (isWatching) {
+                      statusMessage = "👀 Monitorización del portapapeles activa (Protección).";
+                    }
+                  }}
+                  class="p-3 rounded-xl border text-left transition duration-150 flex flex-col justify-between gap-2 cursor-pointer {watchDirection === 'obfuscate' ? 'bg-primary-500/15 border-primary-500/50 shadow-md ring-2 ring-primary-500/20 text-slate-900 dark:text-white' : 'bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-600 dark:text-slate-400'}"
+                  title="Proteger automáticamente: Detecta datos confidenciales y los reemplaza por seudónimos antes de enviar a IAs o chats"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    {#if toolbarButtonStyle !== 'text_only'}
+                      <div class="flex items-center gap-1 text-base font-bold text-primary-600 dark:text-primary-400">
+                        <span>🛡️</span>
+                        <span class="text-xs">➔</span>
+                      </div>
+                    {/if}
+                    <span class="w-2.5 h-2.5 rounded-full {watchDirection === 'obfuscate' ? 'bg-primary-500 ring-2 ring-primary-500/40' : 'bg-slate-300 dark:bg-white/10'}"></span>
+                  </div>
+
+                  <div>
+                    {#if toolbarButtonStyle !== 'icons_only'}
+                      <p class="text-xs font-bold leading-tight">Proteger</p>
+                    {/if}
+                    <p class="text-[10px] font-mono mt-0.5 text-slate-500 dark:text-slate-400">
+                      Original ➔ Seudónimo
+                    </p>
+                  </div>
+                </button>
+
+                <!-- Tarjeta: Restaurar -->
+                <button
+                  type="button"
+                  on:click={() => {
+                    watchDirection = 'deobfuscate';
+                    if (isWatching) {
+                      statusMessage = "👀 Monitorización del portapapeles activa (Restauración).";
+                    }
+                  }}
+                  class="p-3 rounded-xl border text-left transition duration-150 flex flex-col justify-between gap-2 cursor-pointer {watchDirection === 'deobfuscate' ? 'bg-indigo-500/15 border-indigo-500/50 shadow-md ring-2 ring-indigo-500/20 text-slate-900 dark:text-white' : 'bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-600 dark:text-slate-400'}"
+                  title="Restaurar automáticamente: Recupera los valores originales a partir de los seudónimos devueltos por la IA"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    {#if toolbarButtonStyle !== 'text_only'}
+                      <div class="flex items-center gap-1 text-base font-bold text-indigo-600 dark:text-indigo-400">
+                        <span class="text-xs">⮜</span>
+                        <span>🔄</span>
+                      </div>
+                    {/if}
+                    <span class="w-2.5 h-2.5 rounded-full {watchDirection === 'deobfuscate' ? 'bg-indigo-500 ring-2 ring-indigo-500/40' : 'bg-slate-300 dark:bg-white/10'}"></span>
+                  </div>
+
+                  <div>
+                    {#if toolbarButtonStyle !== 'icons_only'}
+                      <p class="text-xs font-bold leading-tight">Restaurar</p>
+                    {/if}
+                    <p class="text-[10px] font-mono mt-0.5 text-slate-500 dark:text-slate-400">
+                      Seudónimo ➔ Original
+                    </p>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -2136,14 +3437,14 @@
               {/if}
             </div>
 
-            <div class="overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 p-3 space-y-2.5 max-h-64 min-h-[160px]">
+            <div class="overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/80 p-3 space-y-2.5 max-h-64 min-h-[160px] smooth-scroll-tokens">
               {#each clipboardEvents as ev (ev.id)}
                 <div class="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm space-y-2">
                   <div class="flex items-center justify-between text-xs">
                     <div class="flex items-center gap-2 font-mono">
                       <span class="text-slate-400 text-[11px]">{ev.timestamp}</span>
                       <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {ev.direction === 'obfuscate' ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'}">
-                        {ev.direction === 'obfuscate' ? 'Ofuscación' : 'Desofuscación'}
+                        {ev.direction === 'obfuscate' ? 'Protección' : 'Restauración'}
                       </span>
                     </div>
                     <span class="text-[11px] font-medium text-slate-500">{ev.tokens.length} entidades reconocidas</span>
@@ -2152,48 +3453,52 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono pt-1">
                     <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
                       <span class="block text-[10px] text-slate-400 font-sans uppercase font-bold mb-1">Texto Capturado:</span>
-                      <p class="truncate text-slate-700 dark:text-slate-300 select-all" title={ev.originalText}>{ev.originalText}</p>
+                      {#if showTokenBadges}
+                        <p class="truncate text-slate-700 dark:text-slate-300 select-all {privacyBlur ? 'privacy-blurred' : ''}" title={ev.originalText}>
+                          {@html renderHighlightedTokens(ev.originalText, ev.direction === 'deobfuscate', ev.tokens)}
+                        </p>
+                      {:else}
+                        <p class="truncate text-slate-700 dark:text-slate-300 select-all {privacyBlur ? 'privacy-blurred' : ''}" title={ev.originalText}>{ev.originalText}</p>
+                      {/if}
                     </div>
                     <div class="p-2 rounded bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/5">
                       <span class="block text-[10px] text-primary-500 font-sans uppercase font-bold mb-1">Resultado en Portapapeles:</span>
-                      <p class="truncate text-primary-700 dark:text-primary-300 select-all" title={ev.transformedText}>{ev.transformedText}</p>
+                      {#if showTokenBadges}
+                        <p class="truncate text-primary-700 dark:text-primary-300 select-all" title={ev.transformedText}>
+                          {@html renderHighlightedTokens(ev.transformedText, ev.direction === 'obfuscate', ev.tokens)}
+                        </p>
+                      {:else}
+                        <p class="truncate text-primary-700 dark:text-primary-300 select-all" title={ev.transformedText}>{ev.transformedText}</p>
+                      {/if}
                     </div>
                   </div>
 
-                  {#if ev.tokens.length > 0}
-                    <div class="flex flex-wrap gap-1.5 pt-1">
-                      {#each ev.tokens as tok}
-                        <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-mono">
-                          <span class="text-[10px] px-1 py-0.2 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded font-semibold">{tok.detector_type || 'Token'}</span>
-                          <span class="text-amber-600 dark:text-amber-400 font-semibold">{tok.original}</span>
-                          <span class="text-slate-400">→</span>
-                          <span class="text-primary-600 dark:text-primary-400">{tok.pseudonym}</span>
-                        </div>
-                      {/each}
-                    </div>
-                  {:else}
-                    <p class="text-[11px] text-slate-400 italic">0 tokens confidenciales detectados (texto íntegro mantenido).</p>
+                  {#if showTokenBadges}
+                    {#if ev.tokens.length > 0}
+                      <div class="flex flex-wrap gap-1.5 pt-1">
+                        {#each ev.tokens as tok}
+                          <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-mono">
+                            <span class="text-[10px] px-1 py-0.2 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded font-semibold">{tok.detector_type || 'Token'}</span>
+                            <span class="text-amber-600 dark:text-amber-400 font-semibold {privacyBlur ? 'privacy-blurred' : ''}">{tok.original}</span>
+                            <span class="text-slate-400">→</span>
+                            <span class="text-primary-600 dark:text-primary-400">{tok.pseudonym}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <p class="text-[11px] text-slate-400 italic">0 tokens confidenciales detectados (texto íntegro mantenido).</p>
+                    {/if}
                   {/if}
                 </div>
               {:else}
                 <div class="h-full flex flex-col items-center justify-center py-8 text-slate-400 dark:text-slate-500 text-center">
-                  <div class="text-2xl mb-1">📋</div>
+                  <div class="text-3xl mb-2">📋</div>
                   <p class="text-xs font-medium">Esperando actividad en el portapapeles...</p>
                   <p class="text-[11px] text-slate-400 mt-0.5">Al copiar texto con IPs, emails, claves o tokens, verás aquí su reconocimiento en vivo.</p>
                 </div>
               {/each}
             </div>
           </div>
-        </div>
-
-        <div class="flex justify-end pt-4 border-t border-slate-200 dark:border-white/10">
-          <button
-            on:click={toggleWatchMode}
-            class="px-6 py-2.5 rounded-xl text-xs font-bold transition duration-150 flex items-center gap-2 shadow-lg {isWatching ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/20' : 'bg-primary-600 hover:bg-primary-500 text-slate-950 shadow-primary-500/20'}"
-          >
-            <span>{isWatching ? '⏹️' : '▶️'}</span>
-            {isWatching ? 'Detener Monitorización' : 'Iniciar Monitorización en Vivo'}
-          </button>
         </div>
       </div>
 
@@ -2221,14 +3526,6 @@
               </h2>
               <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Personaliza la ergonomía de la interfaz, comportamiento del portapapeles y persistencia.</p>
             </div>
-
-            <button
-              on:click={() => openHelp('config')}
-              class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center gap-1 transition"
-              title="Ver guía de configuración"
-            >
-              <span>❔</span> Ayuda
-            </button>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2243,8 +3540,7 @@
                   bind:value={appConfig.gui.default_tab}
                   class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                 >
-                  <option value="studio">✨ Studio</option>
-                  <option value="scanner">🔍 Escáner</option>
+                  <option value="studio">✨ Transformación</option>
                   <option value="pairs">📑 Pares de Tokens</option>
                   <option value="vaults">🗄️ Bóvedas Lexi</option>
                   <option value="watch">📋 Portapapeles</option>
@@ -2255,11 +3551,7 @@
                 <span class="block font-medium text-slate-600 dark:text-slate-400">Pestañas Visibles en Barra Superior:</span>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_studio} class="rounded accent-primary-500" />
-                  <span>Studio</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" bind:checked={appConfig.gui.tabs.show_scanner} class="rounded accent-primary-500" />
-                  <span>Escáner</span>
+                  <span>Transformación</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.tabs.show_pairs} class="rounded accent-primary-500" />
@@ -2321,6 +3613,257 @@
                 </label>
               </div>
             </div>
+
+            <!-- Transformación y Perfil de Sensibilidad -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Transformación y Sensibilidad</span>
+              
+              <div>
+                <label for="config-sensitivity-profile-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Perfil de Sensibilidad de Auditoría:</label>
+                <select
+                  id="config-sensitivity-profile-select"
+                  bind:value={activeSensitivityProfile}
+                  on:change={() => {
+                    localStorage.setItem("sensitivity_profile", activeSensitivityProfile);
+                    statusMessage = `🛡️ Perfil de sensibilidad actualizado a: ${activeSensitivityProfile === 'all' ? 'Completo' : activeSensitivityProfile === 'devops' ? 'DevOps & Red' : 'RGPD & Identidad'}.`;
+                  }}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="all">🛡️ Perfil: Completo (Todos los detectores activos)</option>
+                  <option value="devops">🌐 Perfil: DevOps & Red (IPs, UUIDs, Hostnames, Logs)</option>
+                  <option value="gdpr">🪪 Perfil: RGPD & Identidad (Emails, Nombres, DNI/NIE, Tarjetas)</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                  Filtra los tipos de entidades analizadas y mostradas en la auditoría de Transformación. La preferencia se guarda automáticamente entre sesiones.
+                </p>
+              </div>
+            </div>
+
+            <!-- Selección de Archivos y Carpetas -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Selección de Archivos y Carpetas</span>
+              
+              <div>
+                <label for="config-file-selection-mode-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Método de ingesta preferido:</label>
+                <select
+                  id="config-file-selection-mode-select"
+                  bind:value={appConfig.gui.file_selection_mode}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value="ambos">✨ Ambos (Arrastrar y Soltar + Botones)</option>
+                  <option value="arrastrar">🖱️ Solo Arrastrar y Soltar (Drag & Drop)</option>
+                  <option value="botones">🔘 Solo Botones de Selección</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                  Configura cómo interactuar con archivos en Transformación. Exige que al menos una opción permanezca activa en todo momento.
+                </p>
+              </div>
+            </div>
+
+            <!-- Escritorio y Salida de Archivos -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Escritorio y Salida de Archivos</span>
+              
+              <div>
+                <label for="config-output-suffix-input" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sufijo para copias procesadas en Transformación:</label>
+                <input
+                  id="config-output-suffix-input"
+                  type="text"
+                  bind:value={appConfig.gui.output_suffix}
+                  placeholder=".protegido"
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
+                />
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Se añadirá automáticamente antes de la extensión (ej. <code>archivo{appConfig.gui.output_suffix || '.protegido'}.json</code>).
+                </p>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5 space-y-2">
+                <label for="config-close-action-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400">
+                  Comportamiento al pulsar el botón de cerrar [X]:
+                </label>
+                <select
+                  id="config-close-action-select"
+                  bind:value={appConfig.gui.close_action}
+                  on:change={() => {
+                    appConfig.gui.close_to_tray = (appConfig.gui.close_action === "tray");
+                    saveSettings();
+                  }}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="tray">🗄️ Minimizar a la bandeja del sistema (icono junto al reloj / segundo plano)</option>
+                  <option value="taskbar">📌 Minimizar a la barra de tareas (como ventana minimizada)</option>
+                  <option value="close">🚪 Cerrar la aplicación completamente (por defecto del sistema)</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  {#if appConfig.gui.close_action === 'tray'}
+                    Al pulsar [X], la ventana se oculta y LexiShield sigue protegiendo en segundo plano desde el área de notificación.
+                  {:else if appConfig.gui.close_action === 'taskbar'}
+                    Al pulsar [X], la ventana se minimiza a la barra de tareas inferior sin cerrarse.
+                  {:else}
+                    Al pulsar [X], la ventana y el proceso se cierran por completo.
+                  {/if}
+                </p>
+              </div>
+            </div>
+
+            <!-- Aspecto, Tipografía y Privacidad -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Aspecto y Accesibilidad</span>
+              
+              <div class="space-y-3">
+                <div>
+                  <label for="config-theme-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tema Visual:</label>
+                  <select
+                    id="config-theme-select"
+                    bind:value={appConfig.gui.theme}
+                    on:change={applyThemeFromConfig}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                  >
+                    <option value="system">🖥️ Seguir tema del sistema</option>
+                    <option value="dark">🌙 Modo Oscuro</option>
+                    <option value="light">☀️ Modo Claro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <span class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Color de Acento de la Interfaz:</span>
+                  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {#each [
+                      { id: 'cyan', label: 'Cian Neón', color: 'bg-cyan-500', desc: 'Defecto' },
+                      { id: 'emerald', label: 'Esmeralda', color: 'bg-emerald-500', desc: 'Ciber' },
+                      { id: 'cobalt', label: 'Cobalto', color: 'bg-blue-600', desc: 'SOC' },
+                      { id: 'purple', label: 'Amatista', color: 'bg-purple-600', desc: 'Auditoría' },
+                      { id: 'amber', label: 'Ámbar', color: 'bg-amber-500', desc: 'Retro' }
+                    ] as palette}
+                      <button
+                        type="button"
+                        on:click={() => {
+                          appConfig.gui.accent_color = palette.id;
+                          applyAccentFromConfig();
+                        }}
+                        class="flex flex-col items-center gap-1 p-2 rounded-xl border text-center transition {appConfig.gui.accent_color === palette.id ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500' : 'border-slate-200 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5'}"
+                      >
+                        <span class="w-6 h-6 rounded-full {palette.color} shadow-sm border-2 border-white dark:border-slate-900 flex items-center justify-center text-white text-[10px] font-bold">
+                          {#if appConfig.gui.accent_color === palette.id}✓{/if}
+                        </span>
+                        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">{palette.label}</span>
+                        <span class="text-[10px] text-slate-400">{palette.desc}</span>
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+
+                <div>
+                  <label for="config-font-size-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tamaño de letra en editores y tablas:</label>
+                  <select
+                    id="config-font-size-select"
+                    bind:value={appConfig.gui.font_size}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                  >
+                    <option value="small">Compacta (11px) - Máxima densidad</option>
+                    <option value="medium">Estándar (12px) - Equilibrada</option>
+                    <option value="large">Ampliada (14px) - Pantallas 2K/4K</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="config-toolbar-style-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Estilo de botones en barras de herramientas:</label>
+                  <select
+                    id="config-toolbar-style-select"
+                    bind:value={toolbarButtonStyle}
+                    on:change={() => localStorage.setItem("toolbar_button_style", toolbarButtonStyle)}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                  >
+                    <option value="both">1. ✨ Icono y texto (Completo)</option>
+                    <option value="icons_only">2. 🎨 Solo icono (Minimalista)</option>
+                    <option value="text_only">3. 📝 Solo texto (Clásico)</option>
+                  </select>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    Controla si los botones de toda la aplicación muestran iconos y texto, exclusivamente el icono, o únicamente su etiqueta de texto.
+                  </p>
+                </div>
+
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs space-y-2">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.privacy_blur} class="rounded accent-primary-500" />
+                    <span>Activar Modo Privacidad (Desenfoque de pantalla) por defecto</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.show_token_badges} on:change={() => { showTokenBadges = appConfig.gui.show_token_badges; }} class="rounded accent-primary-500" />
+                    <span>Activar Insignias (Badges) coloreadas de tokens por defecto</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Seguridad y Cero Conocimiento -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Seguridad y Bóvedas</span>
+              
+              <div>
+                <label for="config-auto-lock-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Auto-bloqueo de bóveda por inactividad:</label>
+                <select
+                  id="config-auto-lock-select"
+                  bind:value={appConfig.gui.auto_lock_minutes}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value={0}>🛡️ Desactivado (Mantener desbloqueada)</option>
+                  <option value={1}>⏱️ Bloquear tras 1 minuto sin actividad</option>
+                  <option value={5}>⏱️ Bloquear tras 5 minutos sin actividad</option>
+                  <option value={15}>⏱️ Bloquear tras 15 minutos sin actividad</option>
+                  <option value={30}>⏱️ Bloquear tras 30 minutos sin actividad</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                  Al activarse, LexiShield descarga de la memoria RAM la contraseña y los mapeos si no se detecta actividad del usuario.
+                </p>
+              </div>
+            </div>
+
+            <!-- Diagnóstico y Depuración (Exclusivo en Opciones) -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4 md:col-span-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Diagnóstico y Depuración</span>
+              
+              <div class="flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div class="space-y-1 max-w-xl">
+                  <p class="font-medium text-slate-800 dark:text-slate-200">
+                    Captura y registro de trazas operativas internas
+                  </p>
+                  <p class="text-slate-500 dark:text-slate-400 text-[11px]">
+                    Permite registrar eventos detallados en memoria para depuración de reglas y resolución de incidencias sin exponer iconos en la cabecera principal.
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    on:click={async () => {
+                      try {
+                        debugMode = await invokeTauri("set_debug_mode_command", { enabled: !debugMode });
+                        statusMessage = debugMode ? "Modo depuración activado." : "Modo depuración desactivado.";
+                        if (debugMode) fetchDebugLogs();
+                      } catch (e) {
+                        statusMessage = "Error al cambiar depuración: " + e;
+                      }
+                    }}
+                    class="px-3 py-1.5 rounded-xl border text-xs font-semibold transition flex items-center gap-1.5 {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/10'}"
+                  >
+                    {#if toolbarButtonStyle !== 'text_only'}<span>{debugMode ? '🐞' : '⚙️'}</span>{/if}
+                    {#if toolbarButtonStyle !== 'icons_only'}<span>{debugMode ? 'Depuración: ACTIVA' : 'Depuración: INACTIVA'}</span>{/if}
+                  </button>
+
+                  <button
+                    type="button"
+                    on:click={openLogsModal}
+                    class="px-3 py-1.5 rounded-xl border text-xs font-semibold bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/10 transition flex items-center gap-1.5"
+                    title="Abrir visor de trazas y eventos registrados"
+                  >
+                    {#if toolbarButtonStyle !== 'text_only'}<span>📋</span>{/if}
+                    {#if toolbarButtonStyle !== 'icons_only'}<span>Ver Registro de Logs</span>{/if}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2366,17 +3909,52 @@
     </div>
   {/if}
 
-  <!-- BARRA DE ESTADO INFERIOR -->
-  <footer class="h-7 bg-slate-200 dark:bg-brand-surface border-t border-slate-300 dark:border-white/5 px-4 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 shrink-0 select-text">
-    <div class="flex items-center gap-2 truncate">
-      <span class="truncate">{statusMessage}</span>
+  <!-- BARRA DE ESTADO INFERIOR MODULAR TIPO IDE -->
+  <footer class="h-7 bg-slate-200/90 dark:bg-slate-950 border-t border-slate-300 dark:border-white/10 px-3 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 shrink-0 select-none">
+    <!-- Izquierda: Estado general / Mensaje activo -->
+    <div class="flex items-center gap-2 truncate flex-1 mr-4">
+      <span class="truncate select-text">{statusMessage}</span>
     </div>
-    <div class="flex items-center gap-3 shrink-0 font-mono text-[10px]">
+
+    <!-- Derecha: Cápsulas modulares tipo VS Code / JetBrains -->
+    <div class="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
+      <!-- Bóveda activa -->
+      <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Bóveda de seudónimos activa">
+        <span class="w-1.5 h-1.5 rounded-full {isVaultUnlocked ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
+        <span class="font-semibold text-slate-700 dark:text-slate-300">{vaultPath ? vaultPath.split('/').pop() : 'default.lexi'}</span>
+      </div>
+
+      <!-- Arquitectura Zero-Knowledge -->
+      <div class="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Cifrado local sin servidores externos">
+        <span>🛡️</span> Zero-Knowledge
+      </div>
+
+      <!-- Formato de entrada detectado -->
+      <div class="hidden md:flex items-center gap-1 px-2 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-300 border border-primary-500/20" title="Formato sintáctico detectado">
+        <span>⚡</span> {detectedInputFormat}
+      </div>
+
+      <!-- Rendimiento / Telemetría del último reporte -->
       {#if lastReport}
-        <span>Reemplazos: {lastReport.replacements_applied}</span>
-        <span>Tiempo: {lastReport.elapsed_ms.toFixed(1)}ms</span>
+        <div class="hidden lg:flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" title="Rendimiento del último procesamiento">
+          <span>⚡</span> {lastReport.elapsed_ms.toFixed(1)}ms · {lastReport.replacements_applied} repl.
+        </div>
       {/if}
-      <span>Bóveda: {vaultPath ? vaultPath.split('/').pop() : 'default.lexi'}</span>
+
+      <!-- Modo de Privacidad (Exclusivo en vistas con tokens: Studio, Pares, Portapapeles) -->
+      {#if activeTab === 'studio' || activeTab === 'pairs' || activeTab === 'watch'}
+        <div class="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Modo de privacidad visual (desenfoque)">
+          <span>{privacyBlur ? '🕶️ Protegido' : '👁️ Normal'}</span>
+        </div>
+      {/if}
+
+      <!-- Codificación y Versión -->
+      <div class="px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5 text-slate-500 dark:text-slate-400">
+        UTF-8
+      </div>
+      <div class="px-2 py-0.5 rounded bg-primary-600/15 text-primary-700 dark:text-primary-400 font-semibold border border-primary-500/20">
+        v2.1.0
+      </div>
     </div>
   </footer>
 
@@ -2418,6 +3996,7 @@
             </div>
             <input
               id="unlock-pwd-input"
+              use:autofocus
               type="password"
               bind:value={unlockPassword}
               placeholder="Introduce la contraseña..."
@@ -2477,6 +4056,7 @@
             </div>
             <input
               id="init-vault-pwd"
+              use:autofocus
               type="password"
               bind:value={initVaultPassword}
               placeholder="Introduce la contraseña para cifrar la bóveda..."
@@ -2503,7 +4083,7 @@
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
         <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <span>➕</span> Añadir Par de Ofuscación
+          <span>➕</span> Añadir Par de Sustitución
         </h3>
         
         <form on:submit|preventDefault={handleAddPairSubmit} class="space-y-3 text-xs">
@@ -2514,12 +4094,12 @@
               type="text"
               bind:value={newPairOriginal}
               placeholder="ej: Juan Pérez o 192.168.1.10"
-              class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500"
+              class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500 {privacyBlur ? 'privacy-blurred' : ''}"
             />
           </div>
 
           <div>
-            <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Seudónimo Ofuscado (o '=' para omitir):</label>
+            <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Seudónimo Protegido (o '=' para omitir):</label>
             <input
               id="add-pair-pseudo-input"
               type="text"
@@ -2579,6 +4159,7 @@
             <label for="create-vault-name-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Nombre de la Bóveda (.lexi):</label>
             <input
               id="create-vault-name-input"
+              use:autofocus
               type="text"
               bind:value={newVaultName}
               placeholder="ej: clientes_2026.lexi"
@@ -2630,6 +4211,7 @@
             <label for="rename-vault-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Nuevo Nombre:</label>
             <input
               id="rename-vault-input"
+              use:autofocus
               type="text"
               bind:value={renameNewVaultName}
               class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500"
@@ -2661,7 +4243,7 @@
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
         <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <span>📦</span> Copia de Seguridad Completa (Bzip2)
+          <span>📦</span> Backup Completo de LexiShield
         </h3>
         <p class="text-xs text-slate-500 dark:text-slate-400">Empaqueta la configuración, reglas personalizadas y todas las bóvedas en un único archivo comprimido con algoritmo Bzip2.</p>
         
@@ -2670,6 +4252,7 @@
             <label for="backup-pwd-modal-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Contraseña de Cifrado AES-256 (Opcional):</label>
             <input
               id="backup-pwd-modal-input"
+              use:autofocus
               type="password"
               bind:value={backupPassword}
               placeholder="Contraseña para proteger la copia..."
@@ -2689,7 +4272,7 @@
               type="submit"
               class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-xl shadow-md shadow-amber-500/20"
             >
-              Crear Archivo Bzip2
+              Crear Backup
             </button>
           </div>
         </form>
@@ -2703,10 +4286,12 @@
       <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-4xl w-full h-[80vh] flex flex-col shadow-2xl">
         <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <span class="text-xl">🐞</span>
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center text-xl shrink-0">
+              🐞
+            </div>
             <div>
               <h3 class="text-sm font-bold text-slate-900 dark:text-white">Registros de Depuración en Tiempo Real</h3>
-              <p class="text-xs text-slate-500 dark:text-slate-400">Telemetría profunda del motor de ofuscación y llamadas Tauri.</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Telemetría profunda del motor de protección y llamadas Tauri.</p>
             </div>
           </div>
           
@@ -2724,7 +4309,13 @@
             >
               {debugMode ? 'Modo DEBUG: ACTIVO' : 'Modo DEBUG: INACTIVO'}
             </button>
-            <button on:click={closeLogsModal} class="text-slate-400 hover:text-slate-200 text-lg px-2">✕</button>
+            <button
+              on:click={closeLogsModal}
+              class="w-8 h-8 rounded-xl text-sm flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+              title="Cerrar"
+            >
+              ✕
+            </button>
           </div>
         </div>
 
@@ -2752,7 +4343,7 @@
           </div>
         </div>
 
-        <div class="flex-1 p-3 overflow-auto bg-slate-950 font-mono text-[11px] text-slate-300 space-y-1 select-text">
+        <div class="flex-1 p-3 overflow-auto bg-slate-950 font-mono text-[11px] text-slate-300 space-y-1 select-text smooth-scroll-tokens">
           {#each debugLogs.filter(l => (logFilterLevel === 'all' || l.level.toLowerCase() === logFilterLevel) && (!logSearch || l.message.toLowerCase().includes(logSearch.toLowerCase()))) as log}
             <div class="flex items-start gap-2 leading-relaxed hover:bg-white/5 p-0.5 rounded">
               <span class="text-slate-500 shrink-0">{log.timestamp}</span>
@@ -2784,14 +4375,22 @@
       <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         <!-- Cabecera del modal de ayuda -->
         <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
-          <div class="flex items-center gap-2.5">
-            <span class="text-xl">📘</span>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-500 flex items-center justify-center text-xl shrink-0">
+              📘
+            </div>
             <div>
               <h3 class="text-sm font-bold text-slate-900 dark:text-white">Manual y Ayuda Contextual de LexiShield</h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">Conceptos clave, recomendaciones de seguridad y flujos de trabajo.</p>
             </div>
           </div>
-          <button on:click={closeHelp} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg px-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">✕</button>
+          <button
+            on:click={closeHelp}
+            class="w-8 h-8 rounded-xl text-sm flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+            title="Cerrar"
+          >
+            ✕
+          </button>
         </div>
 
         <!-- Selector de Tema de Ayuda -->
@@ -2800,13 +4399,7 @@
             on:click={() => (activeHelpTab = "studio")}
             class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'studio' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
           >
-            ✨ Studio (IA)
-          </button>
-          <button
-            on:click={() => (activeHelpTab = "scanner")}
-            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'scanner' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
-          >
-            🔍 Escáner
+            ✨ Transformación
           </button>
           <button
             on:click={() => (activeHelpTab = "pairs")}
@@ -2844,25 +4437,32 @@
           >
             🐞 Logs
           </button>
+          <button
+            on:click={() => (activeHelpTab = "shortcuts")}
+            class="px-2.5 py-1 rounded-lg font-medium transition {activeHelpTab === 'shortcuts' ? 'bg-primary-500/20 text-primary-600 dark:text-primary-300 font-bold border border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
+          >
+            ⌨️ Atajos de Teclado
+          </button>
         </div>
 
         <!-- Contenido Específico del Tema -->
-        <div class="flex-1 p-6 overflow-auto text-xs text-slate-700 dark:text-slate-300 space-y-4 select-text leading-relaxed">
+        <div class="flex-1 p-6 overflow-auto text-xs text-slate-700 dark:text-slate-300 space-y-4 select-text leading-relaxed smooth-scroll-tokens">
           {#if activeHelpTab === "studio"}
             <div class="space-y-3">
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>✨</span> Cómo ofuscar texto para usar en Inteligencia Artificial o proteger secretos
+                <span>✨</span> Cómo proteger texto para usar en Inteligencia Artificial o compartir datos
               </h4>
-              <p>El objetivo principal del Studio es permitirte interactuar de forma segura con modelos de lenguaje (como ChatGPT, Claude, Gemini o IAs locales), o compartir documentos con personas que no deben conocer información confidencial (nombres de clientes, DNI, IBAN, contraseñas, direcciones IP o números de tarjeta).</p>
+              <p>El objetivo principal de la Transformación es permitirte interactuar de forma segura con modelos de lenguaje (como ChatGPT, Claude, Gemini o IAs locales), o compartir documentos con personas que no deben conocer información confidencial (nombres de clientes, DNI, IBAN, contraseñas, direcciones IP o números de tarjeta).</p>
               
               <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
                 <p class="font-bold text-slate-900 dark:text-white">Flujo de Trabajo Recomendado:</p>
                 <ol class="list-decimal list-inside space-y-1.5 pl-1">
-                  <li><strong>Pega el texto confidencial</strong> en el panel de entrada (o abre un archivo con <em>Abrir Archivo</em>).</li>
-                  <li><strong>Selecciona el formato:</strong> Si es código estructurado, elige JSON, XML o Logs para garantizar que no se alteren comillas ni delimitadores clave.</li>
-                  <li><strong>Pulsa "Ofuscar":</strong> LexiShield reemplazará cada token confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
-                  <li><strong>Usa el texto en la IA:</strong> Copia el resultado ofuscado y envíalo con total tranquilidad a cualquier modelo de IA.</li>
-                  <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en el Studio y pulsa <strong>"Desofuscar"</strong> para recuperar al 100% los valores reales.</li>
+                  <li><strong>Pega el contenido</strong> en el panel <em>Texto claro</em> (o arrastra y suelta un archivo o carpeta directamente encima).</li>
+                  <li><strong>Detección automática:</strong> El motor identifica automáticamente la estructura sintáctica (JSON, XML, Logs o texto plano) sin que tengas que configurarlo.</li>
+                  <li><strong>Pulsa "Proteger":</strong> El botón direccional central reemplazará cada dato confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
+                  <li><strong>Modo Markdown reactivo:</strong> Si pulsas el conmutador <em>"Markdown"</em> en la barra superior, LexiShield ofuscará automáticamente el texto en claro y mostrará la vista previa formateada en ambos paneles.</li>
+                  <li><strong>Usa el texto en la IA:</strong> Copia el <em>Texto protegido</em> y envíalo con total tranquilidad a cualquier modelo de IA o tercero.</li>
+                  <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en <em>Texto protegido</em> y pulsa <strong>"Restaurar"</strong> para recuperar al 100% los valores reales.</li>
                 </ol>
               </div>
 
@@ -2870,24 +4470,25 @@
                 <p class="font-bold text-primary-700 dark:text-primary-300">📄 Conversión a Markdown con Pandoc:</p>
                 <p>Si activas la casilla "Exportar Markdown con Pandoc", LexiShield convertirá documentos estructurados (.docx, .html, .rst) a Markdown nativo (.md), conservando encabezados, listas y tablas perfectas para ser interpretadas por modelos de IA con el menor consumo de tokens.</p>
               </div>
-            </div>
 
-          {:else if activeHelpTab === "scanner"}
-            <div class="space-y-3">
-              <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🔍</span> Escáner y Auditoría Preventiva de Fugas
-              </h4>
-              <p>El Escáner analiza proactivamente archivos individuales o proyectos enteros sin modificarlos, informándote de cuántos tokens sensibles están expuestos antes de publicar código o compartir repositorios.</p>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div class="p-3 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-1">
-                  <p class="font-bold text-slate-900 dark:text-white">Escaneo con .gitignore:</p>
-                  <p>Por defecto, el motor respeta los archivos <code class="font-mono">.gitignore</code> y omite carpetas masivas como <code class="font-mono">node_modules</code>, <code class="font-mono">target</code>, <code class="font-mono">.git</code> o archivos binarios.</p>
+              <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
+                <p class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <span>🔍</span> Desglose y Auditoría de Tokens:
+                </p>
+                <p>Al arrastrar o escanear archivos y carpetas, se abre automáticamente la pantalla de <em>Desglose y Auditoría</em>. LexiShield analiza los elementos clasificando los tokens por Red, Identidad, Sistemas o Claves, y permitiéndote omitir falsos positivos antes de guardarlos en tu bóveda. Al guardar o pulsar <em>"Limpiar Resultados"</em>, regresas automáticamente a Transformación.</p>
+              </div>
+
+              <div class="p-3 bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-white/5 rounded-xl flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">⌨️</span>
+                  <span>¿Prefieres operar con el teclado? Consulta la chuleta completa de atajos rápidos.</span>
                 </div>
-                <div class="p-3 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-1">
-                  <p class="font-bold text-slate-900 dark:text-white">Telemetría en Vivo:</p>
-                  <p>Durante escaneos de grandes directorios, verás el contador de archivos procesados, entidades encontradas y el archivo que se está examinando en ese instante.</p>
-                </div>
+                <button
+                  on:click={() => (activeHelpTab = "shortcuts")}
+                  class="px-2.5 py-1 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded-lg font-bold border border-primary-500/30 hover:bg-primary-500/30 transition shrink-0"
+                >
+                  Ver Atajos ➔
+                </button>
               </div>
             </div>
 
@@ -2902,8 +4503,9 @@
                 <p><strong>Operaciones Principales:</strong></p>
                 <ul class="list-disc list-inside space-y-1 pl-1">
                   <li><strong>Añadir Par:</strong> Permite precargar asociaciones personalizadas (ej. tu nombre con un seudónimo elegido por ti).</li>
+                  <li><strong>Búsqueda y Limpieza Rápida:</strong> Filtra por original o seudónimo y pulsa el botón <code>✕</code> para vaciar el buscador al instante.</li>
                   <li><strong>Omitir Token:</strong> Si una palabra clave o término técnico no debe sustituirse nunca, selecciónalo y pulsa "Omitir".</li>
-                  <li><strong>Restaurar .bak:</strong> Si cometes un error masivo, puedes recuperar la última copia automática de seguridad de la bóveda con un solo clic.</li>
+                  <li><strong>Copias de Seguridad (.bak):</strong> Las copias automáticas generadas al modificar pares se pueden restaurar de forma individual desde la tabla de Bóvedas.</li>
                 </ul>
               </div>
             </div>
@@ -2911,13 +4513,13 @@
           {:else if activeHelpTab === "vaults"}
             <div class="space-y-3">
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>🗄️</span> Gestión de Bóvedas Lexi y Copias Bzip2
+                <span>🗄️</span> Gestión de Bóvedas Lexi y Copias de Seguridad
               </h4>
               <p>Las bóvedas (<code class="font-mono">.lexi</code>) son archivos binarios herméticos donde residen tus tokens y correspondencias. Puedes crear múltiples bóvedas para separar tus clientes, proyectos o entornos personales.</p>
               
               <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
-                <p class="font-bold text-slate-900 dark:text-white">Copias de Seguridad Comprimidas con Bzip2:</p>
-                <p>La herramienta de backup empaqueta toda tu carpeta <code class="font-mono">~/.lexishield/</code> (incluyendo reglas TOML personalizadas y todas las bóvedas) en un único archivo comprimido con el estándar Bzip2 y opcionalmente protegido con cifrado AES-256 para almacenamiento seguro fuera de línea.</p>
+                <p class="font-bold text-slate-900 dark:text-white">Backup y Restauración de LexiShield:</p>
+                <p>El botón <strong>"Backup LexiShield"</strong> empaqueta toda tu configuración y bóvedas en un único archivo comprimido con Bzip2 (opcionalmente cifrado con AES-256). Con <strong>"Restaurar LexiShield"</strong> puedes recuperar cualquier copia de seguridad (.tar.bz2 o .lexibak) de forma integral.</p>
               </div>
             </div>
 
@@ -2931,9 +4533,10 @@
               <div class="space-y-2">
                 <p><strong>Características de Ergonomía y Seguridad:</strong></p>
                 <ul class="list-disc list-inside space-y-1 pl-1">
+                  <li><strong>Control en Smartbar Tier 2:</strong> Pulsa <em>"Monitorizar"</em> en la barra superior para activar la escucha y <em>"Detener"</em> para pausarla.</li>
                   <li><strong>Notificación Transparente:</strong> Cuando copias texto sin secretos, se informa claramente de <em>"0 tokens reconocidos"</em> para que sepas que el texto no fue modificado innecesariamente.</li>
                   <li><strong>Vista Previa Inmediata:</strong> El historial muestra en tiempo real tanto el texto capturado como el texto transformado colocado en el portapapeles.</li>
-                  <li><strong>Vaciado Seguro:</strong> Puedes pulsar <em>"Vaciar Portapapeles"</em> o activar en Configuración el borrado automático tras N segundos para que ningún secreto permanezca en la memoria del sistema operativo.</li>
+                  <li><strong>Vaciado Seguro:</strong> Puedes pulsar <em>"Vaciar Portapapeles"</em> en la barra superior o programar auto-vaciado en Configuración tras N segundos.</li>
                 </ul>
               </div>
             </div>
@@ -2943,7 +4546,7 @@
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>⚙️</span> Configuración y Ergonomía
               </h4>
-              <p>LexiShield se adapta a tu flujo de trabajo. Puedes personalizar qué pestañas se muestran en la barra superior si solo usas el Studio o el Escáner, elegir tu pestaña predeterminada al abrir el programa y conmutar la barra de comandos CLI equivalentes en vivo.</p>
+              <p>LexiShield se adapta a tu flujo de trabajo. Puedes personalizar qué pestañas se muestran en la barra superior si solo usas la Transformación o el Escáner, elegir tu pestaña predeterminada al abrir el programa y conmutar la barra de comandos CLI equivalentes en vivo.</p>
               <p class="text-[11px] text-slate-400">Todos los ajustes se guardan siguiendo las mejores prácticas de SO en <code class="font-mono">~/.lexishield/config.toml</code> con capacidad de restablecimiento automático en cualquier momento.</p>
             </div>
 
@@ -2969,6 +4572,87 @@
                 <span>🐞</span> Diagnóstico y Registros de Telemetría
               </h4>
               <p>La consola de logs registra cada evento del motor nativo en Rust (invocaciones a Tauri, lecturas y escrituras de bóvedas, detecciones y transformaciones). Puedes activar el <strong>Modo DEBUG</strong> para trazas detalladas o filtrar por nivel (INFO, WARN, ERROR).</p>
+            </div>
+
+          {:else if activeHelpTab === "shortcuts"}
+            <div class="space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/10">
+                <div>
+                  <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>⌨️</span> Atajos de Teclado Rápidos
+                  </h4>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Opera todo el flujo de protección y navegación sin levantar las manos del teclado.</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-2.5 text-xs font-mono">
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Proteger o Restaurar datos (según dirección activa)</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Enter</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Copiar texto resultante al portapapeles</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">C</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Alternar dirección (Proteger ⇄ Restaurar)</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">X</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Auditar texto actual sin modificarlo</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">A</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Limpiar ambos paneles (con guardado en historial)</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Ctrl</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Shift</kbd>
+                    <span>+</span>
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">L</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Abrir manual de ayuda y atajos rápidos</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">?</kbd>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5">
+                  <span class="font-sans text-slate-700 dark:text-slate-300">Cerrar ventanas y modales activos</span>
+                  <div class="flex items-center gap-1">
+                    <kbd class="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded font-bold border border-slate-300 dark:border-white/10 shadow-xs">Esc</kbd>
+                  </div>
+                </div>
+              </div>
             </div>
           {/if}
         </div>
@@ -3030,6 +4714,345 @@
           </button>
         </div>
       </div>
+    </div>
+  {/if}
+
+  <!-- MODAL UNIFICADO DE PROCESAMIENTO DE ARCHIVO O CARPETA EN STUDIO -->
+  {#if studioDropModal}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
+        on:click={cancelStudioDropModal}
+        aria-label="Cerrar modal de procesamiento"
+      ></button>
+      <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 flex flex-col shadow-2xl space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl {studioDropModal.isReverse ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-primary-500/10 border-primary-500/20 text-primary-500'} flex items-center justify-center text-xl shrink-0">
+            {studioDropModal.isDir ? '📁' : '📄'}
+          </div>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white truncate">
+              {studioDropModal.isReverse ? 'Restaurar' : 'Proteger'} {studioDropModal.isDir ? 'Carpeta' : 'Archivo'}: {studioDropModal.name}
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 truncate" title={studioDropModal.path}>{studioDropModal.path}</p>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 dark:text-slate-300">
+          {#if studioDropModal.isReverse}
+            Has soltado un elemento en <strong>Texto protegido</strong>. Se restaurarán los datos originales utilizando tu bóveda local de mapeos.
+          {:else}
+            Has soltado un elemento en <strong>Texto claro</strong>. Se protegerán los tokens confidenciales reemplazándolos por seudónimos seguros.
+          {/if}
+        </p>
+
+        <div class="p-3.5 bg-slate-50 dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-white/5 space-y-3.5 text-xs">
+          <!-- Opción Copia Separada y Sufijo -->
+          <div class="space-y-2">
+            <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+              <input type="checkbox" bind:checked={studioDropModal.copyMode} class="rounded accent-primary-500" />
+              <div>
+                <span class="font-semibold text-slate-900 dark:text-white">Guardar en una copia con sufijo</span>
+                <p class="text-[11px] text-slate-400">Conserva el archivo original intacto y genera una copia procesada.</p>
+              </div>
+            </label>
+
+            {#if studioDropModal.copyMode}
+              <div class="pl-6 space-y-2 pt-1 border-l-2 border-primary-500/30 ml-2">
+                <div class="flex items-center gap-2">
+                  <label for="modal-suffix-input" class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 shrink-0">Sufijo del archivo:</label>
+                  <input
+                    id="modal-suffix-input"
+                    type="text"
+                    bind:value={studioDropModal.suffix}
+                    placeholder={studioDropModal.isReverse ? ".restaurado" : ".protegido"}
+                    class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 font-mono text-xs focus:ring-1 focus:ring-primary-500 focus:outline-none flex-1"
+                  />
+                </div>
+
+                <div class="p-2 bg-primary-500/10 rounded-lg border border-primary-500/20 text-[11px] font-mono text-primary-700 dark:text-primary-300 flex items-center gap-1.5 truncate">
+                  <span class="font-bold">Vista previa:</span>
+                  <span class="truncate" title={computeOutputPreview(studioDropModal)}>{computeOutputPreview(studioDropModal)}</span>
+                </div>
+
+                <label class="flex items-center gap-2 cursor-pointer text-slate-600 dark:text-slate-400 text-[11px]">
+                  <input type="checkbox" bind:checked={studioDropModal.saveSuffixDefault} class="rounded accent-primary-500" />
+                  <span>Recordar este sufijo como predeterminado en mi configuración</span>
+                </label>
+              </div>
+            {:else}
+              <div class="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>Se modificará directamente el archivo original en su ubicación actual.</span>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Opciones específicas de Directorio -->
+          {#if studioDropModal.isDir}
+            <div class="pt-2 border-t border-slate-200/60 dark:border-white/5">
+              <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+                <input type="checkbox" bind:checked={studioDropModal.cleanCache} class="rounded accent-primary-500" />
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-white">Limpiar cachés de sesión</span>
+                  <p class="text-[11px] text-slate-400">Fuerza el re-análisis completo de todos los archivos del directorio sin usar cachés previas.</p>
+                </div>
+              </label>
+            </div>
+          {/if}
+
+          <!-- Opción Markdown con Pandoc -->
+          {#if hasPandoc}
+            <div class="pt-2 border-t border-slate-200/60 dark:border-white/5">
+              <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+                <input type="checkbox" bind:checked={studioDropModal.exportMarkdown} class="rounded accent-primary-500" />
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-white">Guardar en Markdown (.md)</span>
+                  <p class="text-[11px] text-slate-400">Convierte automáticamente documentos de Office procesados a formato Markdown con Pandoc.</p>
+                </div>
+              </label>
+            </div>
+          {/if}
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button
+            on:click={cancelStudioDropModal}
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
+          >
+            Cancelar
+          </button>
+          <button
+            on:click={confirmStudioDropModal}
+            class="px-5 py-2 {studioDropModal.isReverse ? 'bg-amber-500 hover:bg-amber-400' : 'bg-primary-600 hover:bg-primary-500'} text-slate-950 text-xs font-bold rounded-xl transition shadow-md flex items-center gap-1.5"
+          >
+            {#if studioDropModal.isReverse}
+              <span>🔄</span>
+              Restaurar {studioDropModal.isDir ? 'Carpeta' : 'Archivo'}
+            {:else}
+              <span>🛡️</span>
+              Proteger {studioDropModal.isDir ? 'Carpeta' : 'Archivo'}
+            {/if}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- OVERLAY VISUAL DE ARRASTRE DE ARCHIVOS O CARPETAS (DRAG & DROP) -->
+  {#if isDragging && allowDragDrop}
+    <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-8 pointer-events-none transition animate-in fade-in duration-200">
+      {#if activeTab === "studio"}
+        <!-- Overlay dividido de Studio: Texto claro (Proteger) y Texto protegido (Restaurar) -->
+        <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[360px]">
+          <!-- Zona Izquierda: Texto claro (Proteger) -->
+          <div class="rounded-3xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center gap-4 transition-all duration-150 {studioDragTarget === 'deobfuscated' ? 'border-primary-400 bg-primary-500/20 scale-[1.02] shadow-2xl ring-4 ring-primary-500/30' : 'border-slate-500/50 bg-slate-900/60 opacity-75'}">
+            <div class="w-20 h-20 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center text-5xl animate-bounce">
+              📥
+            </div>
+            <h3 class="text-xl font-extrabold text-white">
+              Panel Texto Claro
+            </h3>
+            <div class="px-3 py-1 bg-primary-500 text-slate-950 text-xs font-black rounded-full uppercase tracking-wider">
+              🛡️ Suelta aquí para PROTEGER
+            </div>
+            <p class="text-xs text-slate-300 max-w-xs">
+              Se protegerán los datos confidenciales (IPs, emails, nombres, claves) por seudónimos seguros. Admite archivos individuales o carpetas completas.
+            </p>
+          </div>
+
+          <!-- Zona Derecha: Texto protegido (Restaurar) -->
+          <div class="rounded-3xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center gap-4 transition-all duration-150 {studioDragTarget === 'obfuscated' ? 'border-amber-400 bg-amber-500/20 scale-[1.02] shadow-2xl ring-4 ring-amber-500/30' : 'border-slate-500/50 bg-slate-900/60 opacity-75'}">
+            <div class="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-5xl animate-bounce">
+              📤
+            </div>
+            <h3 class="text-xl font-extrabold text-white">
+              Panel Texto Protegido
+            </h3>
+            <div class="px-3 py-1 bg-amber-400 text-slate-950 text-xs font-black rounded-full uppercase tracking-wider">
+              🔄 Suelta aquí para RESTAURAR
+            </div>
+            <p class="text-xs text-slate-300 max-w-xs">
+              Se restaurarán los valores reales originales a partir de los seudónimos utilizando tu bóveda local de mapeos.
+            </p>
+          </div>
+        </div>
+      {:else}
+        <!-- Overlay del Escáner u otras vistas -->
+        <div class="bg-white/90 dark:bg-slate-900/95 border-2 border-dashed border-primary-500 rounded-3xl p-10 flex flex-col items-center gap-4 shadow-2xl text-center max-w-md frosted-card pulse-glow">
+          <div class="w-20 h-20 rounded-2xl bg-primary-500/10 border border-primary-500/30 flex items-center justify-center text-5xl animate-bounce">
+            📂
+          </div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">
+            Suelta tu archivo o carpeta aquí para escanear
+          </h3>
+          <p class="text-xs text-slate-600 dark:text-slate-300">
+            LexiShield auditará los tokens confidenciales sin modificar los archivos originales en disco.
+          </p>
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- MODAL DE HISTORIAL TEMPORAL DE SESIÓN (ALTA VISIBILIDAD & ZERO-KNOWLEDGE) -->
+  {#if showSessionHistoryModal}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
+        on:click={() => (showSessionHistoryModal = false)}
+        aria-label="Cerrar historial de sesión"
+      ></button>
+      <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <!-- Cabecera -->
+        <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-500 flex items-center justify-center text-xl shrink-0">
+              ⏱️
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white">Historial Temporal de Sesión</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  🔒 En memoria RAM · Zero-Knowledge
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Recupera cualquier texto protegido, restaurado o limpiado en la sesión activa.</p>
+            </div>
+          </div>
+          <button
+            on:click={() => (showSessionHistoryModal = false)}
+            class="w-8 h-8 rounded-xl text-sm flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+            title="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Lista de tarjetas de historial -->
+        <div class="flex-1 overflow-auto p-4 space-y-3 smooth-scroll-tokens">
+          {#if sessionHistory.length === 0}
+            <div class="p-10 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-center space-y-2">
+              <div class="text-3xl mb-2">📭</div>
+              <h4 class="text-sm font-bold text-slate-700 dark:text-slate-300">Aún no hay transformaciones en esta sesión</h4>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto">
+                Cada vez que pulses "Proteger", "Restaurar" o "Limpiar todo", se creará una copia instantánea aquí para que nunca pierdas tu trabajo.
+              </p>
+            </div>
+          {:else}
+            {#each sessionHistory as item (item.id)}
+              <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-white/10 rounded-xl hover:border-primary-500/40 transition flex flex-col gap-2.5 shadow-sm">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center gap-2">
+                    {#if item.actionType === 'obfuscate'}
+                      <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-primary-500/20 text-primary-700 dark:text-primary-300 border border-primary-500/30 flex items-center gap-1">
+                        <span>🛡️</span> PROTEGIDO
+                      </span>
+                    {:else if item.actionType === 'deobfuscate'}
+                      <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                        <span>🔄</span> RESTAURADO
+                      </span>
+                    {:else}
+                      <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                        <span>🗑️</span> ESTADO PREVIO A LIMPIEZA
+                      </span>
+                    {/if}
+                    <span class="font-mono text-xs text-slate-700 dark:text-slate-300 font-semibold">{item.timestamp}</span>
+                    <span class="text-[11px] text-slate-400">({formatRelativeTime(item.dateObj)})</span>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    {#if item.tokensCount > 0}
+                      <span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300">
+                        {item.tokensCount} tokens
+                      </span>
+                    {/if}
+                    <button
+                      on:click={() => restoreHistoryItem(item)}
+                      class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold text-xs rounded-xl transition shadow-md shadow-primary-500/20 flex items-center gap-1"
+                      title="Cargar estos textos directamente en los paneles de Transformación"
+                    >
+                      <span>📥</span> Cargar en Editores
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Extractos de texto contrastados -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono">
+                  <div class="p-2 bg-white dark:bg-slate-900/90 rounded-lg border border-slate-200 dark:border-white/5 space-y-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block">📥 Texto claro:</span>
+                    <p class="text-slate-700 dark:text-slate-300 truncate select-all">{item.inputText || "(Vacío)"}</p>
+                  </div>
+                  <div class="p-2 bg-white dark:bg-slate-900/90 rounded-lg border border-slate-200 dark:border-white/5 space-y-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block">🛡️ Texto protegido:</span>
+                    <p class="text-primary-700 dark:text-primary-400 truncate select-all">{item.outputText || "(Vacío)"}</p>
+                  </div>
+                </div>
+              </div>
+            {/each}
+          {/if}
+        </div>
+
+        <!-- Pie del modal -->
+        <div class="p-3 border-t border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
+          <button
+            on:click={() => {
+              sessionHistory = [];
+              statusMessage = "Historial temporal de sesión vaciado.";
+            }}
+            disabled={sessionHistory.length === 0}
+            class="px-3 py-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 rounded-xl transition disabled:opacity-40"
+          >
+            🗑️ Vaciar Historial
+          </button>
+          <button
+            on:click={() => (showSessionHistoryModal = false)}
+            class="px-5 py-1.5 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- TOAST FLOTANTE GLOBAL DE CAPTURA DEL PORTAPAPELES (ESQUINA SUPERIOR DERECHA) -->
+  {#if clipboardToast}
+    <div
+      in:slide={{ duration: 180 }}
+      out:fade={{ duration: 150 }}
+      class="fixed top-16 right-5 z-50 max-w-sm w-full p-3.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border {clipboardToast.isDeobfuscate ? 'border-primary-500/40 shadow-primary-500/10' : 'border-indigo-500/40 shadow-indigo-500/10'} shadow-2xl flex items-center justify-between gap-3 text-xs"
+    >
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-xl {clipboardToast.isDeobfuscate ? 'bg-primary-500/15 text-primary-500' : 'bg-indigo-500/15 text-indigo-500'} flex items-center justify-center text-lg shrink-0">
+          {clipboardToast.isDeobfuscate ? '🔄' : '⚡'}
+        </div>
+        <div class="min-w-0">
+          <p class="font-bold text-slate-900 dark:text-white truncate">
+            {clipboardToast.isDeobfuscate ? 'Portapapeles Restaurado' : 'Portapapeles Protegido'}
+          </p>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+            {clipboardToast.message}
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        on:click={() => (clipboardToast = null)}
+        class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg text-xs"
+        title="Cerrar notificación"
+      >
+        ✕
+      </button>
     </div>
   {/if}
 
