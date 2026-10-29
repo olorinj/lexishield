@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { fade, slide } from "svelte/transition";
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -177,6 +177,26 @@
   let studioSubView = "transform"; // "transform" (Editor Bidireccional) | "audit" (Desglose y Auditoría)
   let inputText = "";
   let outputText = "";
+  let isEditingInput = false;
+  let isEditingOutput = false;
+  let inputTextAreaEl = null;
+  let outputTextAreaEl = null;
+
+  async function focusInputEditor() {
+    isEditingInput = true;
+    await tick();
+    if (inputTextAreaEl) {
+      inputTextAreaEl.focus();
+    }
+  }
+
+  async function focusOutputEditor() {
+    isEditingOutput = true;
+    await tick();
+    if (outputTextAreaEl) {
+      outputTextAreaEl.focus();
+    }
+  }
   let selectedFormat = "auto";
   let vaultPath = "";
   let password = "";
@@ -1398,7 +1418,8 @@
     auditSummary = null;
     selectedScanOriginals = [];
     textToAudit = "";
-    statusMessage = "Auditoría reiniciada. Listo para un nuevo análisis.";
+    studioSubView = "transform";
+    statusMessage = "Auditoría reiniciada. Regresando a Transformación.";
   }
 
   function sendPastedTextToStudio() {
@@ -2187,10 +2208,10 @@
         <button
           on:click={() => (activeTab = "studio")}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'studio' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
-          title="Studio (Transformación y Desglose)"
+          title="Transformación bidireccional y protección de datos"
         >
           {#if toolbarButtonStyle !== 'text_only'}<span>✨</span>{/if}
-          {#if toolbarButtonStyle !== 'icons_only'}<span>Studio</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>Transformación</span>{/if}
         </button>
       {/if}
 
@@ -2281,36 +2302,9 @@
     {#if activeTab === "studio"}
       <!-- VISTA STUDIO UNIFICADA (TRANSFORMACIÓN + AUDITORÍA) -->
       <div in:fade={{ duration: 150 }} class="flex-1 flex flex-col gap-4 min-h-0">
-        <!-- Barra Superior Minimalista de Studio con Selector de Sub-vistas y Controles Rápidos -->
+        <!-- Barra Superior Minimalista de Transformación con Controles Rápidos -->
         <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 px-4 py-2 flex items-center justify-between gap-3 shadow-sm text-xs flex-wrap">
-          <!-- Grupo Izquierdo: Sub-vistas de Studio exclusivamente -->
-          <div class="flex items-center gap-1.5 p-0.5 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5">
-            <button
-              type="button"
-              on:click={() => (studioSubView = "transform")}
-              class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'transform' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
-              title="Vista de Transformación y Editor Bidireccional"
-            >
-              {#if toolbarButtonStyle !== 'text_only'}<span>✨</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Transformación</span>{/if}
-            </button>
-            <button
-              type="button"
-              on:click={() => (studioSubView = "audit")}
-              class="px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1.5 {studioSubView === 'audit' ? 'bg-white dark:bg-primary-500/20 text-primary-600 dark:text-primary-300 shadow-sm border border-slate-200/60 dark:border-primary-500/30' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}"
-              title="Vista de Desglose y Auditoría de Tokens"
-            >
-              {#if toolbarButtonStyle !== 'text_only'}<span>🔍</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Desglose y Auditoría</span>{/if}
-              {#if visibleDetectedItems.length > 0}
-                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
-                  {visibleDetectedItems.length}
-                </span>
-              {/if}
-            </button>
-          </div>
-
-          <!-- Centro: Conmutador Global Editor / Markdown (cuando está en Transformación) -->
+          <!-- Grupo Izquierdo: Conmutador Editor / Markdown o Volver si está en auditoría -->
           {#if studioSubView === "transform"}
             <div class="flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-white/5 text-[11px]">
               <button
@@ -2332,11 +2326,40 @@
                 {#if toolbarButtonStyle !== 'icons_only'}<span>Markdown</span>{/if}
               </button>
             </div>
+          {:else}
+            <button
+              type="button"
+              on:click={() => (studioSubView = "transform")}
+              class="px-3 py-1 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-500 text-slate-950 transition flex items-center gap-1.5 shadow-sm"
+              title="Volver a los paneles de transformación"
+            >
+              <span>✨</span>
+              <span>Volver a Transformación</span>
+            </button>
           {/if}
 
-          <!-- Grupo Derecho: Acciones de Sesión y Ergonomía (Tier 2 Contextual de Studio) -->
+          <!-- Grupo Derecho: Acciones de Sesión y Ergonomía (Tier 2 Contextual de Transformación) -->
           <div class="flex items-center gap-2">
-            <!-- Botón Modo Privacidad / Desenfoque de Pantalla (Tier 2 Studio) -->
+            <!-- Botón Limpiar Todo (Tier 2) -->
+            <button
+              type="button"
+              on:click={() => {
+                if (inputText || outputText) {
+                  pushToSessionHistory("clear");
+                  inputText = "";
+                  outputText = "";
+                  statusMessage = "Ambos paneles han sido limpiados (guardado en historial de sesión).";
+                }
+              }}
+              disabled={!inputText && !outputText}
+              class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Limpiar ambos paneles (Ctrl+Shift+L)"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>🗑️</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Limpiar todo</span>{/if}
+            </button>
+
+            <!-- Botón Modo Privacidad / Desenfoque de Pantalla (Tier 2 Transformación) -->
             <button
               type="button"
               on:click={() => {
@@ -2350,7 +2373,7 @@
               {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
             </button>
 
-            <!-- Botón Insignias / Badges de Tokens (Confinado a Studio) -->
+            <!-- Botón Insignias / Badges de Tokens -->
             <button
               type="button"
               on:click={toggleTokenBadges}
@@ -2411,7 +2434,7 @@
               <div class="flex items-center gap-3">
                 <span class="text-base shrink-0">✨</span>
                 <p class="text-slate-700 dark:text-slate-300">
-                  <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Studio?</strong> Escribe o pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
+                  <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Transformación?</strong> Pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
                 </p>
               </div>
               <div class="flex items-center gap-2 shrink-0">
@@ -2454,8 +2477,14 @@
                   <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words smooth-scroll-tokens">
                     {@html renderMarkdownPreview(inputText)}
                   </div>
-                {:else if showTokenBadges && inputText.trim()}
-                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens">
+                {:else if showTokenBadges && !isEditingInput && inputText.trim()}
+                  <!-- svelte-ignore a11y-click-events-have-key-events -->
+                  <!-- svelte-ignore a11y-no-static-element-interactions -->
+                  <div
+                    on:click={focusInputEditor}
+                    class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens cursor-text"
+                    title="Haz clic para editar texto"
+                  >
                     {@html renderHighlightedTokens(inputText, false)}
                   </div>
                 {:else}
@@ -2465,12 +2494,14 @@
                     aria-hidden="true"
                   >{inputGutterText}</pre>
                   <textarea
+                    bind:this={inputTextAreaEl}
                     bind:value={inputText}
                     on:paste={handleClearTextPaste}
-                    on:input={() => { studioDirection = "obfuscate"; }}
-                    on:focus={() => { if (inputText.trim()) studioDirection = "obfuscate"; }}
+                    on:input={() => { isEditingInput = true; studioDirection = "obfuscate"; }}
+                    on:focus={() => { isEditingInput = true; if (inputText.trim()) studioDirection = "obfuscate"; }}
+                    on:blur={() => { isEditingInput = false; }}
                     on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                    placeholder="Pega o escribe aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
+                    placeholder="Pega aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
                     class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens"
                   ></textarea>
                 {/if}
@@ -2543,8 +2574,14 @@
                   <div class="flex-1 w-full min-w-0 max-w-full p-4 overflow-y-auto overflow-x-hidden select-text prose dark:prose-invert max-w-none text-xs leading-relaxed font-sans whitespace-pre-wrap break-words smooth-scroll-tokens">
                     {@html renderMarkdownPreview(outputText)}
                   </div>
-                {:else if showTokenBadges && outputText.trim()}
-                  <div class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words smooth-scroll-tokens">
+                {:else if showTokenBadges && !isEditingOutput && outputText.trim()}
+                  <!-- svelte-ignore a11y-click-events-have-key-events -->
+                  <!-- svelte-ignore a11y-no-static-element-interactions -->
+                  <div
+                    on:click={focusOutputEditor}
+                    class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words smooth-scroll-tokens cursor-text"
+                    title="Haz clic para editar texto"
+                  >
                     {@html renderHighlightedTokens(outputText, true)}
                   </div>
                 {:else}
@@ -2554,71 +2591,18 @@
                     aria-hidden="true"
                   >{outputGutterText}</pre>
                   <textarea
+                    bind:this={outputTextAreaEl}
                     bind:value={outputText}
                     on:paste={() => { studioDirection = "deobfuscate"; }}
-                    on:input={() => { studioDirection = "deobfuscate"; }}
-                    on:focus={() => { if (outputText.trim()) studioDirection = "deobfuscate"; }}
+                    on:input={() => { isEditingOutput = true; studioDirection = "deobfuscate"; }}
+                    on:focus={() => { isEditingOutput = true; if (outputText.trim()) studioDirection = "deobfuscate"; }}
+                    on:blur={() => { isEditingOutput = false; }}
                     on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
                     placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
                     class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre smooth-scroll-tokens"
                   ></textarea>
                 {/if}
               </div>
-            </div>
-          </div>
-
-          <!-- Botonera de Acción Principal del Studio -->
-          <div class="flex items-center justify-between gap-3 pt-1 flex-wrap">
-            <div class="flex items-center gap-2">
-              <button
-                on:click={() => {
-                  if (inputText || outputText) {
-                    pushToSessionHistory("clear");
-                    inputText = "";
-                    outputText = "";
-                    statusMessage = "Ambos paneles han sido limpiados (guardado en historial de sesión).";
-                  }
-                }}
-                disabled={!inputText && !outputText}
-                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5 shadow-sm disabled:opacity-40"
-                title="Limpiar ambos paneles (Ctrl+Shift+L)"
-              >
-                <span>🗑️</span> Limpiar todo
-              </button>
-            </div>
-
-            <div class="flex items-center gap-3">
-              {#if studioDirection === "obfuscate"}
-                <button
-                  on:click={handleObfuscate}
-                  disabled={loading || !inputText.trim()}
-                  class="px-5 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-sm font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center justify-center gap-1.5 disabled:opacity-50 group"
-                  title="Proteger datos y auto-copiar (Ctrl+Enter)"
-                  aria-label="Proteger datos y auto-copiar"
-                >
-                  {#if loading}
-                    <span class="animate-spin">⏳</span>
-                  {:else}
-                    <span class="text-base">🛡️</span>
-                  {/if}
-                  <span class="font-extrabold group-hover:translate-x-0.5 transition">➔</span>
-                </button>
-              {:else}
-                <button
-                  on:click={handleDeobfuscate}
-                  disabled={loading || !outputText.trim()}
-                  class="px-5 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-sm font-bold rounded-xl transition duration-150 shadow-lg shadow-primary-500/20 flex items-center justify-center gap-1.5 disabled:opacity-50 group"
-                  title="Restaurar datos y auto-copiar (Ctrl+Enter)"
-                  aria-label="Restaurar datos y auto-copiar"
-                >
-                  {#if loading}
-                    <span class="animate-spin">⏳</span>
-                  {:else}
-                    <span class="font-extrabold group-hover:-translate-x-0.5 transition">⮜</span>
-                  {/if}
-                  <span class="text-base">🔄</span>
-                </button>
-              {/if}
             </div>
           </div>
 
