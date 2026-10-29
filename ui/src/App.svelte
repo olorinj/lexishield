@@ -3159,16 +3159,18 @@
             <button
               on:click={() => (showBackupModal = true)}
               class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1.5"
+              title="Crear un backup comprimido de todas las configuraciones y bóvedas de LexiShield"
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>📦</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Copia Bzip2</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Backup LexiShield</span>{/if}
             </button>
             <button
               on:click={handleRestoreBackup}
               class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5"
+              title="Restaurar un archivo de backup de LexiShield (.tar.bz2 / .lexibak)"
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>♻️</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar Copia</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar LexiShield</span>{/if}
             </button>
           </div>
         </div>
@@ -4251,7 +4253,7 @@
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
         <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <span>📦</span> Copia de Seguridad Completa (Bzip2)
+          <span>📦</span> Backup Completo de LexiShield
         </h3>
         <p class="text-xs text-slate-500 dark:text-slate-400">Empaqueta la configuración, reglas personalizadas y todas las bóvedas en un único archivo comprimido con algoritmo Bzip2.</p>
         
@@ -4280,7 +4282,7 @@
               type="submit"
               class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-xl shadow-md shadow-amber-500/20"
             >
-              Crear Archivo Bzip2
+              Crear Backup
             </button>
           </div>
         </form>
