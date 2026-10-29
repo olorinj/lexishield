@@ -3266,7 +3266,7 @@
 
     {:else if activeTab === "watch"}
       <!-- VISTA PORTAPAPELES (WATCH) -->
-      <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col justify-between shadow-lg">
+      <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col shadow-lg overflow-auto">
         <div>
           {#if !dismissedTips.watch}
             <div transition:slide class="mb-4 p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
@@ -3290,6 +3290,16 @@
             </div>
             
             <div class="flex items-center gap-2">
+              <button
+                type="button"
+                on:click={toggleWatchMode}
+                class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm {isWatching ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/20' : 'bg-primary-600 hover:bg-primary-500 text-slate-950 shadow-primary-500/20'}"
+                title={isWatching ? "Detener monitorización activa del portapapeles" : "Iniciar monitorización activa del portapapeles"}
+              >
+                {#if toolbarButtonStyle !== 'text_only'}<span>{isWatching ? '⏹️' : '▶️'}</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>{isWatching ? 'Detener' : 'Monitorizar'}</span>{/if}
+              </button>
+
               <button
                 type="button"
                 on:click={() => {
@@ -3497,16 +3507,6 @@
               {/each}
             </div>
           </div>
-        </div>
-
-        <div class="flex justify-end pt-4 border-t border-slate-200 dark:border-white/10">
-          <button
-            on:click={toggleWatchMode}
-            class="px-6 py-2.5 rounded-xl text-xs font-bold transition duration-150 flex items-center gap-2 shadow-lg {isWatching ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/20' : 'bg-primary-600 hover:bg-primary-500 text-slate-950 shadow-primary-500/20'}"
-          >
-            <span>{isWatching ? '⏹️' : '▶️'}</span>
-            {isWatching ? 'Detener Monitorización' : 'Iniciar Monitorización en Vivo'}
-          </button>
         </div>
       </div>
 
