@@ -2934,19 +2934,6 @@
               {#if toolbarButtonStyle !== 'icons_only'}<span>Añadir Par</span>{/if}
             </button>
 
-            <button
-              on:click={() => {
-                const targetVault = pairsSelectedVault || vaultPath || 'default.lexi';
-                const name = targetVault.split('/').pop();
-                handleRestoreVaultBak(name);
-              }}
-              class="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-xl border border-amber-500/30 transition flex items-center gap-1.5"
-              title="Recuperar la última copia de seguridad automática (.bak) de esta bóveda"
-            >
-              {#if toolbarButtonStyle !== 'text_only'}<span>↺</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar .bak</span>{/if}
-            </button>
-
             {#if selectedPairKeys.length > 0}
               <button
                 on:click={() => handleBatchOmitPairs(true)}
@@ -2978,12 +2965,24 @@
 
         <!-- Filtros y Selección de Pares -->
         <div class="mb-4 flex items-center gap-3">
-          <input
-            type="text"
-            bind:value={pairSearch}
-            placeholder="Filtrar por original o seudónimo..."
-            class="flex-1 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          />
+          <div class="relative flex-1">
+            <input
+              type="text"
+              bind:value={pairSearch}
+              placeholder="Filtrar por original o seudónimo..."
+              class="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+            {#if pairSearch}
+              <button
+                type="button"
+                on:click={() => (pairSearch = "")}
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs w-4 h-4 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition"
+                title="Limpiar filtro"
+              >
+                ✕
+              </button>
+            {/if}
+          </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
