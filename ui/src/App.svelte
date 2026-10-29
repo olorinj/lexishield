@@ -197,6 +197,13 @@
       outputTextAreaEl.focus();
     }
   }
+
+  async function selectMarkdownViewMode() {
+    studioUnifiedViewMode = "markdown";
+    if (inputText.trim()) {
+      await handleObfuscate();
+    }
+  }
   let selectedFormat = "auto";
   let vaultPath = "";
   let password = "";
@@ -2318,9 +2325,9 @@
               </button>
               <button
                 type="button"
-                on:click={() => (studioUnifiedViewMode = "markdown")}
+                on:click={selectMarkdownViewMode}
                 class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                title="Modo Markdown (vista previa formateada en ambos paneles)"
+                title="Modo Markdown (ofusca automáticamente texto claro y muestra vista previa formateada)"
               >
                 {#if toolbarButtonStyle !== 'text_only'}<span>👁️</span>{/if}
                 {#if toolbarButtonStyle !== 'icons_only'}<span>Markdown</span>{/if}
