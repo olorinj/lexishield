@@ -1,14 +1,14 @@
-# Especificación Técnica: LexiShield v2.0.0 (Office & Document Engine)
+# Especificación Técnica: LexiShield v2.1.0 (Office & Document Engine)
 
 > **Estado**: Planificación / Hoja de Ruta  
-> **Versión Objetivo**: `2.0.0`  
+> **Versión Objetivo**: `2.1.0`  
 > **Módulo Principal**: `lexishield::engine::office`
 
 ---
 
 ## 1. Visión y Objetivos
 
-La versión **2.0.0** de LexiShield amplía el motor de ofuscación semántica más allá del texto plano, logs y fragmentos de código, incorporando soporte nativo para **documentos ofimáticos de Microsoft Office (DOCX, XLSX, PPTX)** y formatos abiertos (**ODT, ODS, PDF, CSV**).
+La versión **2.1.0** de LexiShield amplía el motor de ofuscación semántica más allá del texto plano, logs y fragmentos de código, incorporando soporte nativo para **documentos ofimáticos de Microsoft Office (DOCX, XLSX, PPTX)** y formatos abiertos (**ODT, ODS, PDF, CSV**).
 
 ### Objetivos Clave:
 1. **Preservación Estricta del Formato**: Transformar datos confidenciales sin alterar estilos, tipografías, tablas, celdas, saltos de página ni estructuras internas del documento.
@@ -137,7 +137,7 @@ lexishield scan-file auditoria_2026.docx --format table
 | **Fase 2.4** | *GUI Drag & Drop* | Integración en la interfaz Tauri/Svelte de carga de archivos y previsualización. |
 | **Fase 2.5** | *Test Suite & Benchmarks* | Validación con documentos masivos (>100 MB / >50,000 celdas) y verificación de integridad XML. |
 
-### 5.1 Estado de Implementación de la Interfaz Gráfica (GUI v2.0.0)
+### 5.1 Estado de Implementación de la Interfaz Gráfica (GUI v2.1.0)
 
 | Fase GUI | Alcance | Estado | Descripción |
 | :---: | :--- | :---: | :--- |
