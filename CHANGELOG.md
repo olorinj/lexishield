@@ -5,12 +5,18 @@ Todos los cambios notables de este proyecto se documentarán en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - 2026-10-24
-*Actualización integral de experiencia de usuario: Fusión Arquitectónica de Escáner y Studio, resiliencia multiplataforma de portapapeles en Linux (Wayland/X11/KDE), estandarización de escala de iconos y blindaje universal de privacidad.*
+## [2.1.0] - 2026-10-29
+*Actualización integral de experiencia de usuario: Renombrado conceptual a Transformación, refactorización de barras secundarias Tier 2 (Smartbars), resiliencia multiplataforma de portapapeles en Linux (Wayland/X11/KDE), búsqueda reactiva con botón de vaciado rápido y alineación integral de documentación.*
 
 ### Añadido
+- **🔍 Botón de vaciado rápido en filtro de búsqueda de Pares**:
+  - Incorporación de botón reactivo `✕` en el campo de búsqueda de tokens para limpiar filtros instantáneamente.
+- **⚡ Modo Markdown con ofuscación reactiva automática**:
+  - Al conmutar al modo Markdown en Transformación teniendo texto claro cargado, la aplicación genera reactivamente la ofuscación Markdown sin requerir clics adicionales.
+- **📋 Acceso directo de monitorización Tier 2 en Portapapeles**:
+  - Integración del conmutador de inicio/detención de escucha (`Monitorizar` / `Detener`) directamente en la barra secundaria Smartbar Tier 2 de Portapapeles.
 - **✨ Fusión Arquitectónica de Escáner y Studio**:
-  - Unificación completa de la experiencia de usuario en una única pestaña **Studio** con dos sub-vistas fluidas:
+  - Unificación completa de la experiencia de usuario en la pestaña principal **Transformación**:
     - *Transformación Bidireccional*: Paneles simétricos de *Texto claro* y *Texto protegido* con puente direccional interactivo, soporte Drag & Drop dividido y telemetría de caracteres/líneas.
     - *Desglose y Auditoría*: Tabla categorizada de hallazgos (Red, Identidad, Sistemas, Contacto/Claves), barra de distribución cromática, filtrado por tipo y botón de adición directa de correspondencias a la bóveda.
 - **📋 Cadena de Respaldo Híbrida de Portapapeles en Linux (Wayland / X11 / KDE)**:
@@ -21,24 +27,37 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - El bucle CLI (`watch_clipboard_loop`) inicializa el portapapeles de manera resiliente sin abortar la ejecución ante fallos de backend nativo.
   - Banner informativo y diagnóstico activo en la interfaz gráfica ante problemas de permisos o paquetes faltantes en Linux.
 - **⏱️ Historial Temporal de Sesión en Memoria RAM**:
-  - Almacenamiento local volátil (Zero-Knowledge) de las últimas 30 transformaciones en Studio, permitiendo restaurar estados anteriores con un solo clic.
+  - Almacenamiento local volátil (Zero-Knowledge) de las últimas 30 transformaciones en Transformación, permitiendo restaurar estados anteriores con un solo clic.
 - **⌨️ Atajos de Teclado Centralizados en el Sistema de Ayuda**:
   - Pestaña dedicada *⌨️ Atajos de Teclado* en el modal de Ayuda contextual, invocable en cualquier momento mediante la tecla `?` o el botón de ayuda.
 - **🛡️ Gestión Persistente de Perfiles de Sensibilidad en Opciones**:
   - Selector de perfiles (*Completo*, *DevOps & Red*, *RGPD & Identidad*) ubicado en la pestaña **Opciones**, con persistencia local automática (`localStorage`) entre sesiones.
 
 ### Modificado
+- **🎯 Renombrado de Pestaña Principal a Transformación y Armonización Conceptual**:
+  - Sustitución unificada del término *Studio* por **Transformación** en navegación Tier 1, textos explicativos, descripciones de configuración y documentación técnica.
+  - Simplificación de la barra Tier 2 de Transformación: reubicación de la acción **Limpiar todo** a la barra superior secundaria y eliminación de redundancias.
+  - Retirada de botones duplicados de restauración y auto-copiado en la zona inferior de paneles para una interfaz más despejada.
+  - Actualización de marcadores de posición y ayudas para evitar sugerir escritura manual errática cuando los paneles actúan como receptores directos de pegado o archivos.
+- **💾 Estandarización de Etiquetas de Respaldo en Bóvedas**:
+  - Botones unificados a **Backup LexiShield** y **Restaurar LexiShield** tanto en barras secundarias como en modales de confirmación para eliminar ambigüedades con archivos `.bak` sueltos.
 - **📐 Estandarización de Escala y Contenedores de Iconos (5 Niveles Unificados)**:
   - Normalización geométrica de todos los iconos de la interfaz en [ui/src/App.svelte](file:///home/olorinj/DEV/rust/lexishield/ui/src/App.svelte) para eliminar discrepancias de tamaño entre sistemas operativos:
-    - *Nivel 1 (Botones de acción cuadrados)*: Normalizados a `w-8 h-8 rounded-xl text-sm flex items-center justify-center` (cabecera general, Studio, puente direccional, cierres de modales).
+    - *Nivel 1 (Botones de acción cuadrados)*: Normalizados a `w-8 h-8 rounded-xl text-sm flex items-center justify-center` (cabecera general, Transformación, puente direccional, cierres de modales).
     - *Nivel 2 (Banners informativos y consejos)*: Tipos e iconos alineados uniformemente a `text-base shrink-0`.
     - *Nivel 3 (Cápsulas de cabecera de modales)*: Tarjetas distintivas unificadas a `w-10 h-10 rounded-xl text-xl flex items-center justify-center`.
     - *Nivel 4 (Estados vacíos)*: Estandarizados a `text-3xl mb-2`.
     - *Nivel 5 (Botones de descartar consejos)*: Homogeneizados a `text-xs px-2 py-0.5 rounded`.
-- **🎨 Ergonomía y Limpieza Visual de la Barra Superior de Studio**:
+- **🎨 Ergonomía y Limpieza Visual de la Barra Superior de Transformación**:
   - Botón de auto-copiado al portapapeles rediseñado a formato de conmutador cuadrado (`w-8 h-8`) con cambio dinámico de icono (`📋` activo / `📄` inactivo).
   - Reubicación de la acción **"Auditar Texto"** dentro de la cabecera del panel **"Texto claro"**, donde reside el contexto operativo de los datos en claro.
   - Retirada de desplegables y botones redundantes de la cabecera superior para evitar desbordamientos horizontales.
+
+### Corregido
+- **🛡️ Preservación de Edición en Paneles de Transformación**:
+  - Corrección de la reactividad que desmontaba el elemento `<textarea>` al pulsar la primera tecla si las etiquetas de tokens estaban activadas, garantizando ahora escritura y pegado estables sin pérdida de foco.
+- **🙈 Cobertura Universal del Modo Privacidad (*Privacy Blur*)**:
+  - Aplicado desenfoque condicional a los valores originales confidenciales en la tabla de la pestaña **Pares de Tokens**.
 
 ### Corregido
 - **🙈 Cobertura Universal del Modo Privacidad (*Privacy Blur*)**:
