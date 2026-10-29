@@ -86,7 +86,7 @@ impl CompiledCustomRule {
                 for ch in original.chars() {
                     if ch.is_ascii_digit() {
                         let d = rng.gen_range(0..=9);
-                        result.push(char::from_digit(d, 10).unwrap());
+                        result.push(char::from_digit(d, 10).unwrap_or('0'));
                     } else {
                         result.push(ch);
                     }

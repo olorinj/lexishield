@@ -4,6 +4,7 @@ dist/
 dist-cli/
 ui/dist/
 src-tauri/target/
+src-tauri/bin/
 .svelte-kit/
 
 # Máquinas virtuales Vagrant
@@ -44,6 +45,7 @@ desktop.ini
 # Entornos de desarrollo e IDEs
 .vscode/
 .idea/
+*.code-workspace
 
 # Bóvedas de prueba generadas localmente
 *.lexi
