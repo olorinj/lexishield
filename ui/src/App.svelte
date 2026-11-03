@@ -5,6 +5,7 @@
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { listen } from "@tauri-apps/api/event";
+  import { locale, t } from "./i18n";
   import packageInfo from "../package.json";
 
   const appVersion = packageInfo.version || "2.0.0";
@@ -17,6 +18,9 @@
 
   // Configuración de la Aplicación y Ergonomía
   let appConfig = {
+    general: {
+      language: "en",
+    },
     gui: {
       default_tab: "studio",
       show_cli_dock: true,
@@ -846,6 +850,9 @@
         }
         showTokenBadges = cfg.gui.show_token_badges;
         appConfig = cfg;
+        if (cfg.general && cfg.general.language) {
+          $locale = cfg.general.language;
+        }
         applyThemeFromConfig();
         applyAccentFromConfig();
         if (cfg.gui.default_tab && cfg.gui.tabs[`show_${cfg.gui.default_tab}`] !== false) {
@@ -3803,12 +3810,46 @@
               </div>
             </div>
 
-            <!-- BLOQUE 4: APARIENCIA Y SEGURIDAD -->
+            <!-- BLOQUE 4: APARIENCIA, IDIOMA Y SEGURIDAD -->
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">4. Apariencia y Seguridad</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">4. Apariencia, Idioma y Seguridad</span>
 
               <div class="space-y-3">
+                <!-- Selector de Idioma -->
                 <div>
+                  <label for="config-language-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    {$t ? $t('config.language') : 'Idioma de la Interfaz'}:
+                  </label>
+                  <select
+                    id="config-language-select"
+                    bind:value={appConfig.general.language}
+                    on:change={() => {
+                      if (appConfig.general && appConfig.general.language) {
+                        $locale = appConfig.general.language;
+                      }
+                      saveSettings();
+                    }}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                  >
+                    <option value="en">English (US / Global)</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="pt">Português</option>
+                    <option value="it">Italiano</option>
+                    <option value="zh">简体中文 (Chinese)</option>
+                    <option value="ja">日本語 (Japanese)</option>
+                    <option value="ru">Русский (Russian)</option>
+                    <option value="pl">Polski (Polish)</option>
+                    <option value="nl">Nederlands (Dutch)</option>
+                    <option value="ko">한국어 (Korean)</option>
+                  </select>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    Cambia reactivamente el idioma de la aplicación y persiste la selección en <code>~/.lexishield/config.toml</code>.
+                  </p>
+                </div>
+
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5">
                   <label for="config-theme-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tema visual:</label>
                   <select
                     id="config-theme-select"
