@@ -26,7 +26,7 @@ mostrar_ayuda() {
     echo "  ./publicar_version.sh [OPCIONES] <VERSION>"
     echo ""
     echo -e "${COLOR_CYAN}ARGUMENTOS:${COLOR_RESET}"
-    echo "  <VERSION>         Versión oficial a publicar (ej: v2.0.0 o 2.0.0)."
+    echo "  <VERSION>         Versión oficial a publicar (ej: v2.2.0 o 2.2.0)."
     echo "                    Si se omite el prefijo 'v', se añadirá automáticamente."
     echo ""
     echo -e "${COLOR_CYAN}OPCIONES:${COLOR_RESET}"
@@ -36,10 +36,10 @@ mostrar_ayuda() {
     echo "  -d, --dry-run     Modo simulación: verifica el estado pero no realiza git push."
     echo ""
     echo -e "${COLOR_CYAN}EJEMPLOS:${COLOR_RESET}"
-    echo "  ./publicar_version.sh v2.0.0"
-    echo "  ./publicar_version.sh 2.0.0"
-    echo "  ./publicar_version.sh --force v2.0.0"
-    echo "  ./publicar_version.sh --dry-run v2.0.0"
+    echo "  ./publicar_version.sh v2.2.0"
+    echo "  ./publicar_version.sh 2.2.0"
+    echo "  ./publicar_version.sh --force v2.2.0"
+    echo "  ./publicar_version.sh --dry-run v2.2.0"
     echo ""
 }
 
@@ -89,7 +89,7 @@ done
 # Validar si no se proporcionó versión
 if [[ -z "$VERSION" ]]; then
     mostrar_ayuda
-    echo -e "${COLOR_YELLOW}Por favor, especifica la versión a publicar (ej: ./publicar_version.sh v2.0.0).${COLOR_RESET}\n"
+    echo -e "${COLOR_YELLOW}Por favor, especifica la versión a publicar (ej: ./publicar_version.sh v2.2.0).${COLOR_RESET}\n"
     exit 1
 fi
 

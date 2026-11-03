@@ -2203,7 +2203,7 @@
         const noGitArg = noGitIgnoreScan ? " --no-git-ignore" : "";
         return `lexishield scan -i "<ruta>"${recArg}${noGitArg}${vaultArg}`;
       }
-      return `lexishield obfuscate -f ${selectedFormat}${vaultArg}${cleanArg}${copyArg}${pwdArg}`;
+      return `lexishield protect -f ${selectedFormat}${vaultArg}${cleanArg}${copyArg}${pwdArg}`;
     } else if (activeTab === "pairs") {
       return `lexishield dict list${vaultArg}`;
     } else if (activeTab === "vaults") {
@@ -2357,7 +2357,7 @@
                 type="button"
                 on:click={selectMarkdownViewMode}
                 class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                title="Modo Markdown (ofusca automáticamente texto claro y muestra vista previa formateada)"
+                title="Modo Markdown (protege automáticamente el texto original y muestra la vista previa formateada)"
               >
                 {#if toolbarButtonStyle !== 'text_only'}<span>👁️</span>{/if}
                 {#if toolbarButtonStyle !== 'icons_only'}<span>Markdown</span>{/if}
@@ -4479,7 +4479,7 @@
                   <li><strong>Pega el contenido</strong> en el panel <em>Texto claro</em> (o arrastra y suelta un archivo o carpeta directamente encima).</li>
                   <li><strong>Detección automática:</strong> El motor identifica automáticamente la estructura sintáctica (JSON, XML, Logs o texto plano) sin que tengas que configurarlo.</li>
                   <li><strong>Pulsa "Proteger":</strong> El botón direccional central reemplazará cada dato confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
-                  <li><strong>Modo Markdown reactivo:</strong> Si pulsas el conmutador <em>"Markdown"</em> en la barra superior, LexiShield ofuscará automáticamente el texto en claro y mostrará la vista previa formateada en ambos paneles.</li>
+                  <li><strong>Modo Markdown reactivo:</strong> Si pulsas el conmutador <em>"Markdown"</em> en la barra superior, LexiShield protegerá automáticamente el texto original y mostrará la vista previa formateada en ambos paneles.</li>
                   <li><strong>Usa el texto en la IA:</strong> Copia el <em>Texto protegido</em> y envíalo con total tranquilidad a cualquier modelo de IA o tercero.</li>
                   <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en <em>Texto protegido</em> y pulsa <strong>"Restaurar"</strong> para recuperar al 100% los valores reales.</li>
                 </ol>

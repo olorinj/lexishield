@@ -5,24 +5,30 @@ Todos los cambios notables de este proyecto se documentarán en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.0] - En desarrollo
-*Rediseño ergonómico de la pestaña Opciones: Smartbar Tier 2 fija para guardado inmediato, control granular de minimización a la bandeja del sistema, menús desplegables limpios sin iconos y reorganización en 4 bloques funcionales.*
+## [2.2.0] - 2026-11-03
+*Rediseño ergonómico de la pestaña Opciones (Smartbar Tier 2 fija, control de minimización a la bandeja, desplegables limpios y 4 bloques funcionales), estandarización terminológica universal a Proteger / Restaurar con soporte recursivo de directorios y blindaje activo de seguridad.*
 
 ### Añadido
 - **⚙️ Smartbar Tier 2 fija en la pestaña Opciones**:
   - Incorporación de barra de herramientas superior persistente con los botones *Guardar Configuración*, *Restablecer*, *Ver Logs* y el conmutador de *Depuración*, eliminando la necesidad de desplazarse hasta el final de la página.
 - **📥 Minimización configurable a la bandeja del sistema (`minimize_to_tray`)**:
   - Nueva preferencia independiente en `config.toml` y en la GUI que permite decidir si al pulsar el botón de minimizar `[-]` la ventana se mantiene en la barra de tareas habitual o se envía directamente a la bandeja del sistema junto al reloj, diferenciándolo claramente del ciclo de vida del botón cerrar `[X]`.
+- **📂 Procesamiento recursivo de directorios en `protect` y `restore`**:
+  - Los comandos `protect` y `restore` de la CLI ahora aceptan directorios completos en `-i`, recorriéndolos de manera recursiva (`-r`, respetando `.gitignore` y `.lexiignore`) y generando los archivos protegidos o restaurados en el árbol de destino (`-o`) o con sufijos seguros (`.protegido` / `.restaurado`).
+- **🤖 Modo desatendido (`-y` / `LEXISHIELD_FORCE=1`) para advertencias de recursos**:
+  - Permite confirmar automáticamente las advertencias de descompresión de contenedores ZIP/Office en pipelines CI/CD y procesamientos masivos por lotes.
 
 ### Modificado
+- **🎯 Estandarización terminológica universal a Proteger / Restaurar**:
+  - Promoción de `protect` y `restore` como subcomandos primarios de la CLI y valores por defecto en `watch --direction` (conservando `obfuscate` y `deobfuscate` como alias 100% compatibles), alineando la CLI, la GUI y toda la documentación del proyecto.
 - **🧩 Reorganización conceptual de Opciones en 4 bloques funcionales**:
   - Agrupación lógica y equilibrada en: *1. Motor de Protección* (con selector de *Nivel de protección*: Completo, Técnico & Red, Datos Personales & RGPD), *2. Ventana y Sistema*, *3. Portapapeles y Avisos* y *4. Apariencia y Seguridad*.
 - **🧹 Limpieza visual de menús desplegables (`<select>`)**:
   - Eliminación total de emojis e iconos dentro de las opciones de los menús desplegables de configuración para lograr una lectura limpia, nítida y homogénea en todos los sistemas operativos.
 
 ### Seguridad
-- **🛡️ Inspección preventiva de recursos y protección ante Zip Bombs**:
-  - Incorporación de `OfficeAdapter::inspect_zip_resources` para calcular de antemano el tamaño descomprimido proyectado y contrastarlo con la memoria RAM disponible del equipo, emitiendo una advertencia interactiva de confirmación al usuario tanto en la CLI como en la GUI si el archivo conlleva riesgo de agotamiento de memoria.
+- **🛡️ Inspección preventiva de recursos y protección ante Zip Bombs (Linux y Windows)**:
+  - Incorporación de `OfficeAdapter::inspect_zip_resources` y detección de RAM libre nativa (`/proc/meminfo` en Linux y `GlobalMemoryStatusEx` en Windows) para calcular de antemano el tamaño descomprimido proyectado y contrastarlo con la memoria disponible del equipo, emitiendo una advertencia interactiva de confirmación al usuario tanto en la CLI como en la GUI si el archivo conlleva riesgo de agotamiento de memoria.
 - **🔒 Sanitización e inmunización de argumentos en subprocesos externos (Pandoc)**:
   - Validación estricta de rutas (`SyntaxValidator::validate_external_cli_path`) para bloquear nombres que comiencen por `-` o contengan caracteres de control, aislando los argumentos posicionales mediante el separador `--`.
 - **⚡ Límites de memoria en compilación de reglas regex personalizadas**:

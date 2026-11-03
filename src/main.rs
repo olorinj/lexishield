@@ -24,7 +24,7 @@ fn parse_path(s: &str) -> Result<PathBuf, String> {
 
 #[derive(Parser)]
 #[command(name = "lexishield")]
-#[command(about = "Motor de anonimización y ofuscación semántica de alto rendimiento", long_about = None)]
+#[command(about = "Motor de anonimización y protección semántica de alto rendimiento", long_about = None)]
 #[command(version)]
 struct Cli {
     /// Activa el nivel de log Debug para más detalles (Telemetría en stderr).
@@ -70,17 +70,17 @@ impl From<CliFormat> for FormatType {
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
 enum CliDirection {
-    #[value(alias = "protect")]
-    Obfuscate,
-    #[value(alias = "restore")]
-    Deobfuscate,
+    #[value(name = "protect", alias = "obfuscate")]
+    Protect,
+    #[value(name = "restore", alias = "deobfuscate")]
+    Restore,
 }
 
 impl From<CliDirection> for WatchDirection {
     fn from(d: CliDirection) -> Self {
         match d {
-            CliDirection::Obfuscate => WatchDirection::Obfuscate,
-            CliDirection::Deobfuscate => WatchDirection::Deobfuscate,
+            CliDirection::Protect => WatchDirection::Obfuscate,
+            CliDirection::Restore => WatchDirection::Deobfuscate,
         }
     }
 }
@@ -317,18 +317,26 @@ enum ClipboardCommands {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Protege u ofusca un archivo, texto directo, entrada estándar (stdin) o portapapeles.
-    #[command(alias = "protect", alias = "p")]
-    Obfuscate {
-        /// Archivo de entrada a procesar (use '-' para leer desde stdin).
+    /// Protege un archivo, directorio completo (procesamiento recursivo concurrente), texto directo, entrada estándar (stdin) o portapapeles reemplazando datos sensibles por tokens.
+    #[command(name = "protect", alias = "obfuscate", alias = "p")]
+    Protect {
+        /// Archivo o directorio de entrada a proteger (use '-' para leer desde stdin).
         #[arg(value_parser = parse_path, short, long)]
         input: Option<PathBuf>,
+
+        /// Explorar subdirectorios de forma recursiva cuando la entrada es un directorio (por defecto: true).
+        #[arg(short = 'r', long, default_value_t = true, action = clap::ArgAction::Set)]
+        recursive: bool,
+
+        /// Desactivar el filtrado de .gitignore durante el recorrido de directorios.
+        #[arg(long)]
+        no_git_ignore: bool,
 
         /// Leer datos directamente desde la entrada estándar (stdin).
         #[arg(long)]
         stdin: bool,
 
-        /// Archivo de salida donde guardar el resultado.
+        /// Archivo o directorio de salida donde guardar el resultado.
         #[arg(value_parser = parse_path, short, long)]
         output: Option<PathBuf>,
 
@@ -360,7 +368,7 @@ enum Commands {
         #[arg(value_parser = parse_path, short, long, alias = "mappings")]
         save_mappings: Option<PathBuf>,
 
-        /// Exporta el documento Office sanitizado a Markdown (.md) extrayendo imágenes mediante Pandoc para revisión con IA.
+        /// Exporta el documento Office protegido a Markdown (.md) extrayendo imágenes mediante Pandoc para revisión con IA.
         #[arg(long, num_args = 0..=1, default_missing_value = "auto")]
         export_md: Option<String>,
 
@@ -375,24 +383,36 @@ enum Commands {
         /// No guardar los mapeos generados (ignora el guardado por defecto).
         #[arg(long)]
         no_save: bool,
+
+        /// Confirmar automáticamente advertencias de recursos o procesamiento masivo sin preguntar.
+        #[arg(short = 'y', long)]
+        yes: bool,
     },
 
-    /// Restaura o desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada.
-    #[command(alias = "restore", alias = "r")]
-    Deobfuscate {
-        /// Archivo de entrada a desofuscar (use '-' para leer desde stdin).
+    /// Restaura un archivo, directorio completo (procesamiento recursivo concurrente), texto o portapapeles reemplazando los tokens por sus valores originales.
+    #[command(name = "restore", alias = "deobfuscate", alias = "r")]
+    Restore {
+        /// Archivo o directorio de entrada a restaurar (use '-' para leer desde stdin).
         #[arg(value_parser = parse_path, short, long)]
         input: Option<PathBuf>,
+
+        /// Explorar subdirectorios de forma recursiva cuando la entrada es un directorio (por defecto: true).
+        #[arg(short = 'r', long, default_value_t = true, action = clap::ArgAction::Set)]
+        recursive: bool,
+
+        /// Desactivar el filtrado de .gitignore durante el recorrido de directorios.
+        #[arg(long)]
+        no_git_ignore: bool,
 
         /// Leer datos directamente desde la entrada estándar (stdin).
         #[arg(long)]
         stdin: bool,
 
-        /// Archivo de salida.
+        /// Archivo o directorio de salida.
         #[arg(value_parser = parse_path, short, long)]
         output: Option<PathBuf>,
 
-        /// Texto directo a desofuscar.
+        /// Texto directo a restaurar.
         #[arg(short, long)]
         text: Option<String>,
 
@@ -416,12 +436,16 @@ enum Commands {
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
 
-        /// Exporta el documento Office desofuscado a Markdown (.md) extrayendo imágenes mediante Pandoc para revisión con IA.
+        /// Exporta el documento Office restaurado a Markdown (.md) extrayendo imágenes mediante Pandoc para revisión con IA.
         #[arg(long, num_args = 0..=1, default_missing_value = "auto")]
         export_md: Option<String>,
+
+        /// Confirmar automáticamente advertencias de recursos o procesamiento masivo sin preguntar.
+        #[arg(short = 'y', long)]
+        yes: bool,
     },
 
-    /// Escanea un archivo, texto, stdin o portapapeles y muestra los datos sensibles detectados sin modificarlos.
+    /// Escanea un archivo, directorio completo (recursivo), texto, stdin o portapapeles y muestra los datos sensibles detectados sin modificarlos.
     Scan {
         /// Archivo o directorio a escanear (use '-' para leer desde stdin).
         #[arg(value_parser = parse_path, short, long)]
@@ -467,7 +491,7 @@ enum Commands {
     /// Monitoriza el portapapeles en tiempo real (modo escucha nativo).
     Watch {
         /// Dirección de la transformación continua.
-        #[arg(short, long, value_enum, default_value_t = CliDirection::Obfuscate)]
+        #[arg(short, long, value_enum, default_value_t = CliDirection::Protect)]
         direction: CliDirection,
 
         /// Archivo de mapeos a cargar y mantener sincronizado (JSON o cifrado).
@@ -679,6 +703,8 @@ fn resolve_password(
 
 struct ObfuscateOptions {
     input: Option<PathBuf>,
+    recursive: bool,
+    no_git_ignore: bool,
     stdin: bool,
     output: Option<PathBuf>,
     copy: bool,
@@ -692,6 +718,7 @@ struct ObfuscateOptions {
     ask_password: bool,
     no_save: bool,
     export_md: Option<String>,
+    yes: bool,
 }
 
 fn export_office_to_md_with_pandoc(
@@ -776,7 +803,87 @@ struct ScanOptions {
     yes: bool,
 }
 
-/// Manejador de la acción de ofuscación.
+/// Procesa de forma recursiva todos los archivos de un directorio para protegerlos con LexiShield.
+fn handle_protect_directory(
+    config: LexiConfig,
+    opts: &ObfuscateOptions,
+    dir_path: &Path,
+    map_path: Option<PathBuf>,
+    is_default: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let files = collect_files_with_ignore(
+        dir_path,
+        &config.ignore,
+        opts.recursive,
+        !opts.no_git_ignore,
+    )?;
+    eprintln!(
+        "🛡️ Protegiendo directorio '{}' ({} archivos)...",
+        dir_path.display(),
+        files.len()
+    );
+    let mut engine = ObfuscatorEngine::new(config);
+    if opts.clean_cache {
+        engine.clean_cache();
+    }
+    let mut final_pwd = opts.password.clone();
+    if let Some(ref path) = map_path
+        && path.exists()
+    {
+        let pwd = resolve_password(opts.password.clone(), opts.ask_password, Some(path))?;
+        final_pwd = pwd.clone();
+        if let Ok(loaded) = lexishield::load_mappings_auto(path, pwd.as_deref()) {
+            let _ = engine.manager.load_mappings(loaded);
+        }
+    }
+
+    let suffix = opts.suffix.as_deref().unwrap_or(".protegido");
+    let mut processed = 0usize;
+    for f in &files {
+        let rel = f.strip_prefix(dir_path).unwrap_or(f);
+        let out_file = if let Some(ref out_root) = opts.output {
+            let target = out_root.join(rel);
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            target
+        } else {
+            let stem = f.file_stem().and_then(|s| s.to_str()).unwrap_or("archivo");
+            let ext = f.extension().and_then(|s| s.to_str()).unwrap_or("txt");
+            f.with_file_name(format!("{stem}{suffix}.{ext}"))
+        };
+
+        let is_office = fs::read(f).is_ok_and(|b| {
+            lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&b)
+                != lexishield::format_adapters::office_adapter::OfficeType::Unknown
+        });
+        if is_office {
+            confirm_zip_resources_if_needed(f, opts.yes)?;
+            let _ = engine.scan_file(f)?;
+            let _ = engine.process_file(f, &out_file, opts.format, false)?;
+            processed += 1;
+        } else if let Ok(content) = fs::read_to_string(f) {
+            let _ = engine.scan_and_register_mappings(&content)?;
+            let (res, _) = engine.obfuscate_text(&content, opts.format)?;
+            fs::write(&out_file, res)?;
+            processed += 1;
+        }
+    }
+
+    if let Some(map_path) = map_path {
+        let force_ask = is_default && final_pwd.is_none();
+        let pwd = resolve_password(final_pwd, opts.ask_password || force_ask, None)?;
+        let mappings = engine.manager.get_mappings();
+        lexishield::save_mappings_auto(&map_path, &mappings, pwd.as_deref())?;
+    }
+    eprintln!(
+        "✅ Directorio protegido con éxito: {} archivos procesados.",
+        processed
+    );
+    Ok(())
+}
+
+/// Manejador de la acción de protección (ofuscación).
 fn handle_obfuscate(
     config: LexiConfig,
     opts: ObfuscateOptions,
@@ -785,8 +892,14 @@ fn handle_obfuscate(
     let map_path = if opts.no_save {
         None
     } else {
-        Some(resolve_vault_path(opts.save_mappings)?)
+        Some(resolve_vault_path(opts.save_mappings.clone())?)
     };
+
+    if let Some(ref in_path) = opts.input
+        && in_path.is_dir()
+    {
+        return handle_protect_directory(config, &opts, in_path, map_path, is_default);
+    }
 
     let is_office = if let Some(ref in_path) = opts.input {
         if let Ok(bytes) = fs::read(in_path) {
@@ -823,7 +936,7 @@ fn handle_obfuscate(
             .input
             .as_ref()
             .ok_or("Debe proporcionar un archivo de entrada con --input")?;
-        confirm_zip_resources_if_needed(in_path)?;
+        confirm_zip_resources_if_needed(in_path, opts.yes)?;
         let out_path = target_out_path.unwrap_or_else(|| {
             let stem = in_path
                 .file_stem()
@@ -961,6 +1074,8 @@ fn handle_obfuscate(
 
 struct DeobfuscateOptions {
     input: Option<PathBuf>,
+    recursive: bool,
+    no_git_ignore: bool,
     stdin: bool,
     output: Option<PathBuf>,
     text: Option<String>,
@@ -970,10 +1085,14 @@ struct DeobfuscateOptions {
     ask_password: bool,
     format: FormatType,
     export_md: Option<String>,
+    yes: bool,
 }
 
 /// Verifica si un archivo contenedor Office (ZIP) requiere mucha memoria descomprimida y solicita confirmación interactiva al usuario si entraña riesgo.
-fn confirm_zip_resources_if_needed(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn confirm_zip_resources_if_needed(
+    path: &Path,
+    auto_yes: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     use std::io::Write;
     if let Ok(bytes) = fs::read(path)
         && let Ok(metrics) =
@@ -996,6 +1115,14 @@ fn confirm_zip_resources_if_needed(path: &Path) -> Result<(), Box<dyn std::error
             metrics.compression_ratio,
             avail_str
         );
+        let force_env = std::env::var("LEXISHIELD_FORCE")
+            .is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+        if auto_yes || force_env {
+            eprintln!(
+                "ℹ️ Continuando automáticamente por confirmación desatendida (-y / LEXISHIELD_FORCE)."
+            );
+            return Ok(());
+        }
         eprint!("¿Desea continuar con el procesamiento en este equipo? [s/N]: ");
         std::io::stderr().flush()?;
         let mut resp = String::new();
@@ -1008,11 +1135,87 @@ fn confirm_zip_resources_if_needed(path: &Path) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-/// Manejador de la acción de desofuscación.
+/// Procesa de forma recursiva todos los archivos de un directorio para restaurarlos con LexiShield.
+fn handle_restore_directory(
+    config: LexiConfig,
+    opts: &DeobfuscateOptions,
+    dir_path: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let files = collect_files_with_ignore(
+        dir_path,
+        &config.ignore,
+        opts.recursive,
+        !opts.no_git_ignore,
+    )?;
+    eprintln!(
+        "🔓 Restaurando directorio '{}' ({} archivos)...",
+        dir_path.display(),
+        files.len()
+    );
+    let is_default = opts.mappings.is_none();
+    let map_path = opts
+        .mappings
+        .clone()
+        .or_else(|| lexishield::config::get_default_vault_path().ok())
+        .ok_or("No se especificó archivo de mapeos y no se pudo usar el default")?;
+    let force_ask = is_default && opts.password.is_none();
+    let pwd = resolve_password(
+        opts.password.clone(),
+        opts.ask_password || force_ask,
+        Some(&map_path),
+    )?;
+    let loaded_mappings = lexishield::load_mappings_auto(&map_path, pwd.as_deref())?;
+
+    let mut engine = ObfuscatorEngine::new(config);
+    engine.manager.load_mappings(loaded_mappings)?;
+
+    let mut processed = 0usize;
+    for f in &files {
+        let rel = f.strip_prefix(dir_path).unwrap_or(f);
+        let out_file = if let Some(ref out_root) = opts.output {
+            let target = out_root.join(rel);
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            target
+        } else {
+            let stem = f.file_stem().and_then(|s| s.to_str()).unwrap_or("archivo");
+            let ext = f.extension().and_then(|s| s.to_str()).unwrap_or("txt");
+            f.with_file_name(format!("{stem}.restaurado.{ext}"))
+        };
+
+        let is_office = fs::read(f).is_ok_and(|b| {
+            lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&b)
+                != lexishield::format_adapters::office_adapter::OfficeType::Unknown
+        });
+        if is_office {
+            confirm_zip_resources_if_needed(f, opts.yes)?;
+            let _ = engine.process_file(f, &out_file, opts.format, true)?;
+            processed += 1;
+        } else if let Ok(content) = fs::read_to_string(f) {
+            let (res, _) = engine.deobfuscate_text(&content, opts.format)?;
+            fs::write(&out_file, res)?;
+            processed += 1;
+        }
+    }
+    eprintln!(
+        "✅ Directorio restaurado con éxito: {} archivos procesados.",
+        processed
+    );
+    Ok(())
+}
+
+/// Manejador de la acción de restauración (desofuscación).
 fn handle_deobfuscate(
     config: LexiConfig,
     opts: DeobfuscateOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(ref in_path) = opts.input
+        && in_path.is_dir()
+    {
+        return handle_restore_directory(config, &opts, in_path);
+    }
+
     let is_office = if let Some(ref in_path) = opts.input {
         if let Ok(bytes) = fs::read(in_path) {
             lexishield::format_adapters::office_adapter::OfficeAdapter::detect_office_type(&bytes)
@@ -1029,7 +1232,7 @@ fn handle_deobfuscate(
             .input
             .as_ref()
             .ok_or("Debe proporcionar un archivo de entrada con --input")?;
-        confirm_zip_resources_if_needed(in_path)?;
+        confirm_zip_resources_if_needed(in_path, opts.yes)?;
         let out_path = opts.output.clone().unwrap_or_else(|| {
             let stem = in_path
                 .file_stem()
@@ -2262,8 +2465,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Vault { subcommand } => handle_vault(subcommand),
         Commands::Backup { subcommand } => handle_backup(subcommand),
         Commands::Clipboard { subcommand } => handle_clipboard(subcommand),
-        Commands::Obfuscate {
+        Commands::Protect {
             input,
+            recursive,
+            no_git_ignore,
             stdin,
             output,
             copy,
@@ -2277,10 +2482,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ask_password,
             no_save,
             export_md,
+            yes,
         } => handle_obfuscate(
             config,
             ObfuscateOptions {
                 input,
+                recursive,
+                no_git_ignore,
                 stdin,
                 output,
                 copy,
@@ -2294,11 +2502,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ask_password,
                 no_save,
                 export_md,
+                yes,
             },
         ),
 
-        Commands::Deobfuscate {
+        Commands::Restore {
             input,
+            recursive,
+            no_git_ignore,
             stdin,
             output,
             text,
@@ -2308,10 +2519,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ask_password,
             format,
             export_md,
+            yes,
         } => handle_deobfuscate(
             config,
             DeobfuscateOptions {
                 input,
+                recursive,
+                no_git_ignore,
                 stdin,
                 output,
                 text,
@@ -2321,6 +2535,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ask_password,
                 format: format.into(),
                 export_md,
+                yes,
             },
         ),
 

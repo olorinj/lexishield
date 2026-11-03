@@ -34,23 +34,23 @@ function Mostrar-Ayuda {
     Write-Host "`nUSO:" -ForegroundColor Cyan
     Write-Host "  .\publicar_version.ps1 [-Version] <VERSION> [-Force] [-DryRun] [-Yes] [-Help]"
     Write-Host "`nARGUMENTOS:" -ForegroundColor Cyan
-    Write-Host "  -Version <STRING>   Version oficial a publicar (ej: v2.0.0 o 2.0.0)."
+    Write-Host "  -Version <STRING>   Version oficial a publicar (ej: v2.2.0 o 2.2.0)."
     Write-Host "`nOPCIONES:" -ForegroundColor Cyan
     Write-Host "  -Help, -h           Muestra esta pantalla de ayuda y sale."
     Write-Host "  -Force, -f          Fuerza la recreacion de la etiqueta si ya existe (local o remota)."
     Write-Host "  -Yes, -y            Modo desatendido: confirma automaticamente sin pausar."
     Write-Host "  -DryRun, -d         Modo simulacion: verifica el estado pero no realiza git push."
     Write-Host "`nEJEMPLOS:" -ForegroundColor Cyan
-    Write-Host "  .\publicar_version.ps1 v2.0.0"
-    Write-Host "  .\publicar_version.ps1 -Version 2.0.0"
-    Write-Host "  .\publicar_version.ps1 -Version v2.0.0 -Force"
-    Write-Host "  .\publicar_version.ps1 -Version v2.0.0 -DryRun`n"
+    Write-Host "  .\publicar_version.ps1 v2.2.0"
+    Write-Host "  .\publicar_version.ps1 -Version 2.2.0"
+    Write-Host "  .\publicar_version.ps1 -Version v2.2.0 -Force"
+    Write-Host "  .\publicar_version.ps1 -Version v2.2.0 -DryRun`n"
 }
 
 if ($Help -or [string]::IsNullOrWhiteSpace($Version)) {
     Mostrar-Ayuda
     if ([string]::IsNullOrWhiteSpace($Version) -and -not $Help) {
-        Write-Host "Por favor, especifica la version a publicar (ej: .\publicar_version.ps1 v2.0.0).`n" -ForegroundColor Yellow
+        Write-Host "Por favor, especifica la version a publicar (ej: .\publicar_version.ps1 v2.2.0).`n" -ForegroundColor Yellow
         exit 1
     }
     exit 0

@@ -1,18 +1,18 @@
-# Especificación técnica: LexiShield v2.1.0 (Office & Document Engine)
+# Especificación técnica: LexiShield v2.2.0 (Office & Document Engine)
 
-> **Estado**: Planificación / Hoja de Ruta  
-> **Versión Objetivo**: `2.1.0`  
-> **Módulo Principal**: `lexishield::engine::office`
+> **Estado**: Implementado y Verificado  
+> **Versión Objetivo**: `2.2.0`  
+> **Módulo Principal**: `lexishield::format_adapters::office_adapter`
 
 ---
 
 ## 1. Visión y objetivos
 
-La versión **2.1.0** de LexiShield amplía el motor de ofuscación semántica más allá del texto plano, logs y fragmentos de código, incorporando soporte nativo para **documentos ofimáticos de Microsoft Office (DOCX, XLSX, PPTX)** y formatos abiertos (**ODT, ODS, PDF, CSV**).
+LexiShield amplía su motor de protección semántica más allá del texto plano, logs y fragmentos de código, incorporando soporte nativo para **documentos ofimáticos de Microsoft Office (DOCX, XLSX, PPTX)** y formatos abiertos (**ODT, ODS, ODP, EPUB, PDF, CSV**).
 
 ### Objetivos clave:
-1. **Preservación estricta del formato**: Transformar datos confidenciales sin alterar estilos, tipografías, tablas, celdas, saltos de página ni estructuras internas del documento.
-2. **Biyección y reversibilidad total**: Permitir la restauración bidireccional (desofuscación) de las respuestas generadas por modelos de IA sobre los mismos documentos.
+1. **Preservación estricta del formato**: Proteger datos confidenciales reemplazándolos por tokens coherentes sin alterar estilos, tipografías, tablas, celdas, saltos de página ni estructuras internas del documento.
+2. **Biyección y reversibilidad total**: Permitir la restauración bidireccional de las respuestas generadas por modelos de IA sobre los mismos documentos o directorios completos.
 3. **Cero fugas en disco**: Procesamiento en memoria (*in-memory streaming*) o uso de buffers seguros efímeros sin dejar copias temporales en claro.
 4. **Soporte multiplataforma**: Implementación 100% Rust sin dependencias de COM de Windows, Microsoft Office instalado ni servicios externos.
 
@@ -107,16 +107,17 @@ flowchart TD
 El procesamiento de documentos Office se integra de forma transparente en los comandos universales de LexiShield:
 
 ```bash
-# Ofuscación / protección directa de documento Office
-lexishield protect -i auditoria_2026.docx -o auditoria_sanitizada.docx -s prod.lexi
+# Protección directa de documento Office
+lexishield protect -i auditoria_2026.docx -o auditoria_protegida.docx -s prod.lexi
 
-# Desofuscación / restauración de documento devuelto por la IA
+# Restauración de documento devuelto por la IA
 lexishield restore -i auditoria_procesada_ia.docx -o auditoria_restaurada.docx -m prod.lexi
 
-# Procesamiento por lotes sobre una carpeta completa (soporta recursión)
-lexishield protect -i ./reportes_confidenciales/ --copy -s prod.lexi
+# Procesamiento recursivo por lotes sobre una carpeta completa (Proteger / Restaurar)
+lexishield protect -i ./reportes_confidenciales/ -o ./reportes_protegidos/ -s prod.lexi -y
+lexishield restore -i ./reportes_protegidos/ -o ./reportes_restaurados/ -m prod.lexi -y
 
-# Escaneo y auditoría pasiva de un documento sin modificarlo
+# Escaneo y auditoría pasiva de un documento o directorio sin modificarlo
 lexishield scan -i auditoria_2026.docx
 
 # Exportación automática a Markdown con Pandoc para revisión contextual con IA
@@ -142,13 +143,13 @@ lexishield protect -i manual_empleado.docx --export-md
 | **Fase 2.4** | *GUI Drag & Drop* | Integración en la interfaz Tauri/Svelte de carga de archivos y previsualización. |
 | **Fase 2.5** | *Test Suite & Benchmarks* | Validación con documentos masivos (>100 MB / >50,000 celdas) y verificación de integridad XML. |
 
-### 5.1 Estado de implementación de la interfaz gráfica (GUI v2.1.0)
+### 5.1 Estado de implementación de la interfaz gráfica y seguridad (v2.2.0)
 
-| Fase GUI | Alcance | Estado | Descripción |
+| Fase | Alcance | Estado | Descripción |
 | :---: | :--- | :---: | :--- |
 | **Fase 1** | *Ergonomía, Temas & Packaging* | **COMPLETADA** | Modo Oscuro/Claro con paleta de alto contraste, diseño accesible de pestañas activas, iconos nativos de ventana y sistema en Linux/Windows/macOS, y optimización del script de compilación para descartar dependencias innecesarias en el staging. |
-| **Fase 2** | *Onboarding, Tokens & Telemetría* | **COMPLETADA** | Explicador de requisitos criptográficos (*Zero-Knowledge Onboarding*), ayuda contextual con `❔ Ayuda` y tarjetas de primer uso descartables en todas las pestañas, terminología estandarizada a tokens, integración con Pandoc y desofuscación 1:1, modales con métricas de resultados, modo Watch con notificación de 0 tokens y preview de portapapeles, y telemetría estructurada sin advertencias. |
-| **Fase 3** | *Smartbars Tier 2 & Simplificación de Opciones* | **COMPLETADA** | Unificación de barras secundarias (Smartbars Tier 2) en todas las vistas incluida Opciones, selectores limpios sin iconos, reorganización de preferencias en 4 bloques funcionales (*Motor de Protección*, *Ventana y Sistema*, *Portapapeles*, *Apariencia y Seguridad*) y control granular de minimización/cierre en bandeja. |
+| **Fase 2** | *Onboarding, Tokens & Telemetría* | **COMPLETADA** | Explicador de requisitos criptográficos (*Zero-Knowledge Onboarding*), ayuda contextual con `❔ Ayuda` y tarjetas de primer uso descartables en todas las pestañas, terminología estandarizada a tokens, integración con Pandoc y restauración 1:1, modales con métricas de resultados, modo Watch con notificación de 0 tokens y preview de portapapeles, y telemetría estructurada sin advertencias. |
+| **Fase 3** | *Smartbars Tier 2, Seguridad & Concordancia* | **COMPLETADA** | Unificación de barras secundarias (Smartbars Tier 2) en todas las vistas incluida Opciones, selectores limpios sin iconos, reorganización de preferencias en 4 bloques funcionales, control de minimización/cierre en bandeja, blindaje contra Zip Bombs consciente del hardware (Linux/Windows), sanitización de argumentos de Pandoc, límites de memoria Regex y estandarización de comandos `protect`/`restore` con soporte recursivo de directorios. |
 
 ---
 

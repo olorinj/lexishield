@@ -4,8 +4,8 @@ use lexishield::models::{DetectorType, Mapping};
 use lexishield::validator::SyntaxValidator;
 use std::io::{Cursor, Write};
 use std::path::Path;
-use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
+use zip::write::SimpleFileOptions;
 
 #[test]
 fn test_security_pandoc_argument_sanitization() {
@@ -19,7 +19,9 @@ fn test_security_pandoc_argument_sanitization() {
     // 3. Intento de inyección de flags directos (--filter, -o, etc.)
     assert!(SyntaxValidator::validate_external_cli_path(Path::new("--filter=evil.lua")).is_err());
     assert!(SyntaxValidator::validate_external_cli_path(Path::new("-o")).is_err());
-    assert!(SyntaxValidator::validate_external_cli_path(Path::new("/tmp/-malicious.docx")).is_err());
+    assert!(
+        SyntaxValidator::validate_external_cli_path(Path::new("/tmp/-malicious.docx")).is_err()
+    );
 
     // 4. Intento de inyección con caracteres de control (newline, null byte)
     assert!(
@@ -84,8 +86,8 @@ fn test_security_office_zip_resource_inspection() {
     {
         let cursor = Cursor::new(&mut zip_buf);
         let mut writer = ZipWriter::new(cursor);
-        let options = SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
         writer.start_file("word/document.xml", options).unwrap();
         // Escribir 1 MB de 'A's altamente comprimibles
@@ -127,4 +129,3 @@ fn test_security_custom_regex_complexity_bounds() {
         "El compilador de reglas debe rechazar expresiones regulares que excedan el límite de memoria segura"
     );
 }
-

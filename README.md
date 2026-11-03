@@ -137,24 +137,29 @@ lexishield [GLOBAL_OPTIONS] <COMMAND> [OPTIONS]
 #  --config <PATH>  Ruta a un archivo TOML de configuración personalizado
 ```
 
-### 1. Comando: `protect` (o `obfuscate`)
-Protege u ofusca un archivo, texto directo o el portapapeles reemplazando los datos confidenciales por seudónimos. Ambos nombres (`protect` y `obfuscate`) son equivalentes en la CLI.
+### 1. Comando: `protect` (alias `obfuscate` / `p`)
+Protege un archivo, un directorio completo (recursivamente), texto directo o el portapapeles reemplazando los datos confidenciales por tokens coherentes. Ambos nombres (`protect` y `obfuscate`) son equivalentes en la CLI.
 
-* **`-i, --input <FILE>`**: Archivo de entrada a procesar.
-* **`-o, --output <FILE>`**: Archivo de salida donde guardar el resultado.
+* **`-i, --input <PATH>`**: Archivo o directorio de entrada a proteger. Si se indica un directorio, explora todos sus archivos respetando `.gitignore` y `.lexiignore`.
+* **`-r, --recursive <BOOL>`**: Explora subdirectorios de forma recursiva cuando la entrada es una carpeta (por defecto: `true`).
+* **`-o, --output <PATH>`**: Archivo o directorio de salida donde guardar el resultado.
 * **`--copy`**: Guarda el resultado como una copia sufijada (`.protegido`) en vez de sobrescribir el original.
-* **`--export-md [PATH]`**: Exporta documentos Office (`.docx`, `.xlsx`, `.pptx`) sanitizados a Markdown (`.md`) extrayendo imágenes mediante Pandoc para revisión contextual con IA.
+* **`--export-md [PATH]`**: Exporta documentos Office (`.docx`, `.xlsx`, `.pptx`) protegidos a Markdown (`.md`) extrayendo imágenes mediante Pandoc para revisión contextual con IA.
 * **`-t, --text <STRING>`**: Texto directo a procesar (si no se especifica archivo).
 * **`-c, --clipboard`**: Procesa de forma atómica el contenido actual del portapapeles y copia el resultado de vuelta.
 * **`-f, --format <FORMAT>`**: Formato estructurado (`auto`, `json`, `xml`, `log`, `text`). Por defecto es `auto`.
 * **`-s, --save-mappings <FILE>`**: Ruta donde guardar la tabla de mapeos generada (soporta JSON o bóvedas cifradas `.lexi`).
 * **`-p, --password <PASSWORD>`**: Contraseña para cifrar la tabla de mapeos guardada (Argon2id + ChaCha20-Poly1305).
 * **`--ask-password`**: Solicita la contraseña de cifrado interactivamente de forma oculta en consola.
+* **`-y, --yes`**: Confirma automáticamente advertencias de recursos o procesamiento masivo desatendido.
 
 *Ejemplos:*
 ```bash
-# Proteger archivo y guardar mapeos cifrados con contraseña
+# Proteger archivo individual y guardar mapeos cifrados con contraseña
 lexishield protect -i server_logs.json -o logs_seguros.json -s mapeos.lexi -p "MiContraseña123!"
+
+# Proteger un directorio completo de documentos de forma recursiva y desatendida
+lexishield protect -i ./documentos_internos/ -o ./documentos_protegidos/ -s mapeos.lexi -p "MiContraseña123!" -y
 
 # Proteger un documento Office exportándolo a la vez a Markdown
 lexishield protect -i informe_auditoria.docx --export-md
@@ -163,26 +168,32 @@ lexishield protect -i informe_auditoria.docx --export-md
 lexishield protect -c
 ```
 
-### 2. Comando: `restore` (o `deobfuscate`)
-Restaura o desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado). Ambos nombres (`restore` y `deobfuscate`) son equivalentes en la CLI. Si no se especifica archivo de salida con `-o`, se genera automáticamente un archivo con el sufijo `.restaurado`.
+### 2. Comando: `restore` (alias `deobfuscate` / `r`)
+Restaura un archivo, un directorio completo (recursivamente), texto o portapapeles reemplazando los tokens por sus valores originales mediante una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado). Ambos nombres (`restore` y `deobfuscate`) son equivalentes en la CLI. Si no se especifica ruta de salida con `-o`, se genera automáticamente con el sufijo `.restaurado`.
 
-* **`-i, --input <FILE>`**: Archivo de entrada a restaurar.
-* **`-o, --output <FILE>`**: Archivo de salida.
-* **`--export-md [PATH]`**: Exporta el documento Office restaurado a Markdown (.md) mediante Pandoc.
+* **`-i, --input <PATH>`**: Archivo o directorio de entrada a restaurar.
+* **`-r, --recursive <BOOL>`**: Explora subdirectorios de forma recursiva cuando la entrada es una carpeta (por defecto: `true`).
+* **`-o, --output <PATH>`**: Archivo o directorio de salida.
+* **`--export-md [PATH]`**: Exporta el documento Office restaurado a Markdown (`.md`) mediante Pandoc.
 * **`-t, --text <STRING>`**: Texto directo a restaurar.
 * **`-c, --clipboard`**: Restaura el texto copiado en el portapapeles y lo reemplaza con el texto real.
 * **`-m, --mappings <FILE>`**: Archivo con los mapeos a aplicar (detecta automáticamente si está cifrado o en texto plano).
 * **`-p, --password <PASSWORD>`**: Contraseña de descifrado (si el archivo está protegido).
 * **`--ask-password`**: Pide la contraseña por consola. Si el archivo está cifrado y no pasas contraseña, te la pedirá automáticamente.
 * **`-f, --format <FORMAT>`**: Formato de lectura/escritura (`auto`, `json`, `xml`, `log`, `text`).
+* **`-y, --yes`**: Confirma automáticamente advertencias de recursos en modo desatendido.
 
-*Ejemplo:*
+*Ejemplos:*
 ```bash
+# Restaurar un archivo devuelto por la IA
 lexishield restore -i respuesta_ia.txt -o respuesta_real.txt -m mapeos.lexi -p "MiContraseña123!"
+
+# Restaurar recursivamente un directorio completo de archivos protegidos
+lexishield restore -i ./documentos_protegidos/ -o ./documentos_restaurados/ -m mapeos.lexi -p "MiContraseña123!" -y
 ```
 
 ### 3. Comando: `scan`
-Escanea un archivo, texto, directorio o portapapeles y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni ofuscarlos. Permite revisar de manera interactiva (fichero a fichero) qué se va a cambiar y guardarlo para uso futuro.
+Escanea un archivo, texto, directorio o portapapeles y muestra los datos sensibles detectados (para auditoría) sin modificarlos ni reemplazarlos. Permite revisar de manera interactiva (fichero a fichero) qué se va a cambiar y guardarlo para uso futuro.
 
 * **`-i, --input <PATH>`**: Archivo o directorio a escanear. Si es directorio, lo recorrerá mostrando progreso en tiempo real y preguntando por cada archivo.
 * **`-t, --text <STRING>`**: Texto a escanear.
@@ -200,7 +211,7 @@ lexishield scan -i /var/log/app/ -s mapeos.lexi --ask-password
 ```
 *Durante el escaneo interactivo de un fichero, podrás:*
 1. **Ver resultados paginados:** Si hay más de 20 detecciones, la lista se pausa. Pulsa `Enter` para ver más o `q` para saltar al final.
-2. **Omitir detecciones falsas:** Al finalizar la lista del fichero, el programa te preguntará qué índices deseas omitir. Puedes introducir listas o rangos separados por comas (ej. `1, 3-5`). Estos elementos se guardarán con el valor especial `=` en el diccionario, asegurando que no se ofusquen.
+2. **Omitir detecciones falsas:** Al finalizar la lista del fichero, el programa te preguntará qué índices deseas omitir. Puedes introducir listas o rangos separados por comas (ej. `1, 3-5`). Estos elementos se guardarán con el valor especial `=` en el diccionario, asegurando que no se reemplacen por tokens.
 
 *Ejemplo (Auditoría automatizada):*
 ```bash
@@ -211,18 +222,18 @@ lexishield scan -c -s mapeos.json -y
 ### 4. Comando: `watch` (monitorización en tiempo real)
 Monitoriza continuamente el portapapeles mediante eventos nativos del sistema operativo y supresión de eco. Cada vez que pulses `Ctrl+C` para copiar un texto, LexiShield lo transformará automáticamente.
 
-* **`-d, --direction <DIRECTION>`**: Dirección de transformación: `obfuscate` (por defecto) o `deobfuscate`.
+* **`-d, --direction <DIRECTION>`**: Dirección de transformación: `protect` (por defecto, alias `obfuscate`) o `restore` (alias `deobfuscate`).
 * **`-m, --mappings <FILE>`**: Archivo para sincronizar y persistir mapeos (JSON o `.lexi` cifrado).
 * **`-p, --password <PASSWORD>`**: Contraseña si los mapeos van a guardarse o leerse cifrados.
 * **`-f, --format <FORMAT>`**: Formato estructural esperado.
 
 *Ejemplos:*
 ```bash
-# Modo guardián cifrado: todo lo que copies se ofusca y los mapeos se guardan en la bóveda protegida
-lexishield watch --direction obfuscate -m mapeos.lexi -p "MiContraseña123!"
+# Modo guardián cifrado: todo lo que copies se protege y los mapeos se guardan en la bóveda protegida
+lexishield watch --direction protect -m mapeos.lexi -p "MiContraseña123!"
 
-# Modo restauración: todo lo que copies de la IA se desofuscará automáticamente usando la bóveda
-lexishield watch --direction deobfuscate -m mapeos.lexi -p "MiContraseña123!"
+# Modo restauración: todo lo que copies de la IA se restaurará automáticamente usando la bóveda
+lexishield watch --direction restore -m mapeos.lexi -p "MiContraseña123!"
 ```
 
 ### 5. Comando: `dict`

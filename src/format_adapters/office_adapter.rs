@@ -105,7 +105,47 @@ impl OfficeAdapter {
             }
             None
         }
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(target_os = "windows")]
+        {
+            #[repr(C)]
+            struct MemoryStatusEx {
+                dw_length: u32,
+                dw_memory_load: u32,
+                ull_total_phys: u64,
+                ull_avail_phys: u64,
+                ull_total_page_file: u64,
+                ull_avail_page_file: u64,
+                ull_total_virtual: u64,
+                ull_avail_virtual: u64,
+                ull_avail_extended_virtual: u64,
+            }
+
+            #[link(name = "kernel32")]
+            unsafe extern "system" {
+                fn GlobalMemoryStatusEx(lp_buffer: *mut MemoryStatusEx) -> i32;
+            }
+
+            let mut status = MemoryStatusEx {
+                dw_length: std::mem::size_of::<MemoryStatusEx>() as u32,
+                dw_memory_load: 0,
+                ull_total_phys: 0,
+                ull_avail_phys: 0,
+                ull_total_page_file: 0,
+                ull_avail_page_file: 0,
+                ull_total_virtual: 0,
+                ull_avail_virtual: 0,
+                ull_avail_extended_virtual: 0,
+            };
+
+            // SAFETY: `status` is a properly initialized `#[repr(C)]` struct on the stack
+            // with `dw_length` set to its exact byte size as required by the Win32 API.
+            let ok = unsafe { GlobalMemoryStatusEx(&raw mut status) };
+            if ok != 0 {
+                return Some(status.ull_avail_phys);
+            }
+            None
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         {
             None
         }
