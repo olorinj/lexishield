@@ -968,6 +968,7 @@ dependencies = [
 name = "lexishield"
 version = "2.2.0"
 dependencies = [
+ "aho-corasick",
  "arboard",
  "argon2",
  "bzip2",

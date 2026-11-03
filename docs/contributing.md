@@ -121,3 +121,31 @@ Una vez tu código esté en GitHub, generar instaladores para tus usuarios es ta
 ```
 
 Estos scripts se asegurarán de que tu código esté limpio, crearán una etiqueta git (`v2.2.0`) y la subirán. Inmediatamente después, los servidores de GitHub Actions arrancarán y compilarán los instaladores gráficos para todos los sistemas operativos, depositándolos en la pestaña "Releases" (Lanzamientos) de tu repositorio.
+
+---
+
+## 3. Optimización de compilación y microarquitectura
+
+Por diseño y para garantizar la distribución universal, los binarios oficiales se compilan para arquitecturas base estándar (`x86_64` genérica y `aarch64`), asegurando que cualquier usuario pueda ejecutarlos sin importar la antigüedad de su procesador.
+
+### 3.1 Compilación optimizada para tu CPU local (`target-cpu=native`)
+Si estás compilando LexiShield desde el código fuente para utilizarlo en tu propia máquina (o en un servidor dedicado) y deseas exprimir al 100% las instrucciones vectoriales nativas de tu CPU (AVX2, AVX-512, FMA, BMI2, NEON):
+
+```bash
+# Compilar binario de producción optimizado específicamente para tu procesador:
+RUSTFLAGS="-C target-cpu=native" cargo build --release
+
+# Ejecutar la suite de pruebas de rendimiento sobre tu hardware:
+RUSTFLAGS="-C target-cpu=native" cargo bench --bench engine_benchmark
+```
+
+### 3.2 Niveles de microarquitectura intermedia (`x86-64-v2` / `x86-64-v3`)
+Para despliegues en flotas corporativas homogéneas donde se desea mayor rendimiento que la línea base pero sin atarse a un procesador individual:
+* **`x86-64-v2`**: Compatible con casi cualquier CPU fabricada desde 2009 (soporta SSE4.2, SSSE3 y PopCnt).
+  ```bash
+  RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release
+  ```
+* **`x86-64-v3`**: Optimizado para procesadores desde 2015 en adelante (activa AVX, AVX2 y BMI2).
+  ```bash
+  RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release
+  ```

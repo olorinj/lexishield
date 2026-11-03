@@ -118,5 +118,34 @@ fn bench_obfuscation(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_scanning, bench_obfuscation);
+fn bench_replacements(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Engine_Replacements");
+    let log_1000_lines = generate_synthetic_log(1000);
+
+    let mut map = std::collections::HashMap::new();
+    for i in 0..100 {
+        map.insert(format!("srv-prod{i:02}"), format!("host-anon-{i:04}"));
+        map.insert(format!("192.168.1.{i}"), format!("10.0.0.{i}"));
+        map.insert(format!("admin{i}@corp.es"), format!("user_{i}@example.com"));
+    }
+
+    let replacer = lexishield::engine::replacer::CompiledReplacer::new(&map, true);
+
+    group.throughput(Throughput::Bytes(log_1000_lines.len() as u64));
+    group.bench_function("ahocorasick_replace_300_patterns_1000_lines", |b| {
+        b.iter(|| {
+            let (res, count) = replacer.replace(black_box(&log_1000_lines));
+            black_box((res, count));
+        });
+    });
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_scanning,
+    bench_obfuscation,
+    bench_replacements
+);
 criterion_main!(benches);
