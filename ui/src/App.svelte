@@ -1129,15 +1129,41 @@
         }
       }
 
-      const rep = await invokeTauri("process_file_command", {
-        inputPath: selected,
-        outputPath: outPath,
-        formatStr: selectedFormat,
-        vaultPath: vaultPath || null,
-        password: password || null,
-        reverse: reverse,
-        exportMd: useMd
-      });
+      let rep;
+      try {
+        rep = await invokeTauri("process_file_command", {
+          inputPath: selected,
+          outputPath: outPath,
+          formatStr: selectedFormat,
+          vaultPath: vaultPath || null,
+          password: password || null,
+          reverse: reverse,
+          exportMd: useMd,
+          forceResources: false
+        });
+      } catch (e) {
+        const errStr = String(e);
+        if (errStr.startsWith("RESOURCE_WARNING:")) {
+          const msg = errStr.replace("RESOURCE_WARNING:", "");
+          if (confirm(`⚠️ Advertencia de recursos del sistema:\n\n${msg}`)) {
+            rep = await invokeTauri("process_file_command", {
+              inputPath: selected,
+              outputPath: outPath,
+              formatStr: selectedFormat,
+              vaultPath: vaultPath || null,
+              password: password || null,
+              reverse: reverse,
+              exportMd: useMd,
+              forceResources: true
+            });
+          } else {
+            statusMessage = "Operación cancelada por el usuario por precaución de recursos.";
+            return;
+          }
+        } else {
+          throw e;
+        }
+      }
       lastReport = rep;
       const actionName = reverse ? "restaurado" : "protegido";
       statusMessage = `✅ Archivo ${actionName} (${rep.replacements_applied} tokens procesados). Guardado en: ${outPath}`;

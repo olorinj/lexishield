@@ -28,10 +28,86 @@ pub struct OfficeAdapter {
     xml_adapter: XmlAdapter,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ZipResourceMetrics {
+    pub compressed_bytes: u64,
+    pub uncompressed_bytes: u64,
+    pub compression_ratio: f64,
+    pub available_memory_bytes: Option<u64>,
+    pub requires_warning: bool,
+}
+
 impl OfficeAdapter {
     pub fn new() -> Self {
         Self {
             xml_adapter: XmlAdapter::new(),
+        }
+    }
+
+    /// Calcula el tamaño descomprimido proyectado de un contenedor ZIP y evalúa si puede afectar a la memoria disponible del sistema.
+    #[allow(clippy::cast_precision_loss)]
+    pub fn inspect_zip_resources(bytes: &[u8]) -> Result<ZipResourceMetrics, ObfuscationError> {
+        let compressed_bytes = bytes.len() as u64;
+        let cursor = Cursor::new(bytes);
+        let mut archive = ZipArchive::new(cursor).map_err(|e| {
+            ObfuscationError::XmlError(format!("Error al inspeccionar contenedor ZIP: {e}"))
+        })?;
+
+        let mut uncompressed_bytes: u64 = 0;
+        for i in 0..archive.len() {
+            if let Ok(file) = archive.by_index_raw(i) {
+                uncompressed_bytes = uncompressed_bytes.saturating_add(file.size());
+            }
+        }
+
+        let compression_ratio = if compressed_bytes > 0 {
+            uncompressed_bytes as f64 / compressed_bytes as f64
+        } else {
+            1.0
+        };
+
+        let available_memory_bytes = Self::get_system_available_memory_bytes();
+
+        // Se requiere advertencia al usuario si:
+        // 1. El tamaño descomprimido supera el 50% de la RAM disponible (si se conoce), o
+        // 2. El tamaño descomprimido supera 500 MB, o
+        // 3. El tamaño descomprimido supera 50 MB con un ratio de compresión extremo (> 100:1)
+        let exceeds_ram_share =
+            available_memory_bytes.is_some_and(|avail| uncompressed_bytes > avail / 2);
+        let requires_warning = exceeds_ram_share
+            || uncompressed_bytes > 500 * 1024 * 1024
+            || (uncompressed_bytes > 50 * 1024 * 1024 && compression_ratio > 100.0);
+
+        Ok(ZipResourceMetrics {
+            compressed_bytes,
+            uncompressed_bytes,
+            compression_ratio,
+            available_memory_bytes,
+            requires_warning,
+        })
+    }
+
+    /// Obtiene una estimación de la memoria RAM disponible en el sistema sin dependencias pesadas.
+    pub fn get_system_available_memory_bytes() -> Option<u64> {
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(meminfo) = std::fs::read_to_string("/proc/meminfo") {
+                for line in meminfo.lines() {
+                    if line.starts_with("MemAvailable:") {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 2
+                            && let Ok(kb) = parts[1].parse::<u64>()
+                        {
+                            return Some(kb.saturating_mul(1024));
+                        }
+                    }
+                }
+            }
+            None
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            None
         }
     }
 

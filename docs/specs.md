@@ -154,7 +154,8 @@ lexishield protect -i manual_empleado.docx --export-md
 
 ## 6. Consideraciones de seguridad y calidad
 
-1. **Validación de Integridad XML**: Antes de emitir el archivo final, el motor debe parsear el XML de salida para asegurar que es 100% válido y que Word/Excel no emitirán advertencias de "archivo dañado".
-2. **Defensa contra XML External Entity (XXE) / Zip Bombs**: El descompresor limitará el ratio de descompresión a un máximo seguro (evitando ataques de descompresión infinita).
-3. **Limpieza de Metadatos Ocultos**: Opción configurable (`--strip-metadata`) para limpiar autor original, comentarios eliminados y rutas UNC incrustadas en el documento.
+1. **Validación de integridad XML**: Antes de emitir el archivo final, el motor parsea el XML de salida para asegurar que es 100% válido y que Word/Excel no emitirán advertencias de "archivo dañado".
+2. **Defensa contra XML External Entity (XXE) y Zip Bombs**: El analizador inspecciona previamente las cabeceras del contenedor ZIP (`inspect_zip_resources`), calculando el volumen total descomprimido y contrastándolo con la memoria RAM disponible del equipo, solicitando confirmación explícita al usuario si el archivo supera umbrales de seguridad o ratios de compresión anómalos.
+3. **Sanitización de subprocesos externos (Pandoc)**: Toda ruta pasada a herramientas externas es validada mediante `validate_external_cli_path` para impedir inyección de flags (`-`), caracteres de control y recorridos de directorios no autorizados, aislando los argumentos con `--`.
+4. **Limpieza de metadatos ocultos**: Opción configurable (`--strip-metadata`) para limpiar autor original, comentarios eliminados y rutas UNC incrustadas en el documento.
 

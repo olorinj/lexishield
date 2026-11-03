@@ -715,18 +715,23 @@ fn export_office_to_md_with_pandoc(
         (md, media)
     };
 
+    lexishield::validator::SyntaxValidator::validate_external_cli_path(docx_path)?;
+    lexishield::validator::SyntaxValidator::validate_external_cli_path(&md_path)?;
+    lexishield::validator::SyntaxValidator::validate_external_cli_path(&media_dir)?;
+
     eprintln!(
         "🔄 Exportando a Markdown mediante Pandoc: {}...",
         docx_path.display()
     );
 
     let status = std::process::Command::new("pandoc")
-        .arg(docx_path)
-        .arg("-o")
-        .arg(&md_path)
         .arg("--wrap=none")
         .arg("-s")
         .arg(format!("--extract-media={}", media_dir.display()))
+        .arg("-o")
+        .arg(&md_path)
+        .arg("--")
+        .arg(docx_path)
         .status();
 
     match status {
@@ -818,6 +823,7 @@ fn handle_obfuscate(
             .input
             .as_ref()
             .ok_or("Debe proporcionar un archivo de entrada con --input")?;
+        confirm_zip_resources_if_needed(in_path)?;
         let out_path = target_out_path.unwrap_or_else(|| {
             let stem = in_path
                 .file_stem()
@@ -966,6 +972,42 @@ struct DeobfuscateOptions {
     export_md: Option<String>,
 }
 
+/// Verifica si un archivo contenedor Office (ZIP) requiere mucha memoria descomprimida y solicita confirmación interactiva al usuario si entraña riesgo.
+fn confirm_zip_resources_if_needed(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Write;
+    if let Ok(bytes) = fs::read(path)
+        && let Ok(metrics) =
+            lexishield::format_adapters::office_adapter::OfficeAdapter::inspect_zip_resources(
+                &bytes,
+            )
+        && metrics.requires_warning
+    {
+        let uncomp_mb = metrics.uncompressed_bytes / (1024 * 1024);
+        let comp_mb = metrics.compressed_bytes / (1024 * 1024);
+        let avail_str = metrics.available_memory_bytes.map_or_else(
+            || "desconocida".to_string(),
+            |b| format!("{} MB", b / (1024 * 1024)),
+        );
+        eprintln!(
+            "⚠️ Advertencia de recursos: El archivo '{}' ({} MB comprimido) requiere descomprimir ~{} MB en memoria (ratio {:.1}:1, RAM disponible: {}).",
+            path.display(),
+            comp_mb,
+            uncomp_mb,
+            metrics.compression_ratio,
+            avail_str
+        );
+        eprint!("¿Desea continuar con el procesamiento en este equipo? [s/N]: ");
+        std::io::stderr().flush()?;
+        let mut resp = String::new();
+        std::io::stdin().read_line(&mut resp)?;
+        let resp = resp.trim().to_ascii_lowercase();
+        if resp != "s" && resp != "si" && resp != "sí" && resp != "y" && resp != "yes" {
+            return Err("Operación cancelada por el usuario por precaución de recursos.".into());
+        }
+    }
+    Ok(())
+}
+
 /// Manejador de la acción de desofuscación.
 fn handle_deobfuscate(
     config: LexiConfig,
@@ -987,6 +1029,7 @@ fn handle_deobfuscate(
             .input
             .as_ref()
             .ok_or("Debe proporcionar un archivo de entrada con --input")?;
+        confirm_zip_resources_if_needed(in_path)?;
         let out_path = opts.output.clone().unwrap_or_else(|| {
             let stem = in_path
                 .file_stem()

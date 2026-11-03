@@ -2,7 +2,7 @@
 
 use crate::models::DetectorType;
 use rand::Rng;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 
 /// Estrategia de generación de seudónimos para reglas personalizadas.
@@ -52,7 +52,10 @@ pub struct CompiledCustomRule {
 
 impl CompiledCustomRule {
     pub fn try_from_rule(rule: &CustomRule) -> Result<Self, regex::Error> {
-        let regex = Regex::new(&rule.pattern)?;
+        let regex = RegexBuilder::new(&rule.pattern)
+            .size_limit(2 * 1024 * 1024)
+            .dfa_size_limit(2 * 1024 * 1024)
+            .build()?;
         Ok(Self {
             name: rule.name.clone(),
             regex,

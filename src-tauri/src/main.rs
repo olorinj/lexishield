@@ -428,13 +428,21 @@ fn export_office_to_md_with_pandoc(doc_path: &Path) -> Result<std::path::PathBuf
     let md_path = parent.join(format!("{stem}.md"));
     let media_dir = parent.join(stem);
 
+    lexishield::validator::SyntaxValidator::validate_external_cli_path(doc_path)
+        .map_err(|e| e.to_string())?;
+    lexishield::validator::SyntaxValidator::validate_external_cli_path(&md_path)
+        .map_err(|e| e.to_string())?;
+    lexishield::validator::SyntaxValidator::validate_external_cli_path(&media_dir)
+        .map_err(|e| e.to_string())?;
+
     let status = std::process::Command::new("pandoc")
-        .arg(doc_path)
-        .arg("-o")
-        .arg(&md_path)
         .arg("--wrap=none")
         .arg("-s")
         .arg(format!("--extract-media={}", media_dir.display()))
+        .arg("-o")
+        .arg(&md_path)
+        .arg("--")
+        .arg(doc_path)
         .status()
         .map_err(|e| format!("Error al ejecutar pandoc: {e}"))?;
 
@@ -455,7 +463,28 @@ fn process_file_command(
     password: Option<String>,
     reverse: bool,
     export_md: Option<bool>,
+    force_resources: Option<bool>,
 ) -> Result<ObfuscationReport, String> {
+    if !force_resources.unwrap_or(false)
+        && let Ok(bytes) = std::fs::read(&input_path)
+        && let Ok(metrics) =
+            lexishield::format_adapters::office_adapter::OfficeAdapter::inspect_zip_resources(
+                &bytes,
+            )
+        && metrics.requires_warning
+    {
+        let uncomp_mb = metrics.uncompressed_bytes / (1024 * 1024);
+        let comp_mb = metrics.compressed_bytes / (1024 * 1024);
+        let avail_str = metrics.available_memory_bytes.map_or_else(
+            || "desconocida".to_string(),
+            |b| format!("{} MB", b / (1024 * 1024)),
+        );
+        return Err(format!(
+            "RESOURCE_WARNING:El archivo ({comp_mb} MB comprimido) requiere descomprimir ~{uncomp_mb} MB en memoria (ratio {:.1}:1, RAM disponible: {avail_str}). ¿Deseas continuar con el procesamiento en este equipo?",
+            metrics.compression_ratio
+        ));
+    }
+
     let config = load_config_with_rules(None, None);
     let mut engine = ObfuscatorEngine::new(config);
 

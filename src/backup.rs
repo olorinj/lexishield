@@ -233,4 +233,47 @@ mod tests {
         let _ = fs::remove_dir_all(&restore_dest);
         let _ = fs::remove_file(&backup_file);
     }
+
+    #[test]
+    fn test_backup_zip_slip_path_traversal_prevention() {
+        use bzip2::Compression;
+        use bzip2::write::BzEncoder;
+        use std::io::Write;
+        use tar::Header;
+
+        let temp_root = std::env::temp_dir().join(format!("lexi_zipslip_{}", std::process::id()));
+        let restore_dest = temp_root.join("safe_box");
+        let _ = fs::create_dir_all(&restore_dest);
+
+        // Crear un archivo tar en memoria con una entrada que intenta escribir un fichero normal
+        let mut tar_bytes = Vec::new();
+        {
+            let mut builder = tar::Builder::new(&mut tar_bytes);
+            let data = b"malicious_payload";
+            let mut header = Header::new_gnu();
+            header.set_size(data.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "subcarpeta/config_segura.toml", &data[..])
+                .unwrap();
+            builder.finish().unwrap();
+        }
+
+        // Comprimir con Bzip2
+        let mut bz_encoder = BzEncoder::new(Vec::new(), Compression::default());
+        bz_encoder.write_all(&tar_bytes).unwrap();
+        let compressed = bz_encoder.finish().unwrap();
+
+        let backup_file = temp_root.join("malicious.tar.bz2");
+        fs::write(&backup_file, compressed).unwrap();
+
+        let count = restore_backup_to_dir(&backup_file, &restore_dest, None).unwrap();
+        assert_eq!(count, 1);
+        // Debe haberse extraído aplanado dentro de restore_dest (solo file_name) y nunca crear subdirectorios arbitrarios
+        assert!(restore_dest.join("config_segura.toml").exists());
+        assert!(!restore_dest.join("subcarpeta").exists());
+
+        let _ = fs::remove_dir_all(&temp_root);
+    }
 }

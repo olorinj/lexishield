@@ -181,6 +181,42 @@ impl SyntaxValidator {
 
         Ok(tags)
     }
+
+    /// Valida que una ruta de archivo o argumento pasado a un subproceso externo (como Pandoc)
+    /// sea segura, no contenga caracteres de control ni comience por `-` (evitando inyección de flags).
+    pub fn validate_external_cli_path(path: &std::path::Path) -> Result<(), ObfuscationError> {
+        let path_str = path.to_string_lossy();
+        if path_str.is_empty() {
+            return Err(ObfuscationError::ValidationError(
+                "La ruta proporcionada al subproceso está vacía".to_string(),
+            ));
+        }
+
+        if path_str.starts_with('-') {
+            return Err(ObfuscationError::ValidationError(format!(
+                "Ruta rechazada por seguridad (posible inyección de flag CLI): '{path_str}'"
+            )));
+        }
+
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
+            && file_name.starts_with('-')
+        {
+            return Err(ObfuscationError::ValidationError(format!(
+                "El nombre de archivo comienza con '-' (posible inyección de flag CLI): '{file_name}'"
+            )));
+        }
+
+        if path_str
+            .chars()
+            .any(|c| c == '\0' || c == '\n' || c == '\r')
+        {
+            return Err(ObfuscationError::ValidationError(
+                "La ruta contiene caracteres de control no permitidos".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -20,6 +20,16 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
 - **🧹 Limpieza visual de menús desplegables (`<select>`)**:
   - Eliminación total de emojis e iconos dentro de las opciones de los menús desplegables de configuración para lograr una lectura limpia, nítida y homogénea en todos los sistemas operativos.
 
+### Seguridad
+- **🛡️ Inspección preventiva de recursos y protección ante Zip Bombs**:
+  - Incorporación de `OfficeAdapter::inspect_zip_resources` para calcular de antemano el tamaño descomprimido proyectado y contrastarlo con la memoria RAM disponible del equipo, emitiendo una advertencia interactiva de confirmación al usuario tanto en la CLI como en la GUI si el archivo conlleva riesgo de agotamiento de memoria.
+- **🔒 Sanitización e inmunización de argumentos en subprocesos externos (Pandoc)**:
+  - Validación estricta de rutas (`SyntaxValidator::validate_external_cli_path`) para bloquear nombres que comiencen por `-` o contengan caracteres de control, aislando los argumentos posicionales mediante el separador `--`.
+- **⚡ Límites de memoria en compilación de reglas regex personalizadas**:
+  - Uso de `RegexBuilder` con `size_limit` y `dfa_size_limit` acotados a 2 MB en `custom.rs` para evitar agotamiento de memoria por patrones maliciosos.
+- **🧪 Suite dedicada de pruebas adversarias (`tests/security_tests.rs`)**:
+  - Cobertura automatizada contra inyección de flags CLI, resistencia anti-manipulación de bits en bóvedas ChaCha20-Poly1305, inspección de contenedores ZIP y prevención de *Zip-Slip* en restauración de copias de seguridad.
+
 ## [2.1.0] - 2026-10-29
 *Actualización integral de experiencia de usuario: Renombrado conceptual a Transformación, refactorización de barras secundarias Tier 2 (Smartbars), resiliencia multiplataforma de portapapeles en Linux (Wayland/X11/KDE), búsqueda reactiva con botón de vaciado rápido y alineación integral de documentación.*
 
