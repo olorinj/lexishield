@@ -10,14 +10,12 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::VerboseDesc => {
             "Debugログレベルを有効化して詳細を出力します（stderrへテレメトリ出力）"
         }
-        MsgKey::DebugDesc => {
-            "完全なDEBUGモードを有効化し、網羅的なテレメトリをstderrに出力します"
-        }
+        MsgKey::DebugDesc => "完全なDEBUGモードを有効化し、網羅的なテレメトリをstderrに出力します",
         MsgKey::ConfigPathDesc => "カスタムTOML設定ファイルへのパス",
-        MsgKey::RulesPathDesc => {
-            "カスタムTOMLルールファイルへのパス (~/.lexishield/rules.toml)"
+        MsgKey::RulesPathDesc => "カスタムTOMLルールファイルへのパス (~/.lexishield/rules.toml)",
+        MsgKey::LangDesc => {
+            "表示言語 ('en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja', 'ru', 'pl', 'nl', 'ko')"
         }
-        MsgKey::LangDesc => "表示言語 ('en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja', 'ru', 'pl', 'nl', 'ko')",
         MsgKey::EngineInitialized => "LexiShield コアエンジンが正常に初期化されました",
         MsgKey::ScanningStarted => "対象ファイルのスキャンを開始しています...",
         MsgKey::FilesProcessed => "処理されたファイル数",
@@ -30,4 +28,3 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::ConfigResetSuccess => "デフォルト設定が正常に復元されました",
     }
 }
-

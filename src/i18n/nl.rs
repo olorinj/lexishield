@@ -17,7 +17,9 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::RulesPathDesc => {
             "Pad naar een aangepast TOML-regelbestand (~/.lexishield/rules.toml)"
         }
-        MsgKey::LangDesc => "Weergavetaal ('en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja', 'ru', 'pl', 'nl', 'ko')",
+        MsgKey::LangDesc => {
+            "Weergavetaal ('en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja', 'ru', 'pl', 'nl', 'ko')"
+        }
         MsgKey::EngineInitialized => "LexiShield core engine succesvol geïnitialiseerd",
         MsgKey::ScanningStarted => "Scannen van doelbestanden starten...",
         MsgKey::FilesProcessed => "Verwerkte bestanden",
@@ -30,4 +32,3 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::ConfigResetSuccess => "Standaardconfiguratie succesvol hersteld",
     }
 }
-

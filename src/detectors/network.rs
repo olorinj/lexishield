@@ -117,10 +117,22 @@ impl IPv4Detector {
             let new_subnet = map.entry(subnet_key).or_insert_with(|| {
                 loop {
                     let cand = if is_priv {
-                        // Subredes privadas en 10.x.y.0/24 (65.536 subredes disponibles)
-                        let b: u8 = rng.gen_range(0..=255);
-                        let c: u8 = rng.gen_range(0..=255);
-                        format!("10.{b}.{c}")
+                        // Preservar la misma clase / espacio privado:
+                        if octets[0] == 192 && octets[1] == 168 {
+                            // Subredes en 192.168.x.0/24 (256 subredes privadas)
+                            let c: u8 = rng.gen_range(0..=255);
+                            format!("192.168.{c}")
+                        } else if octets[0] == 172 && (16..=31).contains(&octets[1]) {
+                            // Subredes en 172.(16..31).x.0/24
+                            let b: u8 = rng.gen_range(16..=31);
+                            let c: u8 = rng.gen_range(0..=255);
+                            format!("172.{b}.{c}")
+                        } else {
+                            // Subredes en 10.x.y.0/24 (65.536 subredes privadas)
+                            let b: u8 = rng.gen_range(0..=255);
+                            let c: u8 = rng.gen_range(0..=255);
+                            format!("10.{b}.{c}")
+                        }
                     } else {
                         // Subredes públicas seguras en espacios no reservados (millones de subredes disponibles)
                         let a: u8 = rng.gen_range(11..=220);

@@ -7,10 +7,11 @@ use crate::engine::replacer::CompiledReplacer;
 use crate::models::ObfuscationError;
 use regex::Regex;
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::sync::LazyLock;
 
 static KVP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"([a-zA-Z0-9_\-\.]+)=("?[^"\s]+"?[^"\s]*)"#).expect("Regex KVP inválida")
+    Regex::new(r#"([a-zA-Z0-9_\-\.]+)=((?:"[^"]*")|(?:[^\";\s\]]+))"#).expect("Regex KVP inválida")
 });
 
 #[derive(Default)]
@@ -57,9 +58,24 @@ impl LogAdapter {
                 continue;
             }
 
-            // Si la línea contiene pares clave=valor, procesar respetando la clave
+            // Si la línea contiene pares clave=valor, procesar segmentos KVP y texto intercalado
             if KVP_REGEX.is_match(line) {
-                let replaced_line = KVP_REGEX.replace_all(line, |caps: &regex::Captures| {
+                let mut line_res = String::with_capacity(line.len());
+                let mut last_idx = 0;
+
+                for caps in KVP_REGEX.captures_iter(line) {
+                    let full_match = caps.get(0).unwrap();
+                    let match_start = full_match.start();
+                    let match_end = full_match.end();
+
+                    // Procesar texto libre antes del par KVP
+                    if match_start > last_idx {
+                        let prefix = &line[last_idx..match_start];
+                        let (new_prefix, count) = replacer.replace(prefix);
+                        total_replacements += count;
+                        line_res.push_str(&new_prefix);
+                    }
+
                     let key = &caps[1];
                     let val = &caps[2];
 
@@ -74,12 +90,23 @@ impl LogAdapter {
                     total_replacements += count;
 
                     if is_quoted {
-                        format!("{key}=\"{new_val}\"")
+                        let _ = write!(line_res, "{key}=\"{new_val}\"");
                     } else {
-                        format!("{key}={new_val}")
+                        let _ = write!(line_res, "{key}={new_val}");
                     }
-                });
-                output_lines.push(replaced_line.into_owned());
+
+                    last_idx = match_end;
+                }
+
+                // Procesar texto libre posterior al último par KVP
+                if last_idx < line.len() {
+                    let suffix = &line[last_idx..];
+                    let (new_suffix, count) = replacer.replace(suffix);
+                    total_replacements += count;
+                    line_res.push_str(&new_suffix);
+                }
+
+                output_lines.push(line_res);
             } else {
                 // Línea de log estándar: aplicar reemplazo con guardia de palabras
                 let (replaced_line, count) = replacer.replace(line);

@@ -10,14 +10,14 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::VerboseDesc => {
             "Включить уровень логирования Debug для подробностей (телеметрия в stderr)"
         }
-        MsgKey::DebugDesc => {
-            "Включить полный режим DEBUG с исчерпывающей телеметрией в stderr"
-        }
+        MsgKey::DebugDesc => "Включить полный режим DEBUG с исчерпывающей телеметрией в stderr",
         MsgKey::ConfigPathDesc => "Путь к пользовательскому файлу конфигурации TOML",
         MsgKey::RulesPathDesc => {
             "Путь к пользовательскому файлу правил TOML (~/.lexishield/rules.toml)"
         }
-        MsgKey::LangDesc => "Язык интерфейса ('en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja', 'ru', 'pl', 'nl', 'ko')",
+        MsgKey::LangDesc => {
+            "Язык интерфейса ('en', 'es', 'fr', 'de', 'pt', 'it', 'zh', 'ja', 'ru', 'pl', 'nl', 'ko')"
+        }
         MsgKey::EngineInitialized => "Основной движок LexiShield успешно инициализирован",
         MsgKey::ScanningStarted => "Запуск сканирования целевых файлов...",
         MsgKey::FilesProcessed => "Обработано файлов",
@@ -30,4 +30,3 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::ConfigResetSuccess => "Конфигурация по умолчанию успешно восстановлена",
     }
 }
-
