@@ -1,0 +1,52 @@
+{
+  "tabs": {
+    "studio": "Estudio",
+    "scanner": "Escáner",
+    "pairs": "Pares y Reglas",
+    "vaults": "Bóvedas",
+    "watch": "Centinela",
+    "config": "Configuración",
+    "logs": "Registros"
+  },
+  "studio": {
+    "title": "Estudio de Anonimización",
+    "input_placeholder": "Pega aquí tus logs o datos sensibles...",
+    "output_placeholder": "El resultado sanitizado aparecerá aquí...",
+    "btn_anonymize": "Anonimizar",
+    "btn_deanonymize": "Desanonimizar",
+    "btn_copy": "Copiar",
+    "btn_clear": "Limpiar",
+    "stats_tokens": "Tokens protegidos",
+    "stats_entropy": "Entropía preservada",
+    "format_auto": "Detección Automática",
+    "file_open": "Cargar Archivo",
+    "file_save": "Guardar Como"
+  },
+  "config": {
+    "title": "Ajustes del Sistema",
+    "language": "Idioma de la Interfaz",
+    "language_es": "Español",
+    "language_en": "English",
+    "theme": "Tema Visual",
+    "theme_dark": "Oscuro",
+    "theme_light": "Claro",
+    "theme_system": "Sistema",
+    "btn_reset": "Restaurar Predeterminados",
+    "btn_save": "Guardar Configuración"
+  },
+  "vaults": {
+    "title": "Gestión de Bóvedas Cifradas",
+    "active_vault": "Bóveda Activa",
+    "btn_new": "Nueva Bóveda",
+    "btn_lock": "Bloquear",
+    "btn_unlock": "Desbloquear"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "success": "Operación completada con éxito",
+    "error": "Ha ocurrido un error",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar"
+  }
+}
+

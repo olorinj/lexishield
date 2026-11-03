@@ -43,6 +43,10 @@ struct Cli {
     #[arg(value_parser = parse_path, long, global = true)]
     rules: Option<PathBuf>,
 
+    /// Display language / Idioma de interfaz ('en', 'es').
+    #[arg(long, global = true)]
+    lang: Option<String>,
+
     #[command(subcommand)]
     command: Commands,
 }

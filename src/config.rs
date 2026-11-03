@@ -51,6 +51,9 @@ pub const DEFAULT_CONFIG_TOML: &str = r#"# =====================================
 # ==============================================================================
 
 [general]
+# Idioma preferido / Display language: "en" | "es"
+language = "en"
+
 # Longitud mínima requerida para tokens genéricos no estructurados.
 min_token_length = 4
 
@@ -189,6 +192,12 @@ pub struct GeneralConfig {
     pub enforce_injective_mappings: bool,
     #[serde(default = "default_true")]
     pub generate_valid_checksums: bool,
+    #[serde(default = "default_language")]
+    pub language: String,
+}
+
+fn default_language() -> String {
+    "en".to_string()
 }
 
 fn default_min_token_length() -> usize {
@@ -210,6 +219,7 @@ impl Default for GeneralConfig {
             validate_syntax_post_process: true,
             enforce_injective_mappings: true,
             generate_valid_checksums: true,
+            language: default_language(),
         }
     }
 }

@@ -21,7 +21,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
-    "@tauri-apps/plugin-opener": "^2.0.0"
+    "@tauri-apps/plugin-opener": "^2.0.0",
+    "svelte-i18n": "^4.0.1"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.64.5"

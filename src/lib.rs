@@ -24,6 +24,7 @@ pub mod crypto;
 pub mod detectors;
 pub mod engine;
 pub mod format_adapters;
+pub mod i18n;
 pub mod logger;
 pub mod models;
 pub mod stopwords;

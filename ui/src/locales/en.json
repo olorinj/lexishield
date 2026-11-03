@@ -1,0 +1,52 @@
+{
+  "tabs": {
+    "studio": "Studio",
+    "scanner": "Scanner",
+    "pairs": "Pairs & Rules",
+    "vaults": "Vaults",
+    "watch": "Sentinel",
+    "config": "Settings",
+    "logs": "Logs"
+  },
+  "studio": {
+    "title": "Anonymization Studio",
+    "input_placeholder": "Paste your logs or sensitive data here...",
+    "output_placeholder": "Sanitized result will appear here...",
+    "btn_anonymize": "Anonymize",
+    "btn_deanonymize": "De-anonymize",
+    "btn_copy": "Copy",
+    "btn_clear": "Clear",
+    "stats_tokens": "Protected tokens",
+    "stats_entropy": "Preserved entropy",
+    "format_auto": "Auto Detect",
+    "file_open": "Load File",
+    "file_save": "Save As"
+  },
+  "config": {
+    "title": "System Settings",
+    "language": "Interface Language",
+    "language_es": "Español",
+    "language_en": "English",
+    "theme": "Visual Theme",
+    "theme_dark": "Dark",
+    "theme_light": "Light",
+    "theme_system": "System",
+    "btn_reset": "Restore Defaults",
+    "btn_save": "Save Settings"
+  },
+  "vaults": {
+    "title": "Encrypted Vaults Management",
+    "active_vault": "Active Vault",
+    "btn_new": "New Vault",
+    "btn_lock": "Lock",
+    "btn_unlock": "Unlock"
+  },
+  "common": {
+    "loading": "Loading...",
+    "success": "Operation completed successfully",
+    "error": "An error occurred",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  }
+}
+

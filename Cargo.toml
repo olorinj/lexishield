@@ -40,6 +40,11 @@ tar = "0.4"
 bzip2 = { version = "0.4", features = ["static"] }
 shellexpand = "3.1.2"
 
+[features]
+default = ["lang-en", "lang-es"]
+lang-en = []
+lang-es = []
+
 [build-dependencies]
 winres = "0.1"
 
