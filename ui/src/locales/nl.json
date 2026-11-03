@@ -1,0 +1,62 @@
+{
+  "tabs": {
+    "studio": "Studio",
+    "scanner": "Scanner",
+    "pairs": "Paren & Regels",
+    "vaults": "Kluizen",
+    "watch": "Schildwacht",
+    "config": "Instellingen",
+    "logs": "Logboeken"
+  },
+  "studio": {
+    "title": "Anonimiseringsstudio",
+    "input_placeholder": "Plak hier uw logs of gevoelige gegevens...",
+    "output_placeholder": "Het opgeschoonde resultaat verschijnt hier...",
+    "btn_anonymize": "Anonimiseren",
+    "btn_deanonymize": "De-anonimiseren",
+    "btn_copy": "Kopiëren",
+    "btn_clear": "Wissen",
+    "stats_tokens": "Beveiligde tokens",
+    "stats_entropy": "Behouden entropie",
+    "format_auto": "Automatische detectie",
+    "file_open": "Bestand openen",
+    "file_save": "Opslaan als"
+  },
+  "config": {
+    "title": "Systeeminstellingen",
+    "language": "Interfacetaal",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "language_ja": "日本語",
+    "language_ru": "Русский",
+    "language_pl": "Polski",
+    "language_nl": "Nederlands",
+    "language_ko": "한국어",
+    "theme": "Visueel thema",
+    "theme_dark": "Donker",
+    "theme_light": "Licht",
+    "theme_system": "Systeem",
+    "btn_reset": "Standaardwaarden herstellen",
+    "btn_save": "Instellingen opslaan"
+  },
+  "vaults": {
+    "title": "Beheer van versleutelde kluizen",
+    "active_vault": "Actieve kluis",
+    "btn_new": "Nieuwe kluis",
+    "btn_lock": "Vergrendelen",
+    "btn_unlock": "Ontgrendelen"
+  },
+  "common": {
+    "loading": "Laden...",
+    "success": "Bewerking succesvol voltooid",
+    "error": "Er is een fout opgetreden",
+    "cancel": "Annuleren",
+    "confirm": "Bevestigen"
+  }
+}
+

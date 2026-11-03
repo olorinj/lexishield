@@ -10,9 +10,7 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::VerboseDesc => {
             "Ativar nível de log Debug para detalhes adicionais (telemetria em stderr)"
         }
-        MsgKey::DebugDesc => {
-            "Ativar modo DEBUG completo com telemetria exaustiva em stderr"
-        }
+        MsgKey::DebugDesc => "Ativar modo DEBUG completo com telemetria exaustiva em stderr",
         MsgKey::ConfigPathDesc => "Caminho para arquivo de configuração TOML personalizado",
         MsgKey::RulesPathDesc => {
             "Caminho para arquivo de regras TOML personalizado (~/.lexishield/rules.toml)"
@@ -30,4 +28,3 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::ConfigResetSuccess => "Configuração padrão restaurada com sucesso",
     }
 }
-

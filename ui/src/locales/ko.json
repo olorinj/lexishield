@@ -1,0 +1,62 @@
+{
+  "tabs": {
+    "studio": "스튜디오",
+    "scanner": "스캐너",
+    "pairs": "매핑 및 규칙",
+    "vaults": "보관함",
+    "watch": "실시간 감시",
+    "config": "설정",
+    "logs": "로그"
+  },
+  "studio": {
+    "title": "익명화 스튜디오",
+    "input_placeholder": "로그 또는 민감한 데이터를 여기에 붙여넣으세요...",
+    "output_placeholder": "정제된 결과가 여기에 표시됩니다...",
+    "btn_anonymize": "익명화 실행",
+    "btn_deanonymize": "역익명화 (복원)",
+    "btn_copy": "복사",
+    "btn_clear": "지우기",
+    "stats_tokens": "보호된 토큰 수",
+    "stats_entropy": "보존된 엔트로피",
+    "format_auto": "형식 자동 감지",
+    "file_open": "파일 열기",
+    "file_save": "다른 이름으로 저장"
+  },
+  "config": {
+    "title": "시스템 설정",
+    "language": "인터페이스 언어",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "language_ja": "日本語",
+    "language_ru": "Русский",
+    "language_pl": "Polski",
+    "language_nl": "Nederlands",
+    "language_ko": "한국어",
+    "theme": "시각 테마",
+    "theme_dark": "어둡게",
+    "theme_light": "밝게",
+    "theme_system": "시스템 기본값",
+    "btn_reset": "기본값으로 복원",
+    "btn_save": "설정 저장"
+  },
+  "vaults": {
+    "title": "암호화 보관함 관리",
+    "active_vault": "현재 활성 보관함",
+    "btn_new": "새 보관함",
+    "btn_lock": "잠금",
+    "btn_unlock": "잠금 해제"
+  },
+  "common": {
+    "loading": "로딩 중...",
+    "success": "작업이 성공적으로 완료되었습니다",
+    "error": "오류가 발생했습니다",
+    "cancel": "취소",
+    "confirm": "확인"
+  }
+}
+

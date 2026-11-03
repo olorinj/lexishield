@@ -22,4 +22,3 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::ConfigResetSuccess => "已成功恢复系统默认配置",
     }
 }
-

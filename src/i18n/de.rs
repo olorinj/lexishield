@@ -30,4 +30,3 @@ pub fn translate(key: MsgKey) -> &'static str {
         MsgKey::ConfigResetSuccess => "Standardkonfiguration erfolgreich wiederhergestellt",
     }
 }
-

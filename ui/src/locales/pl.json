@@ -1,0 +1,62 @@
+{
+  "tabs": {
+    "studio": "Studio",
+    "scanner": "Skaner",
+    "pairs": "Pary i reguły",
+    "vaults": "Magazyny",
+    "watch": "Strażnik",
+    "config": "Ustawienia",
+    "logs": "Dzienniki"
+  },
+  "studio": {
+    "title": "Studio anonimizacji",
+    "input_placeholder": "Wklej tutaj swoje logi lub dane poufne...",
+    "output_placeholder": "Oczyszczony wynik pojawi się tutaj...",
+    "btn_anonymize": "Anonimizuj",
+    "btn_deanonymize": "Deanominizuj",
+    "btn_copy": "Kopiuj",
+    "btn_clear": "Wyczyść",
+    "stats_tokens": "Chronione tokeny",
+    "stats_entropy": "Zachowana entropia",
+    "format_auto": "Automatyczne wykrywanie",
+    "file_open": "Otwórz plik",
+    "file_save": "Zapisz jako"
+  },
+  "config": {
+    "title": "Ustawienia systemowe",
+    "language": "Język interfejsu",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "language_ja": "日本語",
+    "language_ru": "Русский",
+    "language_pl": "Polski",
+    "language_nl": "Nederlands",
+    "language_ko": "한국어",
+    "theme": "Motyw wizualny",
+    "theme_dark": "Ciemny",
+    "theme_light": "Jasny",
+    "theme_system": "Systemowy",
+    "btn_reset": "Przywróć domyślne",
+    "btn_save": "Zapisz ustawienia"
+  },
+  "vaults": {
+    "title": "Zarządzanie zaszyfrowanymi magazynami",
+    "active_vault": "Aktywny magazyn",
+    "btn_new": "Nowy magazyn",
+    "btn_lock": "Zablokuj",
+    "btn_unlock": "Odblokuj"
+  },
+  "common": {
+    "loading": "Ładowanie...",
+    "success": "Operacja zakończona sukcesem",
+    "error": "Wystąpił błąd",
+    "cancel": "Anuluj",
+    "confirm": "Potwierdź"
+  }
+}
+

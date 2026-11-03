@@ -41,7 +41,10 @@ bzip2 = { version = "0.4", features = ["static"] }
 shellexpand = "3.1.2"
 
 [features]
-default = ["lang-en", "lang-es", "lang-fr", "lang-de", "lang-pt", "lang-it", "lang-zh"]
+default = [
+    "lang-en", "lang-es", "lang-fr", "lang-de", "lang-pt", "lang-it", "lang-zh",
+    "lang-ja", "lang-ru", "lang-pl", "lang-nl", "lang-ko"
+]
 lang-en = []
 lang-es = []
 lang-fr = []
@@ -49,6 +52,11 @@ lang-de = []
 lang-pt = []
 lang-it = []
 lang-zh = []
+lang-ja = []
+lang-ru = []
+lang-pl = []
+lang-nl = []
+lang-ko = []
 
 [build-dependencies]
 winres = "0.1"

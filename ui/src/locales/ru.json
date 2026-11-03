@@ -1,0 +1,62 @@
+{
+  "tabs": {
+    "studio": "Студия",
+    "scanner": "Сканер",
+    "pairs": "Пары и правила",
+    "vaults": "Хранилища",
+    "watch": "Страж",
+    "config": "Настройки",
+    "logs": "Журналы"
+  },
+  "studio": {
+    "title": "Студия анонимизации",
+    "input_placeholder": "Вставьте сюда логи или конфиденциальные данные...",
+    "output_placeholder": "Очищенный результат появится здесь...",
+    "btn_anonymize": "Анонимизировать",
+    "btn_deanonymize": "Деанонимизировать",
+    "btn_copy": "Копировать",
+    "btn_clear": "Очистить",
+    "stats_tokens": "Защищенные токены",
+    "stats_entropy": "Сохраненная энтропия",
+    "format_auto": "Автоопределение",
+    "file_open": "Открыть файл",
+    "file_save": "Сохранить как"
+  },
+  "config": {
+    "title": "Настройки системы",
+    "language": "Язык интерфейса",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "language_ja": "日本語",
+    "language_ru": "Русский",
+    "language_pl": "Polski",
+    "language_nl": "Nederlands",
+    "language_ko": "한국어",
+    "theme": "Тема оформления",
+    "theme_dark": "Темная",
+    "theme_light": "Светлая",
+    "theme_system": "Системная",
+    "btn_reset": "Сбросить по умолчанию",
+    "btn_save": "Сохранить настройки"
+  },
+  "vaults": {
+    "title": "Управление зашифрованными хранилищами",
+    "active_vault": "Активное хранилище",
+    "btn_new": "Новое хранилище",
+    "btn_lock": "Заблокировать",
+    "btn_unlock": "Разблокировать"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "success": "Операция успешно завершена",
+    "error": "Произошла ошибка",
+    "cancel": "Отмена",
+    "confirm": "Подтвердить"
+  }
+}
+
