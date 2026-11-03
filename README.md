@@ -2,18 +2,18 @@
 
 ## Una historia técnica: Aria, los modelos de IA y el escudo de privacidad
 
-En la era dorada de los Modelos de Inteligencia Artificial (LLMs), **Aria** trabajaba como analista de sistemas y desarrolladora en una gran corporación de telecomunicaciones. Su día a día consistía en resolver complejos errores en los servidores de la empresa. Para acelerar su trabajo, Aria utilizaba asistentes de IA, pasándoles volcados de bases de datos, fragmentos de código, archivos de configuración de Active Directory y archivos de log gigantescos para que la IA le explicara los fallos y sugiriera parches.
+En la era dorada de los modelos de inteligencia artificial (LLMs), **Aria** trabajaba como analista de sistemas y desarrolladora en una gran empresa de telecomunicaciones. Su día a día consistía en resolver errores complejos en los servidores de la empresa. Para acelerar su trabajo, Aria utilizaba asistentes de IA, pasándoles volcados de bases de datos, fragmentos de código, archivos de configuración de Active Directory y archivos de log gigantescos para que la IA le explicara los fallos y sugiriera parches.
 
-Pero un día, el oficial de seguridad del reino de la corporación emitió una advertencia:
+Pero un día, el oficial de seguridad del reino de la empresa emitió una advertencia:
 > *“Queda terminantemente prohibido subir datos reales de producción a servicios externos de IA. Si un log contiene la IP de un cliente, su correo real, un identificador SID de Windows o una contraseña de base de datos, estarás vulnerando la privacidad de millones de usuarios”.*
 
-Aria se vio ante un dilema: renunciar a la velocidad que le daban los asistentes de IA o arriesgarse a una fuga de datos. Fue entonces cuando descubrió **LexiShield**.
+Aria se vio ante un dilema: Renunciar a la velocidad que le daban los asistentes de IA o arriesgarse a una fuga de datos. Fue entonces cuando descubrió **LexiShield**.
 
 ### El escudo inteligente de Aria
-Aria integró LexiShield como su puente local y seguro hacia la Inteligencia Artificial. La herramienta funcionaba de la siguiente manera:
+Aria integró LexiShield como su camino local y seguro hacia la inteligencia artificial. La herramienta funcionaba de la siguiente manera:
 
-1. **Ofuscación semántica inteligente:** Antes de enviar un archivo de log plagado de datos reales a la IA, Aria abría su terminal. El motor de LexiShield escaneaba el documento utilizando expresiones regulares avanzadas, detectando correos electrónicos, IPs, nombres de usuario y dominios.
-2. **Generación coherente:** El sistema no ponía asteriscos o tachaduras que confundieran al modelo de lenguaje (ya que la IA necesita saber que tal IP se conecta con tal correo). En su lugar, usaba generadores sintéticos realistas. Una dirección IP real como `192.168.1.104` se transformaba en `192.168.22.84`, y el correo `marta.sanchez@empresa.com` se convertía en `email000001@acme.com`. Todo quedaba registrado de forma segura y privada en un diccionario local de mapeos JSON.
+1. **Ofuscación semántica inteligente:** Antes de enviar un archivo plagado de datos reales a la IA, Aria abría su terminal. El motor de LexiShield escaneaba el documento utilizando expresiones regulares avanzadas, detectando correos electrónicos, IPs, nombres de usuario y dominios.
+2. **Generación coherente:** El sistema no ponía asteriscos o texto tachado que confundieran al modelo de lenguaje (ya que la IA necesita saber que tal IP se conecta con tal servicio). En su lugar, usaba generadores sintéticos realistas. Una dirección IP real como `192.168.1.104` se transformaba en `192.168.22.84`, y el correo `marta.sanchez@empresa.com` se convertía en `email000001@acme.com`. Todo quedaba registrado de forma segura y privada en un diccionario local de mapeos JSON.
 3. **El envío a la IA:** Aria copiaba el texto ofuscado y lo enviaba al chat de la IA.
 4. **La respuesta del asistente:** La IA leía el texto y respondía de forma impecable: *"El problema reside en que el usuario user000001 tiene un conflicto de credenciales al intentar acceder al servidor IP000001 mediante el puerto 443"*.
 5. **Desofuscación precisa:** Aria tomaba el texto de solución sugerido por la IA y le pedía a LexiShield realizar la desofuscación en sentido inverso pasándole el diccionario. El motor, recorriendo los mapeos de forma estructurada, restauraba de forma exacta los nombres reales, IPs y credenciales corporativas en su máquina local.
@@ -29,10 +29,10 @@ Aria integró LexiShield como su puente local y seguro hacia la Inteligencia Art
 El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendimiento y un bajo consumo de memoria gracias a las características intrínsecas de Rust.
 
 ### Características principales
-* **Paralelización Multihilo Extrema:** Aprovecha todos los núcleos de tu CPU usando `rayon` para escanear directorios enteros en tiempo récord.
-* **Telemetría y Observabilidad Estructurada:** Ejecución silenciosa por defecto y modo de depuración detallada (`-v`) integrado para diagnósticos completos.
-* **Robusto (Fuzz-Tested):** Motor de parsing blindado y tolerante a fallos, verificado bajo escenarios de estrés (Fuzzing).
-* **Motor Híbrido (Formatos y Reglas Custom):** Soporta XML, JSON, texto plano y permite inyectar reglas regex propias vía configuración TOML.
+* **Paralelización multihilo:** Aprovecha todos los núcleos de tu CPU usando `rayon` para escanear directorios enteros en tiempo récord.
+* **Telemetría y observabilidad estructurada:** Ejecución silenciosa por defecto y modo de depuración detallada (`-v`) integrado para diagnósticos completos.
+* **Robusto (fuzz-tested):** Motor de parsing blindado y tolerante a fallos, verificado bajo escenarios de estrés (Fuzzing).
+* **Motor híbrido (formatos y reglas personalizadas):** Soporta XML, JSON, texto plano y permite inyectar reglas regex propias vía configuración TOML.
 
 ### Flujo de operación (arquitectura)
 
@@ -82,42 +82,42 @@ flowchart LR
 
 ### Pestañas y capacidades principales
 
-1. **Transformación (Protección Bidireccional y Auditoría Preventiva):**
-   * **Paneles Bidireccionales Editables:** Vistas simétricas de *Texto claro* y *Texto protegido* con detección inteligente de flujo (`Texto claro ➔ Texto protegido` para Proteger y `Texto protegido ➔ Texto claro` para Restaurar datos).
-   * **Puente Direccional Dinámico:** Conmutador central interactivo (`[ 🛡️ Proteger ➔ ]` / `[ ⮜ Restaurar datos 🔄 ]`) entre paneles.
-   * **Sub-vista de Auditoría y Desglose:** Análisis no destructivo de entidades confidenciales agrupadas por categorías semánticas (Red 🌐, Identidad 🪪, Sistemas 🖥️ y Contacto/Claves 💳) con barra de distribución cromática y opción de omitir falsos positivos antes de guardarlos.
-   * **Arrastrar y Soltar (*Drag & Drop*) Dividido:** Arrastra archivos individuales o carpetas sobre la zona izquierda para proteger o sobre la derecha para restaurar datos con la bóveda.
-   * **Modo Markdown con Ofuscación Automática:** Conmutador `[ Editor / Markdown ]` que dispara la protección automática y previsualiza el resultado estructurado.
-   * **Auto-copiado Conmutable:** Conmutador rápido (`📋` / `📄`) para copiar automáticamente el resultado de la transformación al portapapeles.
-   * **Historial de Sesión en Memoria RAM:** Recuperación instantánea de estados anteriores con un solo clic sin persistencia en disco (Zero-Knowledge).
+1. **Transformación (protección bidireccional y auditoría preventiva):**
+   * **Paneles bidireccionales editables:** Vistas simétricas de *Texto claro* y *Texto protegido* con detección inteligente de flujo (`Texto claro ➔ Texto protegido` para Proteger y `Texto protegido ➔ Texto claro` para Restaurar datos).
+   * **Puente direccional dinámico:** Conmutador central interactivo (`[ 🛡️ Proteger ➔ ]` / `[ ⮜ Restaurar datos 🔄 ]`) entre paneles.
+   * **Sub-vista de auditoría y desglose:** Análisis no destructivo de entidades confidenciales agrupadas por categorías semánticas (Red 🌐, Identidad 🪪, Sistemas 🖥️ y Contacto/Claves 💳) con barra de distribución cromática y opción de omitir falsos positivos antes de guardarlos.
+   * **Arrastrar y soltar (*drag & drop*) dividido:** Arrastra archivos individuales o carpetas sobre la zona izquierda para proteger o sobre la derecha para restaurar datos con la bóveda.
+   * **Modo Markdown con ofuscación automática:** Conmutador `[ Editor / Markdown ]` que dispara la protección automática y previsualiza el resultado estructurado.
+   * **Auto-copiado conmutable:** Conmutador rápido (`📋` / `📄`) para copiar automáticamente el resultado de la transformación al portapapeles.
+   * **Historial de sesión en memoria RAM:** Recuperación instantánea de estados anteriores con un solo clic sin persistencia en disco (Zero-Knowledge).
 
-2. **Pares de Tokens (Biyectividad 1:1 y Privacidad):**
+2. **Pares de tokens (biyectividad 1:1 y privacidad):**
    * Visualización y administración directa del diccionario activo de correspondencias en la bóveda.
    * Campo de búsqueda y filtrado interactivo con botón `✕` de vaciado instantáneo.
    * Permite añadir pares manuales personalizados, editar sustituciones y marcar tokens a **Omitir** (`=`) para evitar reemplazos indeseados.
-   * **Modo Privacidad Blindado:** Desenfoque automático de valores confidenciales en la tabla y en el modal de adición para compartir pantalla con total seguridad.
+   * **Modo privacidad blindado:** Desenfoque automático de valores confidenciales en la tabla y en el modal de adición para compartir pantalla con total seguridad.
 
-3. **Bóvedas Lexi y Copias de Seguridad:**
+3. **Bóvedas Lexi y copias de seguridad:**
    * Creación, renombramiento, exportación e importación de contenedores criptográficos aislados (`.lexi`).
    * Generación y restauración de copias de seguridad de perfil completas (**Backup LexiShield** y **Restaurar LexiShield**) comprimidas con **Bzip2** y opcionalmente cifradas con AES-256.
-   * **Arquitectura Zero-Knowledge:** Las bóvedas se protegen con contraseña maestra; la clave se deriva mediante **Argon2id** en memoria de sesión y los datos se sellan con **ChaCha20-Poly1305**.
+   * **Arquitectura zero-knowledge:** Las bóvedas se protegen con contraseña maestra; la clave se deriva mediante **Argon2id** en memoria de sesión y los datos se sellan con **ChaCha20-Poly1305**.
 
-4. **Portapapeles (Watch Mode Multiplataforma):**
+4. **Portapapeles (modo de monitorización continua):**
    * Monitorización continua en segundo plano del portapapeles (`Ctrl+C` / `Cmd+C`) activable con un clic (`Monitorizar` / `Detener`).
-   * **Compatibilidad Total en Linux:** Cadena de respaldo híbrida automática con soporte nativo para Wayland (`wl-paste`/`wl-copy`), KDE Plasma (Klipper vía D-Bus) y X11 (`xclip`/`xsel`).
+   * **Compatibilidad total en Linux:** Cadena de respaldo híbrida automática con soporte nativo para Wayland (`wl-paste`/`wl-copy`), KDE Plasma (Klipper vía D-Bus) y X11 (`xclip`/`xsel`).
    * Diagnóstico activo en interfaz y notificaciones explícitas de estado ante errores de conexión.
    * Vaciado seguro del portapapeles manual o temporizado para máxima higiene en el sistema operativo.
 
-5. **Configuración y Logs:**
-   * **Perfiles de Sensibilidad Persistentes:** Selección de perfiles de detección (*Completo*, *DevOps & Red*, *RGPD & Identidad*) con guardado automático entre sesiones.
-   * **Atajos de Teclado Centralizados:** Acceso inmediato a la guía de atajos de teclado (`⌨️`) desde el modal de Ayuda (`?`) o desde cualquier vista.
+5. **Configuración y registros:**
+   * **Perfiles de sensibilidad persistentes:** Selección de perfiles de detección (*Completo*, *DevOps & Red*, *RGPD & Identidad*) con guardado automático entre sesiones.
+   * **Atajos de teclado centralizados:** Acceso inmediato a la guía de atajos de teclado (`⌨️`) desde el modal de Ayuda (`?`) o desde cualquier vista.
    * Selección de pestaña predeterminada al arrancar, personalización de pestañas visibles en la barra superior y barra CLI docking en vivo.
    * Consola de telemetría y diagnóstico en vivo con niveles de filtrado (`INFO`, `WARN`, `ERROR`, `DEBUG`).
 
 ### Ergonomía visual y accesibilidad
-* **Modo Claro / Modo Oscuro:** Conmutador de tema con paleta de alto contraste acorde a los más exigentes estándares de diseño de interfaces.
-* **Ayuda Contextual Integrada (`❔ Ayuda`):** Manual navegable disponible en cualquier momento desde todas las pestañas.
-* **Tarjetas de Onboarding:** Consejos de primer uso guiados y descartables de forma permanente.
+* **Modo claro / modo oscuro:** Conmutador de tema con paleta de alto contraste acorde a los más exigentes estándares de diseño de interfaces.
+* **Ayuda contextual integrada:** Manual navegable disponible en cualquier momento desde todas las pestañas con `?` o el botón de ayuda.
+* **Tarjetas de bienvenida e inducción:** Consejos de primer uso guiados y descartables de forma permanente.
 
 ---
 
@@ -293,5 +293,5 @@ lexishield completions fish > ~/.config/fish/completions/lexishield.fish
 
 Si te interesa conocer las entrañas de LexiShield, cómo funciona el motor, o quieres compilar el proyecto tú mismo, hemos separado toda la información técnica en los siguientes documentos:
 
-* **[Arquitectura y Motor de Mapeo (docs/architecture.md)](docs/architecture.md)**: Explicación detallada de los detectores, la inyectividad de los diccionarios, y el tratamiento de JSON/XML.
-* **[Guía de Compilación Oficial con DevForge (docs/contributing.md)](docs/contributing.md)**: Instrucciones para compilar en modo nativo o generar binarios multiplataforma aislados (Windows, Linux, macOS) mediante dev-forge.
+* **[Arquitectura y motor de mapeo (docs/architecture.md)](docs/architecture.md)**: Explicación detallada de los detectores, la inyectividad de los diccionarios, y el tratamiento de JSON/XML.
+* **[Guía de compilación oficial con DevForge (docs/contributing.md)](docs/contributing.md)**: Instrucciones para compilar en modo nativo o generar binarios multiplataforma aislados (Windows, Linux, macOS) mediante dev-forge.

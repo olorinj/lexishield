@@ -1,26 +1,26 @@
-# Guía de Contribución y Compilación
+# Guía de contribución y compilación
 
 Este documento explica cómo configurar el entorno de desarrollo y compilar LexiShield para múltiples plataformas.
 
-## 🛠️ Compilación y Empaquetado Oficial (`dev-forge`)
+## Compilación y empaquetado oficial (`dev-forge`)
 
 LexiShield delega todo su ciclo de compilación, construcción nativa y empaquetado multiplataforma a la herramienta universal **[`dev-forge`](../../dev-forge)**.
 
 Todas las compilaciones (tanto locales como aisladas en máquinas virtuales para evadir alertas de antivirus/EDRs) se gestionan a través de `dev-forge` desde la raíz del proyecto:
 
-### 1. Compilación Rápida en el Sistema Actual (Modo Nativo)
+### 1. Compilación rápida en el sistema actual (modo nativo)
 Para compilar los binarios de la CLI directamente con el toolchain de Rust del anfitrión:
 ```bash
 dev-forge build --native
 ```
 
-### 2. Compilación Multiplataforma Aislada (Linux, Windows y macOS)
+### 2. Compilación multiplataforma aislada (Linux, Windows y macOS)
 Para compilar de forma aislada y reproducible para todas las plataformas soportadas sin ensuciar el sistema anfitrión:
 ```bash
 dev-forge build --all
 ```
 
-### 3. Compilación por Plataforma Específica
+### 3. Compilación por plataforma específica
 ```bash
 # Compilar únicamente para Linux (x86_64)
 dev-forge build --linux
@@ -32,7 +32,7 @@ dev-forge build --windows
 dev-forge build --mac
 ```
 
-### 4. Compilación de la Interfaz Gráfica (Desktop Tauri GUI)
+### 4. Compilación de la interfaz gráfica (desktop Tauri GUI)
 Para compilar la aplicación de escritorio nativa (.deb, .rpm, .msi, etc.):
 ```bash
 dev-forge build --gui
@@ -40,7 +40,7 @@ dev-forge build --gui
 
 Los artefactos finales compilados se depositan automáticamente en la carpeta `dist/` en la raíz del proyecto.
 
-## 🧪 Flujo de Calidad Obligatorio (Quality Gate)
+## Flujo de calidad obligatorio (quality gate)
 
 Antes de enviar cualquier contribución o abrir una *Pull Request*, debes pasar el control de calidad en cuatro pasos:
 
@@ -48,20 +48,20 @@ Antes de enviar cualquier contribución o abrir una *Pull Request*, debes pasar 
    ```bash
    cargo fmt --all -- --check
    ```
-2. **Linting Pedante:**
+2. **Linting pedante:**
    ```bash
    cargo clippy --all-targets --all-features -- -D warnings
    ```
-3. **Pruebas Automatizadas:**
+3. **Pruebas automatizadas:**
    ```bash
    cargo test --all-targets
    ```
-4. **Auditoría de Seguridad de Dependencias:**
+4. **Auditoría de seguridad de dependencias:**
    ```bash
    cargo audit
    ```
 
-## 🛡️ Pruebas de Fuzzing (`cargo-fuzz`)
+## Pruebas de fuzzing (`cargo-fuzz`)
 
 Para verificar que los adaptadores y motores no producen pánicos ante datos corruptos:
 
@@ -75,7 +75,7 @@ cargo +nightly fuzz run fuzz_xml
 cargo +nightly fuzz run fuzz_log
 ```
 
-## ⏱️ Ejecución de Benchmarks (`criterion`)
+## Ejecución de benchmarks (`criterion`)
 
 Para validar el rendimiento y *throughput* de escaneo y ofuscación:
 
@@ -83,11 +83,11 @@ Para validar el rendimiento y *throughput* de escaneo y ofuscación:
 cargo bench
 ```
 
-## 🚀 Publicación y Generación de Instaladores (GitHub Actions)
+## Publicación y generación de instaladores (GitHub Actions)
 
 El proyecto está configurado para compilar y empaquetar automáticamente las interfaces gráficas nativas (.msi, .dmg, .deb, .AppImage) en la nube utilizando **GitHub Actions**, dado que compilar la interfaz de Mac y Windows desde Linux local no es posible.
 
-### 1. Vincular tu Repositorio a GitHub
+### 1. Vincular tu repositorio a GitHub
 
 Si tienes tu código local y todavía no lo has subido a GitHub (no tienes configurado el `remote`), debes seguir estos pasos primero:
 
@@ -106,7 +106,7 @@ git branch -M main
 git push -u origin main
 ```
 
-### 2. Generar una Nueva Versión (Release) Automática
+### 2. Generar una nueva versión (release) automática
 
 Una vez tu código esté en GitHub, generar instaladores para tus usuarios es tan fácil como etiquetar una versión. Tienes unos scripts automáticos en la raíz del proyecto para hacer esto en un solo paso:
 

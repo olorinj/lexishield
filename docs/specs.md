@@ -1,4 +1,4 @@
-# Especificación Técnica: LexiShield v2.1.0 (Office & Document Engine)
+# Especificación técnica: LexiShield v2.1.0 (Office & Document Engine)
 
 > **Estado**: Planificación / Hoja de Ruta  
 > **Versión Objetivo**: `2.1.0`  
@@ -6,19 +6,19 @@
 
 ---
 
-## 1. Visión y Objetivos
+## 1. Visión y objetivos
 
 La versión **2.1.0** de LexiShield amplía el motor de ofuscación semántica más allá del texto plano, logs y fragmentos de código, incorporando soporte nativo para **documentos ofimáticos de Microsoft Office (DOCX, XLSX, PPTX)** y formatos abiertos (**ODT, ODS, PDF, CSV**).
 
-### Objetivos Clave:
-1. **Preservación Estricta del Formato**: Transformar datos confidenciales sin alterar estilos, tipografías, tablas, celdas, saltos de página ni estructuras internas del documento.
-2. **Biyección y Reversibilidad Total**: Permitir la restauración bidireccional (desofuscación) de las respuestas generadas por modelos de IA sobre los mismos documentos.
-3. **Cero Fugas en Disco**: Procesamiento en memoria (*in-memory streaming*) o uso de buffers seguros efímeros sin dejar copias temporales en claro.
-4. **Soporte Multiplataforma**: Implementación 100% Rust sin dependencias de COM de Windows, Microsoft Office instalado ni servicios externos.
+### Objetivos clave:
+1. **Preservación estricta del formato**: Transformar datos confidenciales sin alterar estilos, tipografías, tablas, celdas, saltos de página ni estructuras internas del documento.
+2. **Biyección y reversibilidad total**: Permitir la restauración bidireccional (desofuscación) de las respuestas generadas por modelos de IA sobre los mismos documentos.
+3. **Cero fugas en disco**: Procesamiento en memoria (*in-memory streaming*) o uso de buffers seguros efímeros sin dejar copias temporales en claro.
+4. **Soporte multiplataforma**: Implementación 100% Rust sin dependencias de COM de Windows, Microsoft Office instalado ni servicios externos.
 
 ---
 
-## 2. Diagrama de Arquitectura del Pipeline de Documentos
+## 2. Diagrama de arquitectura del pipeline de documentos
 
 ```mermaid
 flowchart TD
@@ -72,37 +72,37 @@ flowchart TD
 
 ---
 
-## 3. Especificación Técnica por Formato
+## 3. Especificación técnica por formato
 
 ### 3.1 Microsoft Word (`.docx`)
-* **Estructura Interna**: Contenedor ZIP con `word/document.xml`, `word/header*.xml`, `word/footer*.xml`, `word/comments.xml` y `word/footnotes.xml`.
-* **Nodos Objetivo**:
+* **Estructura interna**: Contenedor ZIP con `word/document.xml`, `word/header*.xml`, `word/footer*.xml`, `word/comments.xml` y `word/footnotes.xml`.
+* **Nodos objetivo**:
   * `<w:t>`: Nodos de texto en ejecuciones (*runs*).
   * `<w:instrText>`: Códigos de campo (hipervínculos, metadatos, etc.).
-* **Reto Técnico (Fragmentación de Runs)**: Los editores de texto suelen dividir palabras en múltiples runs `<w:r>` tras autocorrecciones o cambios de formato.
+* **Reto técnico (fragmentación de runs)**: Los editores de texto suelen dividir palabras en múltiples runs `<w:r>` tras autocorrecciones o cambios de formato.
   * *Solución*: Unificación lógica del texto del párrafo antes del análisis con mapeo de índices hacia los runs originales.
 
 ### 3.2 Microsoft Excel (`.xlsx`)
-* **Estructura Interna**: `xl/sharedStrings.xml` y `xl/worksheets/sheet*.xml`.
-* **Nodos Objetivo**:
+* **Estructura interna**: `xl/sharedStrings.xml` y `xl/worksheets/sheet*.xml`.
+* **Nodos objetivo**:
   * `<t>` en `sharedStrings.xml`: Diccionario global de cadenas compartidas de la hoja de cálculo.
   * `<v>` en celdas de tipo texto explícito (`inlineStr`).
-* **Preservación de Fórmulas**: Las fórmulas `<f>` se analizan para sustituir literales de texto confidenciales sin romper referencias de celdas (`A1:B10`).
+* **Preservación de fórmulas**: Las fórmulas `<f>` se analizan para sustituir literales de texto confidenciales sin romper referencias de celdas (`A1:B10`).
 
 ### 3.3 Microsoft PowerPoint (`.pptx`)
-* **Estructura Interna**: `ppt/slides/slide*.xml` y `ppt/notesSlides/notesSlide*.xml`.
-* **Nodos Objetivo**:
+* **Estructura interna**: `ppt/slides/slide*.xml` y `ppt/notesSlides/notesSlide*.xml`.
+* **Nodos objetivo**:
   * `<a:t>` dentro de cuadros de texto, tablas y notas del orador.
 
-### 3.4 Formatos Adicionales
+### 3.4 Formatos adicionales
 * **PDF (`.pdf`)**: Extracción de texto y análisis forense de entidades confidenciales (con advertencia de solo lectura / generación de resumen).
 * **CSV / TSV**: Procesamiento directo con delimitador configurable y detección de cabeceras.
 
 ---
 
-## 4. Interfaces de Usuario (CLI & GUI)
+## 4. Interfaces de usuario (CLI y GUI)
 
-### 4.1 Nuevos Comandos en la CLI
+### 4.1 Nuevos comandos en la CLI
 
 ```bash
 # Ofuscación directa de documento único
@@ -118,16 +118,16 @@ lexishield batch -i ./reportes_confidenciales/ -o ./reportes_sanitizados/ --ext 
 lexishield scan-file auditoria_2026.docx --format table
 ```
 
-### 4.2 Integración en la Interfaz Gráfica (GUI)
-1. **Zona de Arrastre (*Drag & Drop*)**: El usuario puede arrastrar archivos `.docx`, `.xlsx` o `.pptx` a la pestaña **Transformación**.
-2. **Visor de Resumen Previo**:
+### 4.2 Integración en la interfaz gráfica (GUI)
+1. **Zona de arrastre (*drag & drop*)**: El usuario puede arrastrar archivos `.docx`, `.xlsx` o `.pptx` a la pestaña **Transformación**.
+2. **Visor de resumen previo**:
    * Recuento de tablas y párrafos procesados.
    * Lista desglosada de entidades sensibles detectadas con opción de omitir falsos positivos.
-3. **Botón de Exportación Directa**: Descarga con un solo clic del archivo sanitizado listo para enviar a ChatGPT / Claude / DeepSeek.
+3. **Botón de exportación directa**: Descarga con un solo clic del archivo sanitizado listo para enviar a ChatGPT / Claude / DeepSeek.
 
 ---
 
-## 5. Hoja de Ruta de Implementación (Fases)
+## 5. Hoja de ruta de implementación (fases)
 
 | Fase | Hito | Descripción |
 | :---: | :--- | :--- |
@@ -137,7 +137,7 @@ lexishield scan-file auditoria_2026.docx --format table
 | **Fase 2.4** | *GUI Drag & Drop* | Integración en la interfaz Tauri/Svelte de carga de archivos y previsualización. |
 | **Fase 2.5** | *Test Suite & Benchmarks* | Validación con documentos masivos (>100 MB / >50,000 celdas) y verificación de integridad XML. |
 
-### 5.1 Estado de Implementación de la Interfaz Gráfica (GUI v2.1.0)
+### 5.1 Estado de implementación de la interfaz gráfica (GUI v2.1.0)
 
 | Fase GUI | Alcance | Estado | Descripción |
 | :---: | :--- | :---: | :--- |
@@ -146,7 +146,7 @@ lexishield scan-file auditoria_2026.docx --format table
 
 ---
 
-## 6. Consideraciones de Seguridad y Calidad
+## 6. Consideraciones de seguridad y calidad
 
 1. **Validación de Integridad XML**: Antes de emitir el archivo final, el motor debe parsear el XML de salida para asegurar que es 100% válido y que Word/Excel no emitirán advertencias de "archivo dañado".
 2. **Defensa contra XML External Entity (XXE) / Zip Bombs**: El descompresor limitará el ratio de descompresión a un máximo seguro (evitando ataques de descompresión infinita).
