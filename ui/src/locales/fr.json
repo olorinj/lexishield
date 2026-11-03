@@ -1,0 +1,57 @@
+{
+  "tabs": {
+    "studio": "Studio",
+    "scanner": "Scanner",
+    "pairs": "Paires & Règles",
+    "vaults": "Coffres",
+    "watch": "Sentinelle",
+    "config": "Paramètres",
+    "logs": "Journaux"
+  },
+  "studio": {
+    "title": "Studio d'Anonymisation",
+    "input_placeholder": "Collez ici vos journaux ou données sensibles...",
+    "output_placeholder": "Le résultat nettoyé apparaîtra ici...",
+    "btn_anonymize": "Anonymiser",
+    "btn_deanonymize": "Désanonymiser",
+    "btn_copy": "Copier",
+    "btn_clear": "Effacer",
+    "stats_tokens": "Jetons protégés",
+    "stats_entropy": "Entropie préservée",
+    "format_auto": "Détection Automatique",
+    "file_open": "Ouvrir un Fichier",
+    "file_save": "Enregistrer Sous"
+  },
+  "config": {
+    "title": "Paramètres du Système",
+    "language": "Langue de l'Interface",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "theme": "Thème Visuel",
+    "theme_dark": "Sombre",
+    "theme_light": "Clair",
+    "theme_system": "Système",
+    "btn_reset": "Restaurer les Valeurs par Défaut",
+    "btn_save": "Enregistrer les Paramètres"
+  },
+  "vaults": {
+    "title": "Gestion des Coffres Chiffrés",
+    "active_vault": "Coffre Actif",
+    "btn_new": "Nouveau Coffre",
+    "btn_lock": "Verrouiller",
+    "btn_unlock": "Déverrouiller"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "success": "Opération terminée avec succès",
+    "error": "Une erreur est survenue",
+    "cancel": "Annuler",
+    "confirm": "Confirmer"
+  }
+}
+

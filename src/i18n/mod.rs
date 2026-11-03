@@ -8,10 +8,20 @@ use std::env;
 use std::fmt;
 use std::str::FromStr;
 
+#[cfg(feature = "lang-de")]
+pub mod de;
 #[cfg(feature = "lang-en")]
 pub mod en;
 #[cfg(feature = "lang-es")]
 pub mod es;
+#[cfg(feature = "lang-fr")]
+pub mod fr;
+#[cfg(feature = "lang-it")]
+pub mod it;
+#[cfg(feature = "lang-pt")]
+pub mod pt;
+#[cfg(feature = "lang-zh")]
+pub mod zh;
 
 /// Códigos de idiomas soportados por LexiShield.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -19,6 +29,11 @@ pub enum Language {
     #[default]
     En,
     Es,
+    Fr,
+    De,
+    Pt,
+    It,
+    Zh,
 }
 
 impl Language {
@@ -27,6 +42,11 @@ impl Language {
         match self {
             Self::En => "en",
             Self::Es => "es",
+            Self::Fr => "fr",
+            Self::De => "de",
+            Self::Pt => "pt",
+            Self::It => "it",
+            Self::Zh => "zh",
         }
     }
 
@@ -35,6 +55,11 @@ impl Language {
         match self {
             Self::En => "English",
             Self::Es => "Español",
+            Self::Fr => "Français",
+            Self::De => "Deutsch",
+            Self::Pt => "Português",
+            Self::It => "Italiano",
+            Self::Zh => "简体中文",
         }
     }
 
@@ -55,6 +80,21 @@ impl Language {
                 let lower = val.to_lowercase();
                 if lower.starts_with("es") {
                     return Self::Es;
+                }
+                if lower.starts_with("fr") {
+                    return Self::Fr;
+                }
+                if lower.starts_with("de") {
+                    return Self::De;
+                }
+                if lower.starts_with("pt") {
+                    return Self::Pt;
+                }
+                if lower.starts_with("it") {
+                    return Self::It;
+                }
+                if lower.starts_with("zh") {
+                    return Self::Zh;
                 }
                 if lower.starts_with("en") {
                     return Self::En;
@@ -81,9 +121,19 @@ impl FromStr for Language {
             Ok(Self::Es)
         } else if clean.starts_with("en") {
             Ok(Self::En)
+        } else if clean.starts_with("fr") {
+            Ok(Self::Fr)
+        } else if clean.starts_with("de") {
+            Ok(Self::De)
+        } else if clean.starts_with("pt") {
+            Ok(Self::Pt)
+        } else if clean.starts_with("it") {
+            Ok(Self::It)
+        } else if clean.starts_with("zh") {
+            Ok(Self::Zh)
         } else {
             Err(format!(
-                "Unsupported language: '{s}'. Supported: 'en', 'es'"
+                "Unsupported language: '{s}'. Supported: 'en', 'es', 'fr', 'de', 'pt', 'it', 'zh'"
             ))
         }
     }
@@ -123,6 +173,31 @@ pub fn tr(lang: Language, key: MsgKey) -> &'static str {
         Language::En => en::translate(key),
         #[cfg(not(feature = "lang-en"))]
         Language::En => tr(Language::Es, key),
+
+        #[cfg(feature = "lang-fr")]
+        Language::Fr => fr::translate(key),
+        #[cfg(not(feature = "lang-fr"))]
+        Language::Fr => tr(Language::En, key),
+
+        #[cfg(feature = "lang-de")]
+        Language::De => de::translate(key),
+        #[cfg(not(feature = "lang-de"))]
+        Language::De => tr(Language::En, key),
+
+        #[cfg(feature = "lang-pt")]
+        Language::Pt => pt::translate(key),
+        #[cfg(not(feature = "lang-pt"))]
+        Language::Pt => tr(Language::En, key),
+
+        #[cfg(feature = "lang-it")]
+        Language::It => it::translate(key),
+        #[cfg(not(feature = "lang-it"))]
+        Language::It => tr(Language::En, key),
+
+        #[cfg(feature = "lang-zh")]
+        Language::Zh => zh::translate(key),
+        #[cfg(not(feature = "lang-zh"))]
+        Language::Zh => tr(Language::En, key),
     }
 }
 
@@ -136,7 +211,12 @@ mod tests {
         assert_eq!(Language::from_str("es_ES.UTF-8").unwrap(), Language::Es);
         assert_eq!(Language::from_str("en").unwrap(), Language::En);
         assert_eq!(Language::from_str("en_US").unwrap(), Language::En);
-        assert!(Language::from_str("fr").is_err());
+        assert_eq!(Language::from_str("fr").unwrap(), Language::Fr);
+        assert_eq!(Language::from_str("de").unwrap(), Language::De);
+        assert_eq!(Language::from_str("pt").unwrap(), Language::Pt);
+        assert_eq!(Language::from_str("it").unwrap(), Language::It);
+        assert_eq!(Language::from_str("zh").unwrap(), Language::Zh);
+        assert!(Language::from_str("xx").is_err());
     }
 
     #[test]

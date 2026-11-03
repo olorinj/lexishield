@@ -1,0 +1,57 @@
+{
+  "tabs": {
+    "studio": "Estúdio",
+    "scanner": "Scanner",
+    "pairs": "Pares & Regras",
+    "vaults": "Cofres",
+    "watch": "Sentinela",
+    "config": "Configurações",
+    "logs": "Registros"
+  },
+  "studio": {
+    "title": "Estúdio de Anonimização",
+    "input_placeholder": "Cole aqui seus logs ou dados sensíveis...",
+    "output_placeholder": "O resultado sanitizado aparecerá aqui...",
+    "btn_anonymize": "Anonimizar",
+    "btn_deanonymize": "Desanonimizar",
+    "btn_copy": "Copiar",
+    "btn_clear": "Limpar",
+    "stats_tokens": "Tokens protegidos",
+    "stats_entropy": "Entropia preservada",
+    "format_auto": "Deteção Automática",
+    "file_open": "Abrir Ficheiro",
+    "file_save": "Guardar Como"
+  },
+  "config": {
+    "title": "Ajustes do Sistema",
+    "language": "Idioma da Interface",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "theme": "Tema Visual",
+    "theme_dark": "Escuro",
+    "theme_light": "Claro",
+    "theme_system": "Sistema",
+    "btn_reset": "Restaurar Padrões",
+    "btn_save": "Guardar Configurações"
+  },
+  "vaults": {
+    "title": "Gestão de Cofres Cifrados",
+    "active_vault": "Cofre Ativo",
+    "btn_new": "Novo Cofre",
+    "btn_lock": "Bloquear",
+    "btn_unlock": "Desbloquear"
+  },
+  "common": {
+    "loading": "A carregar...",
+    "success": "Operação concluída com sucesso",
+    "error": "Ocorreu um erro",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar"
+  }
+}
+

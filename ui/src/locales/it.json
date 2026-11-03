@@ -1,0 +1,57 @@
+{
+  "tabs": {
+    "studio": "Studio",
+    "scanner": "Scanner",
+    "pairs": "Coppie & Regole",
+    "vaults": "Cassaforti",
+    "watch": "Sentinella",
+    "config": "Impostazioni",
+    "logs": "Registri"
+  },
+  "studio": {
+    "title": "Studio di Anonimizzazione",
+    "input_placeholder": "Incolla qui i tuoi log o dati sensibili...",
+    "output_placeholder": "Il risultato sanificato apparirà qui...",
+    "btn_anonymize": "Anonimizza",
+    "btn_deanonymize": "Disanonimizza",
+    "btn_copy": "Copia",
+    "btn_clear": "Pulisci",
+    "stats_tokens": "Token protetti",
+    "stats_entropy": "Entropia preservata",
+    "format_auto": "Rilevamento Automatico",
+    "file_open": "Apri File",
+    "file_save": "Salva Con Nome"
+  },
+  "config": {
+    "title": "Impostazioni di Sistema",
+    "language": "Lingua dell'Interfaccia",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "theme": "Tema Visivo",
+    "theme_dark": "Scuro",
+    "theme_light": "Chiaro",
+    "theme_system": "Sistema",
+    "btn_reset": "Ripristina Predefiniti",
+    "btn_save": "Salva Impostazioni"
+  },
+  "vaults": {
+    "title": "Gestione Cassaforti Cifrate",
+    "active_vault": "Cassaforte Attiva",
+    "btn_new": "Nuova Cassaforte",
+    "btn_lock": "Blocca",
+    "btn_unlock": "Sblocca"
+  },
+  "common": {
+    "loading": "Caricamento...",
+    "success": "Operazione completata con successo",
+    "error": "Si è verificato un errore",
+    "cancel": "Annulla",
+    "confirm": "Conferma"
+  }
+}
+

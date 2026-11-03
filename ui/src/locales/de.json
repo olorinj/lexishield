@@ -1,0 +1,57 @@
+{
+  "tabs": {
+    "studio": "Studio",
+    "scanner": "Scanner",
+    "pairs": "Paare & Regeln",
+    "vaults": "Tresore",
+    "watch": "Wächter",
+    "config": "Einstellungen",
+    "logs": "Protokolle"
+  },
+  "studio": {
+    "title": "Anonymisierungs-Studio",
+    "input_placeholder": "Fügen Sie hier Ihre Protokolle oder sensiblen Daten ein...",
+    "output_placeholder": "Das bereinigte Ergebnis wird hier angezeigt...",
+    "btn_anonymize": "Anonymisieren",
+    "btn_deanonymize": "Deanonymisieren",
+    "btn_copy": "Kopieren",
+    "btn_clear": "Löschen",
+    "stats_tokens": "Geschützte Token",
+    "stats_entropy": "Erhaltene Entropie",
+    "format_auto": "Automatische Erkennung",
+    "file_open": "Datei Öffnen",
+    "file_save": "Speichern Unter"
+  },
+  "config": {
+    "title": "Systemeinstellungen",
+    "language": "Oberflächensprache",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "theme": "Visuelles Design",
+    "theme_dark": "Dunkel",
+    "theme_light": "Hell",
+    "theme_system": "System",
+    "btn_reset": "Standardwerte Wiederherstellen",
+    "btn_save": "Einstellungen Speichern"
+  },
+  "vaults": {
+    "title": "Verschlüsselte Tresorverwaltung",
+    "active_vault": "Aktiver Tresor",
+    "btn_new": "Neuer Tresor",
+    "btn_lock": "Sperren",
+    "btn_unlock": "Entsperren"
+  },
+  "common": {
+    "loading": "Wird geladen...",
+    "success": "Vorgang erfolgreich abgeschlossen",
+    "error": "Ein Fehler ist aufgetreten",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen"
+  }
+}
+

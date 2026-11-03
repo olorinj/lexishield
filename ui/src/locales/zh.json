@@ -1,0 +1,57 @@
+{
+  "tabs": {
+    "studio": "工作台",
+    "scanner": "扫描器",
+    "pairs": "映射与规则",
+    "vaults": "加密保管库",
+    "watch": "实时监控",
+    "config": "系统设置",
+    "logs": "运行日志"
+  },
+  "studio": {
+    "title": "脱敏工作台",
+    "input_placeholder": "在此粘贴您的日志或敏感数据...",
+    "output_placeholder": "脱敏净化后的结果将显示在此处...",
+    "btn_anonymize": "执行脱敏",
+    "btn_deanonymize": "反向还原",
+    "btn_copy": "复制",
+    "btn_clear": "清空",
+    "stats_tokens": "已受保护标记",
+    "stats_entropy": "保留信息熵",
+    "format_auto": "自动检测格式",
+    "file_open": "打开文件",
+    "file_save": "另存为"
+  },
+  "config": {
+    "title": "系统参数设置",
+    "language": "界面显示语言",
+    "language_es": "Español",
+    "language_en": "English",
+    "language_fr": "Français",
+    "language_de": "Deutsch",
+    "language_pt": "Português",
+    "language_it": "Italiano",
+    "language_zh": "简体中文",
+    "theme": "视觉主题",
+    "theme_dark": "深色",
+    "theme_light": "浅色",
+    "theme_system": "跟随系统",
+    "btn_reset": "恢复默认设置",
+    "btn_save": "保存设置"
+  },
+  "vaults": {
+    "title": "加密保管库管理",
+    "active_vault": "当前生效保管库",
+    "btn_new": "新建保管库",
+    "btn_lock": "锁定",
+    "btn_unlock": "解锁"
+  },
+  "common": {
+    "loading": "加载中...",
+    "success": "操作成功完成",
+    "error": "发生错误",
+    "cancel": "取消",
+    "confirm": "确认"
+  }
+}
+
