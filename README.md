@@ -1,4 +1,4 @@
-# LexiShield - Motor de ofuscación semántica para consultas de IA y gestión de mapeos
+# LexiShield - Motor de protección semántica para consultas de IA y gestión de mapeos
 
 ## Una historia técnica: Aria, los modelos de IA y el escudo de privacidad
 
@@ -12,11 +12,11 @@ Aria se vio ante un dilema: Renunciar a la velocidad que le daban los asistentes
 ### El escudo inteligente de Aria
 Aria integró LexiShield como su camino local y seguro hacia la inteligencia artificial. La herramienta funcionaba de la siguiente manera:
 
-1. **Ofuscación semántica inteligente:** Antes de enviar un archivo plagado de datos reales a la IA, Aria abría su terminal. El motor de LexiShield escaneaba el documento utilizando expresiones regulares avanzadas, detectando correos electrónicos, IPs, nombres de usuario y dominios.
+1. **Protección semántica inteligente:** Antes de enviar un archivo plagado de datos reales a la IA, Aria abría su terminal. El motor de LexiShield escaneaba el documento utilizando expresiones regulares avanzadas, detectando correos electrónicos, IPs, nombres de usuario y dominios.
 2. **Generación coherente:** El sistema no ponía asteriscos o texto tachado que confundieran al modelo de lenguaje (ya que la IA necesita saber que tal IP se conecta con tal servicio). En su lugar, usaba generadores sintéticos realistas. Una dirección IP real como `192.168.1.104` se transformaba en `192.168.22.84`, y el correo `marta.sanchez@empresa.com` se convertía en `email000001@acme.com`. Todo quedaba registrado de forma segura y privada en un diccionario local de mapeos JSON.
 3. **El envío a la IA:** Aria copiaba el texto ofuscado y lo enviaba al chat de la IA.
 4. **La respuesta del asistente:** La IA leía el texto y respondía de forma impecable: *"El problema reside en que el usuario user000001 tiene un conflicto de credenciales al intentar acceder al servidor IP000001 mediante el puerto 443"*.
-5. **Desofuscación precisa:** Aria tomaba el texto de solución sugerido por la IA y le pedía a LexiShield realizar la desofuscación en sentido inverso pasándole el diccionario. El motor, recorriendo los mapeos de forma estructurada, restauraba de forma exacta los nombres reales, IPs y credenciales corporativas en su máquina local.
+5. **Restauración precisa:** Aria tomaba el texto de solución sugerido por la IA y le pedía a LexiShield realizar la restauración en sentido inverso pasándole el diccionario. El motor, recorriendo los mapeos de forma estructurada, restauraba de forma exacta los nombres reales, IPs y credenciales corporativas en su máquina local.
 
 ¡Aria obtuvo la respuesta exacta mapeada a su entorno real sin que un solo byte de información confidencial saliera de su ordenador!
 
@@ -24,7 +24,7 @@ Aria integró LexiShield como su camino local y seguro hacia la inteligencia art
 
 ## Descripción general
 
-**LexiShield** es una herramienta de consola ultrarrápida desarrollada en **Rust** (con binarios independientes libres de dependencias) diseñada para la ofuscación y desofuscación semántica de datos sensibles en archivos de texto estructurado y no estructurado. Su objetivo primordial es actuar como pasarela de anonimización local y segura para compartir contextos con servicios externos sin riesgo de fugas de información.
+**LexiShield** es una herramienta de consola ultrarrápida desarrollada en **Rust** (con binarios independientes libres de dependencias) diseñada para la protección y restauración semántica de datos sensibles en archivos de texto estructurado y no estructurado. Su objetivo primordial es actuar como pasarela de anonimización local y segura para compartir contextos con servicios externos sin riesgo de fugas de información.
 
 El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendimiento y un bajo consumo de memoria gracias a las características intrínsecas de Rust.
 
@@ -38,21 +38,21 @@ El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendim
 
 ```mermaid
 flowchart TD
-    subgraph Local["Entorno Local (Seguro)"]
-        A[Datos Sensibles Originales\nLogs / JSON / XML] -->|lexishield protect / obfuscate| B(LexiShield Engine)
-        B -->|Genera| C[Texto Protegido con Tokens]
-        B -->|Guarda| D[(Bóveda de Mapeos .lexi)]
+    subgraph Local["Entorno local (Seguro)"]
+        A[Datos sensibles originales\nLogs / JSON / XML / DOCX] -->|lexishield protect / obfuscate| B(LexiShield engine)
+        B -->|Genera| C[Texto protegido con tokens]
+        B -->|Guarda| D[(Bóveda de mapeos .lexi)]
     end
 
     subgraph Nube["Servicios de IA (Inseguro)"]
         C -->|Petición| E(ChatGPT / Claude / Gemini)
-        E -->|Respuesta| F[Solución con Seudónimos]
+        E -->|Respuesta| F[Solución con seudónimos]
     end
     
-    subgraph Restauración["Entorno Local (Seguro)"]
-        F -->|lexishield restore / deobfuscate| G(LexiShield Engine)
+    subgraph Restauración["Entorno local (Seguro)"]
+        F -->|lexishield restore / deobfuscate| G(LexiShield engine)
         D -.->|Lee mapeos| G
-        G --> H[Respuesta Final con\nDatos Reales Restaurados]
+        G --> H[Respuesta final con\nDatos reales restaurados]
     end
 ```
 
@@ -66,17 +66,17 @@ Además de la potente herramienta de consola, LexiShield incluye una aplicación
 
 ```mermaid
 flowchart LR
-    subgraph Usuario["Flujo de Trabajo del Usuario"]
+    subgraph Usuario["Flujo de trabajo del usuario"]
         U1["Pega texto o abre archivo confidencial"] --> S["✨ Transformación"]
-        S -->|Proteger| O["Texto Sanitizado con Tokens"]
-        O -->|Copiar| AI["🤖 Modelo de IA\n(ChatGPT, Claude, Gemini)"]
-        AI -->|Respuesta con Tokens| D["📥 Restaurar"]
-        D --> R["Texto Final con Datos Reales"]
+        S -->|Proteger| O["Texto sanitizado con tokens"]
+        O -->|Copiar| AI["Modelo de IA\n(ChatGPT, Claude, Gemini)"]
+        AI -->|Respuesta con tokens| D["Restaurar"]
+        D --> R["Texto final con datos reales"]
     end
 
     subgraph Seguridad["Motor Local y Bóvedas"]
-        S <-->|Sincronización 1:1| V[("🗄️ Bóveda Cifrada .lexi\nArgon2id + ChaCha20")]
-        D <-->|Lectura Biyectiva| V
+        S <-->|Sincronización 1:1| V[("🗄️ Bóveda cifrada .lexi\nArgon2id + ChaCha20")]
+        D <-->|Lectura biyectiva| V
     end
 ```
 
@@ -87,7 +87,7 @@ flowchart LR
    * **Puente direccional dinámico:** Conmutador central interactivo (`[ 🛡️ Proteger ➔ ]` / `[ ⮜ Restaurar datos 🔄 ]`) entre paneles.
    * **Sub-vista de auditoría y desglose:** Análisis no destructivo de entidades confidenciales agrupadas por categorías semánticas (Red 🌐, Identidad 🪪, Sistemas 🖥️ y Contacto/Claves 💳) con barra de distribución cromática y opción de omitir falsos positivos antes de guardarlos.
    * **Arrastrar y soltar (*drag & drop*) dividido:** Arrastra archivos individuales o carpetas sobre la zona izquierda para proteger o sobre la derecha para restaurar datos con la bóveda.
-   * **Modo Markdown con ofuscación automática:** Conmutador `[ Editor / Markdown ]` que dispara la protección automática y previsualiza el resultado estructurado.
+   * **Modo Markdown con protección automática:** Conmutador `[ Editor / Markdown ]` que dispara la protección automática y previsualiza el resultado estructurado.
    * **Auto-copiado conmutable:** Conmutador rápido (`📋` / `📄`) para copiar automáticamente el resultado de la transformación al portapapeles.
    * **Historial de sesión en memoria RAM:** Recuperación instantánea de estados anteriores con un solo clic sin persistencia en disco (Zero-Knowledge).
 
@@ -136,10 +136,12 @@ lexishield [GLOBAL_OPTIONS] <COMMAND> [OPTIONS]
 ```
 
 ### 1. Comando: `protect` (o `obfuscate`)
-Protege u ofusca un archivo, texto directo o el portapapeles reemplazando los datos confidenciales por seudónimos.
+Protege u ofusca un archivo, texto directo o el portapapeles reemplazando los datos confidenciales por seudónimos. Ambos nombres (`protect` y `obfuscate`) son equivalentes en la CLI.
 
 * **`-i, --input <FILE>`**: Archivo de entrada a procesar.
 * **`-o, --output <FILE>`**: Archivo de salida donde guardar el resultado.
+* **`--copy`**: Guarda el resultado como una copia sufijada (`.protegido`) en vez de sobrescribir el original.
+* **`--export-md [PATH]`**: Exporta documentos Office (`.docx`, `.xlsx`, `.pptx`) sanitizados a Markdown (`.md`) extrayendo imágenes mediante Pandoc para revisión contextual con IA.
 * **`-t, --text <STRING>`**: Texto directo a procesar (si no se especifica archivo).
 * **`-c, --clipboard`**: Procesa de forma atómica el contenido actual del portapapeles y copia el resultado de vuelta.
 * **`-f, --format <FORMAT>`**: Formato estructurado (`auto`, `json`, `xml`, `log`, `text`). Por defecto es `auto`.
@@ -152,15 +154,19 @@ Protege u ofusca un archivo, texto directo o el portapapeles reemplazando los da
 # Proteger archivo y guardar mapeos cifrados con contraseña
 lexishield protect -i server_logs.json -o logs_seguros.json -s mapeos.lexi -p "MiContraseña123!"
 
+# Proteger un documento Office exportándolo a la vez a Markdown
+lexishield protect -i informe_auditoria.docx --export-md
+
 # Proteger directamente lo que tienes copiado en el portapapeles (One-Shot)
 lexishield protect -c
 ```
 
 ### 2. Comando: `restore` (o `deobfuscate`)
-Restaura o desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado).
+Restaura o desofusca un archivo, texto o portapapeles utilizando una tabla de mapeos guardada previamente (JSON plano o `.lexi` cifrado). Ambos nombres (`restore` y `deobfuscate`) son equivalentes en la CLI. Si no se especifica archivo de salida con `-o`, se genera automáticamente un archivo con el sufijo `.restaurado`.
 
 * **`-i, --input <FILE>`**: Archivo de entrada a restaurar.
 * **`-o, --output <FILE>`**: Archivo de salida.
+* **`--export-md [PATH]`**: Exporta el documento Office restaurado a Markdown (.md) mediante Pandoc.
 * **`-t, --text <STRING>`**: Texto directo a restaurar.
 * **`-c, --clipboard`**: Restaura el texto copiado en el portapapeles y lo reemplaza con el texto real.
 * **`-m, --mappings <FILE>`**: Archivo con los mapeos a aplicar (detecta automáticamente si está cifrado o en texto plano).

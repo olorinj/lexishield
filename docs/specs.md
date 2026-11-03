@@ -104,18 +104,23 @@ flowchart TD
 
 ### 4.1 Nuevos comandos en la CLI
 
+El procesamiento de documentos Office se integra de forma transparente en los comandos universales de LexiShield:
+
 ```bash
-# Ofuscación directa de documento único
-lexishield file -i auditoria_2026.docx -o auditoria_sanitizada.docx --vault prod.lexi
+# Ofuscación / protección directa de documento Office
+lexishield protect -i auditoria_2026.docx -o auditoria_sanitizada.docx -s prod.lexi
 
-# Desofuscación y restauración de documento devuelto por la IA
-lexishield file -d -i auditoria_procesada_ia.docx -o auditoria_restaurada.docx --vault prod.lexi
+# Desofuscación / restauración de documento devuelto por la IA
+lexishield restore -i auditoria_procesada_ia.docx -o auditoria_restaurada.docx -m prod.lexi
 
-# Procesamiento por lotes sobre una carpeta completa
-lexishield batch -i ./reportes_confidenciales/ -o ./reportes_sanitizados/ --ext docx,xlsx --vault prod.lexi
+# Procesamiento por lotes sobre una carpeta completa (soporta recursión)
+lexishield protect -i ./reportes_confidenciales/ --copy -s prod.lexi
 
-# Escaneo / Auditoría pasiva de un documento sin modificarlo
-lexishield scan-file auditoria_2026.docx --format table
+# Escaneo y auditoría pasiva de un documento sin modificarlo
+lexishield scan -i auditoria_2026.docx
+
+# Exportación automática a Markdown con Pandoc para revisión contextual con IA
+lexishield protect -i manual_empleado.docx --export-md
 ```
 
 ### 4.2 Integración en la interfaz gráfica (GUI)
@@ -133,7 +138,7 @@ lexishield scan-file auditoria_2026.docx --format table
 | :---: | :--- | :--- |
 | **Fase 2.1** | *OpenXML Word Core* | Parser y reempaquetador de `.docx` con soporte de párrafos, tablas y encabezados. |
 | **Fase 2.2** | *OpenXML Excel & PowerPoint* | Soporte para `sharedStrings` en `.xlsx` y cajas de texto en `.pptx`. |
-| **Fase 2.3** | *CLI `lexishield file / batch`* | Implementación de comandos CLI con barra de progreso interactiva. |
+| **Fase 2.3** | *Integración CLI Office* | Soporte transparente en comandos `protect`, `restore` y `scan` con opción `--export-md`. |
 | **Fase 2.4** | *GUI Drag & Drop* | Integración en la interfaz Tauri/Svelte de carga de archivos y previsualización. |
 | **Fase 2.5** | *Test Suite & Benchmarks* | Validación con documentos masivos (>100 MB / >50,000 celdas) y verificación de integridad XML. |
 

@@ -996,7 +996,7 @@ fn handle_deobfuscate(
                 .extension()
                 .and_then(|s| s.to_str())
                 .unwrap_or("docx");
-            in_path.with_file_name(format!("{stem}_restored.{ext}"))
+            in_path.with_file_name(format!("{stem}.restaurado.{ext}"))
         });
 
         let is_default = opts.mappings.is_none();
