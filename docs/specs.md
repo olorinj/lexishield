@@ -148,6 +148,7 @@ lexishield protect -i manual_empleado.docx --export-md
 | :---: | :--- | :---: | :--- |
 | **Fase 1** | *Ergonomía, Temas & Packaging* | **COMPLETADA** | Modo Oscuro/Claro con paleta de alto contraste, diseño accesible de pestañas activas, iconos nativos de ventana y sistema en Linux/Windows/macOS, y optimización del script de compilación para descartar dependencias innecesarias en el staging. |
 | **Fase 2** | *Onboarding, Tokens & Telemetría* | **COMPLETADA** | Explicador de requisitos criptográficos (*Zero-Knowledge Onboarding*), ayuda contextual con `❔ Ayuda` y tarjetas de primer uso descartables en todas las pestañas, terminología estandarizada a tokens, integración con Pandoc y desofuscación 1:1, modales con métricas de resultados, modo Watch con notificación de 0 tokens y preview de portapapeles, y telemetría estructurada sin advertencias. |
+| **Fase 3** | *Smartbars Tier 2 & Simplificación de Opciones* | **COMPLETADA** | Unificación de barras secundarias (Smartbars Tier 2) en todas las vistas incluida Opciones, selectores limpios sin iconos, reorganización de preferencias en 4 bloques funcionales (*Motor de Protección*, *Ventana y Sistema*, *Portapapeles*, *Apariencia y Seguridad*) y control granular de minimización/cierre en bandeja. |
 
 ---
 

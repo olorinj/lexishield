@@ -254,7 +254,8 @@ flowchart TD
    * La derivación de claves mediante **Argon2id** garantiza resistencia contra volcados de memoria y ataques GPU/ASIC fuera de línea.
    * Las operaciones de borrado automático de portapapeles eliminan rastros sensibles de la memoria del sistema operativo tras el tiempo configurado.
 
-3. **Compatibilidad Multiplataforma Nativa:**
+3. **Compatibilidad multiplataforma nativa y gestión de ventana:**
    * **Linux:** Soporte nativo para Wayland y X11, con registro de `app_id` y empaquetado `.deb` y `.rpm`.
    * **Windows:** Binario nativo empaquetado en instaladores `.msi`.
    * **macOS:** Empaquetado `.dmg` universal.
+   * **Ciclo de vida e icono de bandeja (*system tray*):** El controlador de Tauri intercepta los eventos `CloseRequested` y `Resized` (minimizado), permitiendo que el usuario configure de forma independiente el comportamiento del botón cerrar `[X]` (`close_action`) y del botón minimizar `[-]` (`minimize_to_tray`) para mantener el motor activo en segundo plano junto al reloj.

@@ -379,6 +379,8 @@ pub struct GuiConfig {
     pub close_to_tray: bool,
     #[serde(default = "default_close_action")]
     pub close_action: String,
+    #[serde(default)]
+    pub minimize_to_tray: bool,
     #[serde(default = "default_output_suffix")]
     pub output_suffix: String,
     #[serde(default = "default_font_size")]
@@ -460,6 +462,7 @@ impl Default for GuiConfig {
             file_selection_mode: default_file_selection_mode(),
             close_to_tray: true,
             close_action: default_close_action(),
+            minimize_to_tray: false,
             output_suffix: default_output_suffix(),
             font_size: default_font_size(),
             privacy_blur: false,

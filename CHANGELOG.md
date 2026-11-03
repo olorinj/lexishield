@@ -5,6 +5,21 @@ Todos los cambios notables de este proyecto se documentarán en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - En desarrollo
+*Rediseño ergonómico de la pestaña Opciones: Smartbar Tier 2 fija para guardado inmediato, control granular de minimización a la bandeja del sistema, menús desplegables limpios sin iconos y reorganización en 4 bloques funcionales.*
+
+### Añadido
+- **⚙️ Smartbar Tier 2 fija en la pestaña Opciones**:
+  - Incorporación de barra de herramientas superior persistente con los botones *Guardar Configuración*, *Restablecer*, *Ver Logs* y el conmutador de *Depuración*, eliminando la necesidad de desplazarse hasta el final de la página.
+- **📥 Minimización configurable a la bandeja del sistema (`minimize_to_tray`)**:
+  - Nueva preferencia independiente en `config.toml` y en la GUI que permite decidir si al pulsar el botón de minimizar `[-]` la ventana se mantiene en la barra de tareas habitual o se envía directamente a la bandeja del sistema junto al reloj, diferenciándolo claramente del ciclo de vida del botón cerrar `[X]`.
+
+### Modificado
+- **🧩 Reorganización conceptual de Opciones en 4 bloques funcionales**:
+  - Agrupación lógica y equilibrada en: *1. Motor de Protección* (con selector de *Nivel de protección*: Completo, Técnico & Red, Datos Personales & RGPD), *2. Ventana y Sistema*, *3. Portapapeles y Avisos* y *4. Apariencia y Seguridad*.
+- **🧹 Limpieza visual de menús desplegables (`<select>`)**:
+  - Eliminación total de emojis e iconos dentro de las opciones de los menús desplegables de configuración para lograr una lectura limpia, nítida y homogénea en todos los sistemas operativos.
+
 ## [2.1.0] - 2026-10-29
 *Actualización integral de experiencia de usuario: Renombrado conceptual a Transformación, refactorización de barras secundarias Tier 2 (Smartbars), resiliencia multiplataforma de portapapeles en Linux (Wayland/X11/KDE), búsqueda reactiva con botón de vaciado rápido y alineación integral de documentación.*
 

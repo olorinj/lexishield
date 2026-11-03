@@ -34,6 +34,7 @@
       file_selection_mode: "ambos",
       close_to_tray: true,
       close_action: "tray",
+      minimize_to_tray: false,
       output_suffix: ".protegido",
       font_size: "medium",
       privacy_blur: false,
@@ -821,10 +822,13 @@
         if (!["ambos", "arrastrar", "botones"].includes(cfg.gui.file_selection_mode)) {
           cfg.gui.file_selection_mode = "ambos";
         }
-        if (!["tray", "taskbar", "close"].includes(cfg.gui.close_action)) {
+        if (!["tray", "close"].includes(cfg.gui.close_action)) {
           cfg.gui.close_action = cfg.gui.close_to_tray === false ? "close" : "tray";
         }
         cfg.gui.close_to_tray = (cfg.gui.close_action === "tray");
+        if (cfg.gui.minimize_to_tray === undefined) {
+          cfg.gui.minimize_to_tray = false;
+        }
         if (!cfg.gui.output_suffix) {
           cfg.gui.output_suffix = ".protegido";
         }
@@ -3504,74 +3508,233 @@
 
     {:else if activeTab === "config"}
       <!-- VISTA CONFIGURACIÓN -->
-      <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 flex flex-col justify-between shadow-lg overflow-auto">
-        <div class="space-y-6">
+      <div in:fade={{ duration: 150 }} class="flex-1 flex flex-col gap-4 min-h-0">
+        <!-- SMARTBAR TIER 2 (OPCIONES) -->
+        <div class="bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 px-4 py-2.5 flex items-center justify-between gap-3 shadow-sm text-xs flex-wrap shrink-0">
+          <div class="flex items-center gap-2.5">
+            <span class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-sm">
+              <span>⚙️</span> Opciones del Sistema
+            </span>
+            <span class="hidden sm:inline-block text-slate-300 dark:text-white/10">|</span>
+            <span class="hidden sm:inline-block text-[11px] text-slate-500 dark:text-slate-400">
+              Archivo: <code class="font-mono text-primary-600 dark:text-primary-400">~/.lexishield/config.toml</code>
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <!-- Conmutador Depuración -->
+            <button
+              type="button"
+              on:click={async () => {
+                try {
+                  debugMode = await invokeTauri("set_debug_mode_command", { enabled: !debugMode });
+                  statusMessage = debugMode ? "Modo depuración activado." : "Modo depuración desactivado.";
+                  if (debugMode) fetchDebugLogs();
+                } catch (e) {
+                  statusMessage = "Error al cambiar depuración: " + e;
+                }
+              }}
+              class="px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition flex items-center gap-1.5 {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'}"
+              title="Activar o desactivar captura de trazas operativas internas"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>{debugMode ? '🐞' : '⚙️'}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>{debugMode ? 'Depuración: ACTIVA' : 'Depuración'}</span>{/if}
+            </button>
+
+            <!-- Botón Ver Registro de Logs -->
+            <button
+              type="button"
+              on:click={openLogsModal}
+              class="px-2.5 py-1.5 rounded-xl border text-xs font-semibold bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 transition flex items-center gap-1.5"
+              title="Abrir visor de trazas y eventos registrados"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>📋</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Ver Logs</span>{/if}
+            </button>
+
+            <!-- Botón Restablecer -->
+            <button
+              type="button"
+              on:click={async () => {
+                if (confirm("¿Restablecer ~/.lexishield/config.toml a los valores por defecto?")) {
+                  await invokeTauri("reset_config_command");
+                  await loadSettings();
+                  statusMessage = "✅ Configuración restablecida a valores por defecto.";
+                }
+              }}
+              class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/60 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 transition flex items-center gap-1.5"
+              title="Restaurar configuración predeterminada"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>🔄</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Restablecer</span>{/if}
+            </button>
+
+            <!-- Botón Guardar Configuración (Principal) -->
+            <button
+              type="button"
+              on:click={saveSettings}
+              class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
+              title="Guardar cambios en ~/.lexishield/config.toml"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>💾</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Guardar Configuración</span>{/if}
+            </button>
+          </div>
+        </div>
+
+        <!-- PANEL DE BLOQUES DE CONFIGURACIÓN -->
+        <div class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-6 shadow-lg overflow-auto space-y-6">
           {#if !dismissedTips.config}
-            <div transition:slide class="mb-4 p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
+            <div transition:slide class="p-3.5 bg-primary-500/10 border border-primary-500/30 rounded-xl flex items-start justify-between gap-3 text-xs text-slate-700 dark:text-slate-300">
               <div class="flex items-start gap-2.5">
-                <span class="text-base">💡</span>
+                <span class="text-base shrink-0">💡</span>
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Preferencias del Sistema</p>
-                  <p>Ajusta qué pestañas se muestran en la barra de navegación, qué vista se abre al arrancar LexiShield, y las opciones de borrado automático seguro del portapapeles en el archivo de configuración estándar <code class="font-mono text-primary-600 dark:text-primary-400">~/.lexishield/config.toml</code>.</p>
+                  <p>Personaliza el nivel de protección, el comportamiento de la ventana al minimizar o cerrar, las alertas de portapapeles y la apariencia visual. Pulsa <strong>Guardar Configuración</strong> en la barra superior para persistir los ajustes.</p>
                 </div>
               </div>
               <button on:click={() => dismissTip('config')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
             </div>
           {/if}
 
-          <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10">
-            <div>
-              <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>⚙️</span> Configuración General de LexiShield
-              </h2>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Personaliza la ergonomía de la interfaz, comportamiento del portapapeles y persistencia.</p>
-            </div>
-          </div>
-
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Pestaña Inicial y Visibilidad -->
+            <!-- BLOQUE 1: MOTOR DE PROTECCIÓN -->
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Pestañas y Arranque</span>
-              
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">1. Motor de Protección</span>
+
               <div>
-                <label for="config-default-tab-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Pestaña Inicial Predeterminada:</label>
+                <label for="config-sensitivity-profile-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Nivel de protección y alcance de análisis:</label>
+                <select
+                  id="config-sensitivity-profile-select"
+                  bind:value={activeSensitivityProfile}
+                  on:change={() => {
+                    localStorage.setItem("sensitivity_profile", activeSensitivityProfile);
+                    statusMessage = `Nivel de protección actualizado a: ${activeSensitivityProfile === 'all' ? 'Completo' : activeSensitivityProfile === 'devops' ? 'Técnico & Red' : 'Datos Personales & RGPD'}.`;
+                  }}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="all">Completo (Todos los detectores activos)</option>
+                  <option value="devops">Técnico & Red (IPs, UUIDs, Hostnames, Logs)</option>
+                  <option value="gdpr">Datos Personales & RGPD (Emails, Nombres, DNI/NIE, Tarjetas)</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                  Define qué categorías de datos confidenciales se filtran y auditan en la vista de Transformación.
+                </p>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5">
+                <label for="config-output-suffix-input" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sufijo para copias de archivos protegidos:</label>
+                <input
+                  id="config-output-suffix-input"
+                  type="text"
+                  bind:value={appConfig.gui.output_suffix}
+                  placeholder=".protegido"
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
+                />
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Se añade antes de la extensión al proteger archivos (ej. <code>documento{appConfig.gui.output_suffix || '.protegido'}.docx</code>).
+                </p>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5">
+                <label for="config-file-selection-mode-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Método de entrada de archivos:</label>
+                <select
+                  id="config-file-selection-mode-select"
+                  bind:value={appConfig.gui.file_selection_mode}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                >
+                  <option value="ambos">Ambos (Arrastrar y Soltar + Botones)</option>
+                  <option value="arrastrar">Solo Arrastrar y Soltar (Drag & Drop)</option>
+                  <option value="botones">Solo Botones de Selección</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- BLOQUE 2: VENTANA Y COMPORTAMIENTO DEL SISTEMA -->
+            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">2. Ventana y Sistema</span>
+
+              <div>
+                <label for="config-close-action-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                  Al pulsar el botón de cerrar [X]:
+                </label>
+                <select
+                  id="config-close-action-select"
+                  bind:value={appConfig.gui.close_action}
+                  on:change={() => {
+                    appConfig.gui.close_to_tray = (appConfig.gui.close_action === "tray");
+                    saveSettings();
+                  }}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="tray">Minimizar a la bandeja del sistema (segundo plano)</option>
+                  <option value="close">Salir completamente de la aplicación</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                  {#if appConfig.gui.close_action === 'tray'}
+                    Al cerrar la ventana, LexiShield permanece activo junto al reloj para seguir protegiendo el portapapeles.
+                  {:else}
+                    Al cerrar la ventana, el programa y todos sus servicios en segundo plano se detienen por completo.
+                  {/if}
+                </p>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs space-y-1.5">
+                <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    bind:checked={appConfig.gui.minimize_to_tray}
+                    on:change={saveSettings}
+                    class="rounded accent-primary-500"
+                  />
+                  <span>Enviar a la bandeja del sistema también al pulsar minimizar [-]</span>
+                </label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 pl-6">
+                  Si está desactivado, el botón minimizar [-] dejará la ventana en la barra de tareas habitual.
+                </p>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5">
+                <label for="config-default-tab-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Pestaña inicial al abrir LexiShield:</label>
                 <select
                   id="config-default-tab-select"
                   bind:value={appConfig.gui.default_tab}
                   class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                 >
-                  <option value="studio">✨ Transformación</option>
-                  <option value="pairs">📑 Pares de Tokens</option>
-                  <option value="vaults">🗄️ Bóvedas Lexi</option>
-                  <option value="watch">📋 Portapapeles</option>
+                  <option value="studio">Transformación</option>
+                  <option value="pairs">Pares de Tokens</option>
+                  <option value="vaults">Bóvedas Lexi</option>
+                  <option value="watch">Portapapeles</option>
                 </select>
               </div>
 
-              <div class="space-y-2 text-xs">
-                <span class="block font-medium text-slate-600 dark:text-slate-400">Pestañas Visibles en Barra Superior:</span>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" bind:checked={appConfig.gui.tabs.show_studio} class="rounded accent-primary-500" />
-                  <span>Transformación</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" bind:checked={appConfig.gui.tabs.show_pairs} class="rounded accent-primary-500" />
-                  <span>Pares de Tokens</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" bind:checked={appConfig.gui.tabs.show_vaults} class="rounded accent-primary-500" />
-                  <span>Bóvedas Lexi</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" bind:checked={appConfig.gui.tabs.show_watch} class="rounded accent-primary-500" />
-                  <span>Portapapeles (Watch)</span>
-                </label>
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5 space-y-2 text-xs">
+                <span class="block font-medium text-slate-600 dark:text-slate-400">Pestañas visibles en la barra de navegación:</span>
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.tabs.show_studio} class="rounded accent-primary-500" />
+                    <span>Transformación</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.tabs.show_pairs} class="rounded accent-primary-500" />
+                    <span>Pares de Tokens</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.tabs.show_vaults} class="rounded accent-primary-500" />
+                    <span>Bóvedas Lexi</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" bind:checked={appConfig.gui.tabs.show_watch} class="rounded accent-primary-500" />
+                    <span>Portapapeles</span>
+                  </label>
+                </div>
               </div>
             </div>
 
-            <!-- Avisos y Auto-vaciado de Portapapeles -->
+            <!-- BLOQUE 3: PORTAPAPELES Y NOTIFICACIONES -->
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Portapapeles y Avisos</span>
-              
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">3. Portapapeles y Avisos</span>
+
               <div>
                 <label for="config-clip-notify-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Aviso al capturar datos del portapapeles:</label>
                 <select
@@ -3579,18 +3742,18 @@
                   bind:value={appConfig.gui.clipboard.notification_type}
                   class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                 >
-                  <option value="toast">🍞 Mensaje emergente (Toast en barra inferior)</option>
-                  <option value="visual_flash">⚡ Parpadeo visual de ventana</option>
-                  <option value="silent">🔕 Silencioso (Sin avisos)</option>
+                  <option value="toast">Mensaje emergente (Toast en barra inferior)</option>
+                  <option value="visual_flash">Parpadeo visual de ventana</option>
+                  <option value="silent">Silencioso (Sin avisos)</option>
                 </select>
               </div>
 
-              <div class="space-y-2 text-xs">
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5 space-y-2 text-xs">
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" bind:checked={appConfig.gui.clipboard.auto_clear_enabled} class="rounded accent-primary-500" />
                   <span>Programar auto-vaciado del portapapeles tras procesar</span>
                 </label>
-                
+
                 {#if appConfig.gui.clipboard.auto_clear_enabled}
                   <div class="flex items-center gap-2 pl-6">
                     <span class="text-slate-500">Vaciar tras:</span>
@@ -3614,121 +3777,28 @@
               </div>
             </div>
 
-            <!-- Transformación y Perfil de Sensibilidad -->
+            <!-- BLOQUE 4: APARIENCIA Y SEGURIDAD -->
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Transformación y Sensibilidad</span>
-              
-              <div>
-                <label for="config-sensitivity-profile-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Perfil de Sensibilidad de Auditoría:</label>
-                <select
-                  id="config-sensitivity-profile-select"
-                  bind:value={activeSensitivityProfile}
-                  on:change={() => {
-                    localStorage.setItem("sensitivity_profile", activeSensitivityProfile);
-                    statusMessage = `🛡️ Perfil de sensibilidad actualizado a: ${activeSensitivityProfile === 'all' ? 'Completo' : activeSensitivityProfile === 'devops' ? 'DevOps & Red' : 'RGPD & Identidad'}.`;
-                  }}
-                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
-                >
-                  <option value="all">🛡️ Perfil: Completo (Todos los detectores activos)</option>
-                  <option value="devops">🌐 Perfil: DevOps & Red (IPs, UUIDs, Hostnames, Logs)</option>
-                  <option value="gdpr">🪪 Perfil: RGPD & Identidad (Emails, Nombres, DNI/NIE, Tarjetas)</option>
-                </select>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
-                  Filtra los tipos de entidades analizadas y mostradas en la auditoría de Transformación. La preferencia se guarda automáticamente entre sesiones.
-                </p>
-              </div>
-            </div>
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">4. Apariencia y Seguridad</span>
 
-            <!-- Selección de Archivos y Carpetas -->
-            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Selección de Archivos y Carpetas</span>
-              
-              <div>
-                <label for="config-file-selection-mode-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Método de ingesta preferido:</label>
-                <select
-                  id="config-file-selection-mode-select"
-                  bind:value={appConfig.gui.file_selection_mode}
-                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
-                >
-                  <option value="ambos">✨ Ambos (Arrastrar y Soltar + Botones)</option>
-                  <option value="arrastrar">🖱️ Solo Arrastrar y Soltar (Drag & Drop)</option>
-                  <option value="botones">🔘 Solo Botones de Selección</option>
-                </select>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
-                  Configura cómo interactuar con archivos en Transformación. Exige que al menos una opción permanezca activa en todo momento.
-                </p>
-              </div>
-            </div>
-
-            <!-- Escritorio y Salida de Archivos -->
-            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Escritorio y Salida de Archivos</span>
-              
-              <div>
-                <label for="config-output-suffix-input" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sufijo para copias procesadas en Transformación:</label>
-                <input
-                  id="config-output-suffix-input"
-                  type="text"
-                  bind:value={appConfig.gui.output_suffix}
-                  placeholder=".protegido"
-                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
-                />
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Se añadirá automáticamente antes de la extensión (ej. <code>archivo{appConfig.gui.output_suffix || '.protegido'}.json</code>).
-                </p>
-              </div>
-
-              <div class="pt-2 border-t border-slate-200 dark:border-white/5 space-y-2">
-                <label for="config-close-action-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400">
-                  Comportamiento al pulsar el botón de cerrar [X]:
-                </label>
-                <select
-                  id="config-close-action-select"
-                  bind:value={appConfig.gui.close_action}
-                  on:change={() => {
-                    appConfig.gui.close_to_tray = (appConfig.gui.close_action === "tray");
-                    saveSettings();
-                  }}
-                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
-                >
-                  <option value="tray">🗄️ Minimizar a la bandeja del sistema (icono junto al reloj / segundo plano)</option>
-                  <option value="taskbar">📌 Minimizar a la barra de tareas (como ventana minimizada)</option>
-                  <option value="close">🚪 Cerrar la aplicación completamente (por defecto del sistema)</option>
-                </select>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                  {#if appConfig.gui.close_action === 'tray'}
-                    Al pulsar [X], la ventana se oculta y LexiShield sigue protegiendo en segundo plano desde el área de notificación.
-                  {:else if appConfig.gui.close_action === 'taskbar'}
-                    Al pulsar [X], la ventana se minimiza a la barra de tareas inferior sin cerrarse.
-                  {:else}
-                    Al pulsar [X], la ventana y el proceso se cierran por completo.
-                  {/if}
-                </p>
-              </div>
-            </div>
-
-            <!-- Aspecto, Tipografía y Privacidad -->
-            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Aspecto y Accesibilidad</span>
-              
               <div class="space-y-3">
                 <div>
-                  <label for="config-theme-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tema Visual:</label>
+                  <label for="config-theme-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tema visual:</label>
                   <select
                     id="config-theme-select"
                     bind:value={appConfig.gui.theme}
                     on:change={applyThemeFromConfig}
                     class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                   >
-                    <option value="system">🖥️ Seguir tema del sistema</option>
-                    <option value="dark">🌙 Modo Oscuro</option>
-                    <option value="light">☀️ Modo Claro</option>
+                    <option value="system">Seguir tema del sistema</option>
+                    <option value="dark">Modo Oscuro</option>
+                    <option value="light">Modo Claro</option>
                   </select>
                 </div>
 
                 <div>
-                  <span class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Color de Acento de la Interfaz:</span>
-                  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                  <span class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Color de acento de la interfaz:</span>
+                  <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     {#each [
                       { id: 'cyan', label: 'Cian Neón', color: 'bg-cyan-500', desc: 'Defecto' },
                       { id: 'emerald', label: 'Esmeralda', color: 'bg-emerald-500', desc: 'Ciber' },
@@ -3744,149 +3814,72 @@
                         }}
                         class="flex flex-col items-center gap-1 p-2 rounded-xl border text-center transition {appConfig.gui.accent_color === palette.id ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500' : 'border-slate-200 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5'}"
                       >
-                        <span class="w-6 h-6 rounded-full {palette.color} shadow-sm border-2 border-white dark:border-slate-900 flex items-center justify-center text-white text-[10px] font-bold">
+                        <span class="w-5 h-5 rounded-full {palette.color} shadow-sm border-2 border-white dark:border-slate-900 flex items-center justify-center text-white text-[10px] font-bold">
                           {#if appConfig.gui.accent_color === palette.id}✓{/if}
                         </span>
-                        <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">{palette.label}</span>
-                        <span class="text-[10px] text-slate-400">{palette.desc}</span>
+                        <span class="text-[11px] font-semibold text-slate-800 dark:text-slate-200">{palette.label}</span>
                       </button>
                     {/each}
                   </div>
                 </div>
 
-                <div>
-                  <label for="config-font-size-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tamaño de letra en editores y tablas:</label>
-                  <select
-                    id="config-font-size-select"
-                    bind:value={appConfig.gui.font_size}
-                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
-                  >
-                    <option value="small">Compacta (11px) - Máxima densidad</option>
-                    <option value="medium">Estándar (12px) - Equilibrada</option>
-                    <option value="large">Ampliada (14px) - Pantallas 2K/4K</option>
-                  </select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label for="config-font-size-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Tamaño de letra:</label>
+                    <select
+                      id="config-font-size-select"
+                      bind:value={appConfig.gui.font_size}
+                      class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                    >
+                      <option value="small">Compacta (11px)</option>
+                      <option value="medium">Estándar (12px)</option>
+                      <option value="large">Ampliada (14px)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label for="config-toolbar-style-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Estilo de botones:</label>
+                    <select
+                      id="config-toolbar-style-select"
+                      bind:value={toolbarButtonStyle}
+                      on:change={() => localStorage.setItem("toolbar_button_style", toolbarButtonStyle)}
+                      class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                    >
+                      <option value="both">Icono y texto (Completo)</option>
+                      <option value="icons_only">Solo icono (Minimalista)</option>
+                      <option value="text_only">Solo texto (Clásico)</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label for="config-toolbar-style-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Estilo de botones en barras de herramientas:</label>
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5">
+                  <label for="config-auto-lock-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Auto-bloqueo de bóveda por inactividad:</label>
                   <select
-                    id="config-toolbar-style-select"
-                    bind:value={toolbarButtonStyle}
-                    on:change={() => localStorage.setItem("toolbar_button_style", toolbarButtonStyle)}
-                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                    id="config-auto-lock-select"
+                    bind:value={appConfig.gui.auto_lock_minutes}
+                    class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                   >
-                    <option value="both">1. ✨ Icono y texto (Completo)</option>
-                    <option value="icons_only">2. 🎨 Solo icono (Minimalista)</option>
-                    <option value="text_only">3. 📝 Solo texto (Clásico)</option>
+                    <option value={0}>Desactivado (Mantener desbloqueada)</option>
+                    <option value={1}>Bloquear tras 1 minuto sin actividad</option>
+                    <option value={5}>Bloquear tras 5 minutos sin actividad</option>
+                    <option value={15}>Bloquear tras 15 minutos sin actividad</option>
+                    <option value={30}>Bloquear tras 30 minutos sin actividad</option>
                   </select>
-                  <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    Controla si los botones de toda la aplicación muestran iconos y texto, exclusivamente el icono, o únicamente su etiqueta de texto.
-                  </p>
                 </div>
 
                 <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs space-y-2">
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" bind:checked={appConfig.gui.privacy_blur} class="rounded accent-primary-500" />
-                    <span>Activar Modo Privacidad (Desenfoque de pantalla) por defecto</span>
+                    <span>Activar Modo Privacidad (desenfoque) por defecto</span>
                   </label>
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" bind:checked={appConfig.gui.show_token_badges} on:change={() => { showTokenBadges = appConfig.gui.show_token_badges; }} class="rounded accent-primary-500" />
-                    <span>Activar Insignias (Badges) coloreadas de tokens por defecto</span>
+                    <span>Activar insignias coloreadas de tokens por defecto</span>
                   </label>
-                </div>
-              </div>
-            </div>
-
-            <!-- Seguridad y Cero Conocimiento -->
-            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Seguridad y Bóvedas</span>
-              
-              <div>
-                <label for="config-auto-lock-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Auto-bloqueo de bóveda por inactividad:</label>
-                <select
-                  id="config-auto-lock-select"
-                  bind:value={appConfig.gui.auto_lock_minutes}
-                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
-                >
-                  <option value={0}>🛡️ Desactivado (Mantener desbloqueada)</option>
-                  <option value={1}>⏱️ Bloquear tras 1 minuto sin actividad</option>
-                  <option value={5}>⏱️ Bloquear tras 5 minutos sin actividad</option>
-                  <option value={15}>⏱️ Bloquear tras 15 minutos sin actividad</option>
-                  <option value={30}>⏱️ Bloquear tras 30 minutos sin actividad</option>
-                </select>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
-                  Al activarse, LexiShield descarga de la memoria RAM la contraseña y los mapeos si no se detecta actividad del usuario.
-                </p>
-              </div>
-            </div>
-
-            <!-- Diagnóstico y Depuración (Exclusivo en Opciones) -->
-            <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-4 md:col-span-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Diagnóstico y Depuración</span>
-              
-              <div class="flex flex-wrap items-center justify-between gap-4 text-xs">
-                <div class="space-y-1 max-w-xl">
-                  <p class="font-medium text-slate-800 dark:text-slate-200">
-                    Captura y registro de trazas operativas internas
-                  </p>
-                  <p class="text-slate-500 dark:text-slate-400 text-[11px]">
-                    Permite registrar eventos detallados en memoria para depuración de reglas y resolución de incidencias sin exponer iconos en la cabecera principal.
-                  </p>
-                </div>
-
-                <div class="flex items-center gap-3 shrink-0">
-                  <button
-                    type="button"
-                    on:click={async () => {
-                      try {
-                        debugMode = await invokeTauri("set_debug_mode_command", { enabled: !debugMode });
-                        statusMessage = debugMode ? "Modo depuración activado." : "Modo depuración desactivado.";
-                        if (debugMode) fetchDebugLogs();
-                      } catch (e) {
-                        statusMessage = "Error al cambiar depuración: " + e;
-                      }
-                    }}
-                    class="px-3 py-1.5 rounded-xl border text-xs font-semibold transition flex items-center gap-1.5 {debugMode ? 'bg-amber-500/20 border-amber-500/40 text-amber-600 dark:text-amber-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/10'}"
-                  >
-                    {#if toolbarButtonStyle !== 'text_only'}<span>{debugMode ? '🐞' : '⚙️'}</span>{/if}
-                    {#if toolbarButtonStyle !== 'icons_only'}<span>{debugMode ? 'Depuración: ACTIVA' : 'Depuración: INACTIVA'}</span>{/if}
-                  </button>
-
-                  <button
-                    type="button"
-                    on:click={openLogsModal}
-                    class="px-3 py-1.5 rounded-xl border text-xs font-semibold bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/10 transition flex items-center gap-1.5"
-                    title="Abrir visor de trazas y eventos registrados"
-                  >
-                    {#if toolbarButtonStyle !== 'text_only'}<span>📋</span>{/if}
-                    {#if toolbarButtonStyle !== 'icons_only'}<span>Ver Registro de Logs</span>{/if}
-                  </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="flex items-center justify-between pt-6 border-t border-slate-200 dark:border-white/10">
-          <button
-            on:click={async () => {
-              if (confirm("¿Restablecer ~/.lexishield/config.toml a los valores por defecto?")) {
-                await invokeTauri("reset_config_command");
-                await loadSettings();
-                statusMessage = "✅ Configuración restablecida a valores por defecto.";
-              }
-            }}
-            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition"
-          >
-            Restablecer Valores por Defecto
-          </button>
-
-          <button
-            on:click={saveSettings}
-            class="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-lg shadow-primary-500/20"
-          >
-            Guardar Configuración
-          </button>
         </div>
       </div>
     {/if}
@@ -4546,8 +4539,14 @@
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>⚙️</span> Configuración y Ergonomía
               </h4>
-              <p>LexiShield se adapta a tu flujo de trabajo. Puedes personalizar qué pestañas se muestran en la barra superior si solo usas la Transformación o el Escáner, elegir tu pestaña predeterminada al abrir el programa y conmutar la barra de comandos CLI equivalentes en vivo.</p>
-              <p class="text-[11px] text-slate-400">Todos los ajustes se guardan siguiendo las mejores prácticas de SO en <code class="font-mono">~/.lexishield/config.toml</code> con capacidad de restablecimiento automático en cualquier momento.</p>
+              <p>La pestaña <strong>Opciones</strong> está organizada en 4 bloques funcionales con una barra de acciones superior (Smartbar Tier 2) para guardar, restablecer o consultar los logs en cualquier momento:</p>
+              <ul class="list-disc list-inside space-y-1.5 pl-1 text-[11px]">
+                <li><strong>1. Motor de Protección:</strong> Selecciona el <em>Nivel de protección</em> (Completo, Técnico & Red o Datos Personales & RGPD), el sufijo para copias protegidas y el método de entrada de archivos.</li>
+                <li><strong>2. Ventana y Sistema:</strong> Configura qué sucede al pulsar el botón cerrar <code class="font-mono">[X]</code> (minimizar a la bandeja del sistema en segundo plano o salir de la aplicación), si el botón minimizar <code class="font-mono">[-]</code> también envía la ventana a la bandeja del sistema, y qué pestañas son visibles.</li>
+                <li><strong>3. Portapapeles y Avisos:</strong> Ajusta el tipo de aviso al interceptar texto, el auto-vaciado temporizado y la barra inferior CLI.</li>
+                <li><strong>4. Apariencia y Seguridad:</strong> Elige tema visual, color de acento, tamaño tipográfico, estilo de botones e inactividad para auto-bloqueo de bóvedas.</li>
+              </ul>
+              <p class="text-[11px] text-slate-400">Todos los ajustes se persisten en <code class="font-mono">~/.lexishield/config.toml</code>.</p>
             </div>
 
           {:else if activeHelpTab === "password_why"}

@@ -108,8 +108,10 @@ flowchart LR
    * Diagnóstico activo en interfaz y notificaciones explícitas de estado ante errores de conexión.
    * Vaciado seguro del portapapeles manual o temporizado para máxima higiene en el sistema operativo.
 
-5. **Configuración y registros:**
-   * **Perfiles de sensibilidad persistentes:** Selección de perfiles de detección (*Completo*, *DevOps & Red*, *RGPD & Identidad*) con guardado automático entre sesiones.
+5. **Opciones y registros:**
+   * **Barra de acciones fija (Smartbar Tier 2):** Botones siempre visibles en la parte superior para guardar configuración, restablecer valores por defecto y consultar el registro de trazas sin necesidad de desplazarse.
+   * **Motor de protección y nivel de alcance:** Selección del *Nivel de protección* (*Completo*, *Técnico & Red*, *Datos Personales & RGPD*), sufijo de copias protegidas y método de entrada de archivos.
+   * **Comportamiento de ventana (cerrar y minimizar):** Configuración independiente de la acción del botón cerrar `[X]` (minimizar a la bandeja del sistema en segundo plano o salir de la aplicación) y opción para enviar la ventana a la bandeja también al pulsar minimizar `[-]`.
    * **Atajos de teclado centralizados:** Acceso inmediato a la guía de atajos de teclado (`⌨️`) desde el modal de Ayuda (`?`) o desde cualquier vista.
    * Selección de pestaña predeterminada al arrancar, personalización de pestañas visibles en la barra superior y barra CLI docking en vivo.
    * Consola de telemetría y diagnóstico en vivo con niveles de filtrado (`INFO`, `WARN`, `ERROR`, `DEBUG`).

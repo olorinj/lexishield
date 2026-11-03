@@ -1252,7 +1252,7 @@ fn main() {
             }
             tauri::WindowEvent::Resized(_) if window.is_minimized().unwrap_or(false) => {
                 let config = load_config_with_rules(None, None);
-                if config.gui.resolved_close_action() == "tray" {
+                if config.gui.minimize_to_tray {
                     let _ = window.hide();
                 }
             }
