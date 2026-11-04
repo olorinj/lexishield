@@ -660,6 +660,10 @@
       let match;
 
       while ((match = combinedRegex.exec(text)) !== null) {
+        if (match[0].length === 0) {
+          combinedRegex.lastIndex++;
+          continue;
+        }
         if (match.index > lastIdx) {
           result += escapeHtml(text.slice(lastIdx, match.index));
         }
@@ -667,7 +671,7 @@
         const itemInfo = pseudoMap.get(matchedStr);
         const detType = itemInfo?.detector_type || "Token";
         const cat = getDetectorCategory(detType);
-        const origTooltip = itemInfo?.original ? `Original: ${itemInfo.original} (${cat.name})` : `Token seudonimizado (${cat.name})`;
+        const origTooltip = itemInfo?.original ? `Original: ${itemInfo.original} (${cat.name})` : `Token protegido (${cat.name})`;
         result += `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(origTooltip)}">${escapeHtml(matchedStr)}</mark>`;
         lastIdx = combinedRegex.lastIndex;
       }
@@ -719,6 +723,10 @@
     let match;
 
     while ((match = combinedRegex.exec(text)) !== null) {
+      if (match[0].length === 0) {
+        combinedRegex.lastIndex++;
+        continue;
+      }
       if (match.index > lastIdx) {
         result += escapeHtml(text.slice(lastIdx, match.index));
       }
@@ -1050,7 +1058,7 @@
       lastReport = res.report;
       vaultMappings = res.mappings || [];
       studioDirection = "obfuscate";
-      statusMessage = `✅ Datos protegidos exitosamente: ${res.report.replacements_applied} tokens seudonimizados en ${res.report.elapsed_ms.toFixed(2)}ms`;
+      statusMessage = `✅ Datos protegidos exitosamente: ${res.report.replacements_applied} tokens protegidos en ${res.report.elapsed_ms.toFixed(2)}ms`;
       if (autoCopyToClipboard && res.obfuscated_text) {
         try {
           await navigator.clipboard.writeText(res.obfuscated_text);
@@ -1125,6 +1133,7 @@
       const useCopy = customOptions ? customOptions.copyMode : copyMode;
       const activeSuffix = customOptions?.suffix || (reverse ? ".restaurado" : copySuffix);
       const useMd = customOptions ? (hasPandoc && customOptions.exportMarkdown) : (hasPandoc && exportMarkdown);
+      const protectName = customOptions ? !!customOptions.protectFilename : false;
 
       let outPath = selected;
       if (useCopy) {
@@ -1146,7 +1155,8 @@
           password: password || null,
           reverse: reverse,
           exportMd: useMd,
-          forceResources: false
+          forceResources: false,
+          protectFilename: protectName
         });
       } catch (e) {
         const errStr = String(e);
@@ -1161,7 +1171,8 @@
               password: password || null,
               reverse: reverse,
               exportMd: useMd,
-              forceResources: true
+              forceResources: true,
+              protectFilename: protectName
             });
           } else {
             statusMessage = "Operación cancelada por el usuario por precaución de recursos.";
@@ -1173,7 +1184,7 @@
       }
       lastReport = rep;
       const actionName = reverse ? "restaurado" : "protegido";
-      statusMessage = `✅ Archivo ${actionName} (${rep.replacements_applied} tokens procesados). Guardado en: ${outPath}`;
+      statusMessage = `✅ Archivo ${actionName} (${rep.replacements_applied} tokens protegidos). Guardado en: ${outPath}`;
       actionResultModal = {
         title: reverse ? "Archivo Restaurado con Éxito" : "Archivo Protegido con Éxito",
         type: "success",
@@ -1183,10 +1194,11 @@
         details: [
           { label: "Archivo Origen", value: selected.split(/[/\\]/).pop() },
           { label: "Archivo Guardado", value: outPath.split(/[/\\]/).pop() },
-          { label: reverse ? "Tokens Restaurados" : "Tokens Seudonimizados", value: `${rep.replacements_applied}` },
+          { label: reverse ? "Tokens Restaurados" : "Tokens Protegidos", value: `${rep.replacements_applied}` },
           { label: "Tiempo", value: `${rep.elapsed_ms.toFixed(2)} ms` },
           { label: "Exportado a Markdown", value: useMd ? "Sí (.md)" : "No" }
-        ]
+        ],
+        canViewPairs: true
       };
       refreshVaultsList();
     } catch (err) {
@@ -1485,6 +1497,20 @@
       const itemName = droppedPath.split(/[/\\]/).filter(Boolean).pop() || droppedPath;
       const isReverse = (targetPanel === "obfuscated");
       const defaultSuffix = isReverse ? ".restaurado" : copySuffix;
+      
+      // En modo protección (Texto claro), iniciar Inspección Previa automática
+      if (!isReverse) {
+        activeTab = "studio";
+        studioSubView = "audit";
+        if (isDir) {
+          await auditDirectoryPath(droppedPath);
+        } else {
+          await auditFilePath(droppedPath);
+        }
+        statusMessage = `🔍 Inspección previa completada para ${isDir ? 'la carpeta' : 'el archivo'}. Revisa los tokens antes de proteger.`;
+        return;
+      }
+
       studioDropModal = {
         path: droppedPath,
         name: itemName,
@@ -1494,7 +1520,8 @@
         suffix: defaultSuffix,
         saveSuffixDefault: false,
         cleanCache: true,
-        exportMarkdown: hasPandoc && exportMarkdown
+        exportMarkdown: hasPandoc && exportMarkdown,
+        protectFilename: false
       };
     } catch (err) {
       statusMessage = "Error al procesar elemento arrastrado: " + err;
@@ -1510,15 +1537,18 @@
     if (!modal.copyMode) return `${modal.name} (Sobrescribir archivo original)`;
     const sfx = modal.suffix || "";
     const dotIdx = modal.name.lastIndexOf(".");
-    if (dotIdx !== -1) {
-      return modal.name.substring(0, dotIdx) + sfx + modal.name.substring(dotIdx);
+    const baseStem = dotIdx !== -1 ? modal.name.substring(0, dotIdx) : modal.name;
+    const ext = dotIdx !== -1 ? modal.name.substring(dotIdx) : "";
+    
+    if (modal.protectFilename && !modal.isReverse) {
+      return `Protegido_${baseStem}${sfx}${ext}`;
     }
-    return modal.name + sfx;
+    return `${baseStem}${sfx}${ext}`;
   }
 
   async function confirmStudioDropModal() {
     if (!studioDropModal) return;
-    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd } = studioDropModal;
+    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd, protectFilename: protName } = studioDropModal;
     studioDropModal = null;
 
     try {
@@ -1543,7 +1573,8 @@
         await processFilePathInStudio(path, isReverse, {
           copyMode,
           suffix,
-          exportMarkdown: expMd
+          exportMarkdown: expMd,
+          protectFilename: protName
         });
       }
     } catch (err) {
@@ -2469,7 +2500,19 @@
                 <span class="text-base">✅</span>
                 <span>{studioToast.message}</span>
               </div>
-              <button type="button" on:click={() => (studioToast = null)} class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-white px-2 py-0.5 rounded text-xs font-bold" title="Cerrar aviso">✕</button>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  on:click={() => {
+                    activeTab = "pairs";
+                    loadPairsForVault(vaultPath);
+                  }}
+                  class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white dark:text-slate-950 font-bold rounded-lg text-xs transition"
+                >
+                  🔍 Ver tokens
+                </button>
+                <button type="button" on:click={() => (studioToast = null)} class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-white px-2 py-0.5 rounded text-xs font-bold" title="Cerrar aviso">✕</button>
+              </div>
             </div>
           {/if}
 
@@ -2651,14 +2694,14 @@
           </div>
 
         {:else if studioSubView === "audit"}
-          <!-- SUB-VISTA DESGLOSE Y AUDITORÍA DE TOKENS -->
+          <!-- SUB-VISTA INSPECCIÓN PREVIA DE TOKENS -->
           <div in:fade={{ duration: 150 }} class="flex-1 bg-white dark:bg-brand-surface/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 p-5 flex flex-col min-h-0 shadow-lg">
             <div class="flex flex-wrap items-center justify-between gap-4 mb-3 pb-2 border-b border-slate-200 dark:border-white/5">
               <div>
                 <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>🔍</span> Desglose y Auditoría de Tokens Confidenciales
+                  <span>🔍</span> Inspección Previa de Tokens
                 </h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Inspecciona y clasifica tokens detectados sin modificarlos. Desmarca casillas si deseas omitir falsos positivos.</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Inspecciona y clasifica tokens detectados antes de proteger el archivo. Desmarca casillas si deseas omitir falsos positivos.</p>
               </div>
               
               <div class="flex items-center gap-3">
@@ -2801,11 +2844,37 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                  {#if auditSummary && auditSummary.path_analyzed}
+                    <button
+                      type="button"
+                      on:click={async () => {
+                        const path = auditSummary.path_analyzed;
+                        const isDir = await invokeTauri("is_directory", { path });
+                        const itemName = path.split(/[/\\]/).filter(Boolean).pop() || path;
+                        studioDropModal = {
+                          path,
+                          name: itemName,
+                          isDir,
+                          isReverse: false,
+                          copyMode: true,
+                          suffix: copySuffix,
+                          saveSuffixDefault: false,
+                          cleanCache: false,
+                          exportMarkdown: hasPandoc && exportMarkdown,
+                          protectFilename: false
+                        };
+                      }}
+                      class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-lg transition shadow-md flex items-center gap-1.5"
+                      title="Proceder a proteger el archivo con los tokens verificados"
+                    >
+                      <span>🛡️</span> Proteger Archivo...
+                    </button>
+                  {/if}
                   <button
                     type="button"
                     on:click={clearScanResults}
                     class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition flex items-center gap-1"
-                    title="Limpiar los resultados y reiniciar la auditoría"
+                    title="Limpiar los resultados y reiniciar la inspección previa"
                   >
                     <span>🗑️</span> Limpiar Resultados
                   </button>
@@ -4533,9 +4602,9 @@
 
               <div class="p-3.5 bg-slate-50 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-white/5 space-y-2">
                 <p class="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <span>🔍</span> Desglose y Auditoría de Tokens:
+                  <span>🔍</span> Inspección Previa de Tokens:
                 </p>
-                <p>Al arrastrar o escanear archivos y carpetas, se abre automáticamente la pantalla de <em>Desglose y Auditoría</em>. LexiShield analiza los elementos clasificando los tokens por Red, Identidad, Sistemas o Claves, y permitiéndote omitir falsos positivos antes de guardarlos en tu bóveda. Al guardar o pulsar <em>"Limpiar Resultados"</em>, regresas automáticamente a Transformación.</p>
+                <p>Al arrastrar o escanear archivos y carpetas, se abre automáticamente la pantalla de <em>Inspección Previa</em>. LexiShield analiza los elementos clasificando los tokens por Red, Identidad, Sistemas o Claves, y permitiéndote omitir falsos positivos antes de guardarlos en tu bóveda. Al guardar o pulsar <em>"Limpiar Resultados"</em>, regresas automáticamente a Transformación.</p>
               </div>
 
               <div class="p-3 bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-white/5 rounded-xl flex items-center justify-between gap-3">
@@ -4771,7 +4840,19 @@
           </div>
         {/if}
 
-        <div class="flex items-center justify-end pt-2">
+        <div class="flex items-center justify-end gap-2 pt-2">
+          {#if actionResultModal.canViewPairs}
+            <button
+              on:click={() => {
+                actionResultModal = null;
+                activeTab = "pairs";
+                loadPairsForVault(vaultPath);
+              }}
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+            >
+              <span>🔍</span> Ver tokens protegidos
+            </button>
+          {/if}
           <button
             on:click={() => (actionResultModal = null)}
             class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-primary-500/20"
@@ -4858,6 +4939,19 @@
               </div>
             {/if}
           </div>
+
+          <!-- Opción Proteger Nombre de Archivo -->
+          {#if !studioDropModal.isReverse && !studioDropModal.isDir}
+            <div class="pt-2 border-t border-slate-200/60 dark:border-white/5">
+              <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+                <input type="checkbox" bind:checked={studioDropModal.protectFilename} class="rounded accent-primary-500" />
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-white">Proteger también el nombre del archivo</span>
+                  <p class="text-[11px] text-slate-400">Genera un nombre protegido seguro para el archivo de salida conservando intacta su extensión original.</p>
+                </div>
+              </label>
+            </div>
+          {/if}
 
           <!-- Opciones específicas de Directorio -->
           {#if studioDropModal.isDir}

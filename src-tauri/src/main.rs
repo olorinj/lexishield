@@ -464,6 +464,7 @@ fn process_file_command(
     reverse: bool,
     export_md: Option<bool>,
     force_resources: Option<bool>,
+    protect_filename: Option<bool>,
 ) -> Result<ObfuscationReport, String> {
     if !force_resources.unwrap_or(false)
         && let Ok(bytes) = std::fs::read(&input_path)
@@ -510,23 +511,46 @@ fn process_file_command(
         }
     }
 
+    let effective_output_path = if protect_filename.unwrap_or(false) && !reverse {
+        let p = Path::new(&output_path);
+        let parent = p.parent().unwrap_or_else(|| Path::new(""));
+        let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let file_stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("archivo");
+        
+        let protected_stem = if let Some(m) = engine.manager.get_mapping(file_stem) {
+            m.pseudonym.clone()
+        } else {
+            let id: u32 = rand::random::<u32>();
+            format!("Protegido_{id:08X}")
+        };
+
+        let new_file_name = if ext.is_empty() {
+            protected_stem
+        } else {
+            format!("{protected_stem}.{ext}")
+        };
+        parent.join(new_file_name).to_string_lossy().to_string()
+    } else {
+        output_path.clone()
+    };
+
     let report = engine
         .process_file(
             Path::new(&input_path),
-            Path::new(&output_path),
+            Path::new(&effective_output_path),
             FormatType::Auto,
             reverse,
         )
         .map_err(|e| e.to_string())?;
 
     if export_md.unwrap_or(false) {
-        let _ = export_office_to_md_with_pandoc(Path::new(&output_path));
+        let _ = export_office_to_md_with_pandoc(Path::new(&effective_output_path));
     }
 
     log::info!(
-        "Studio: Archivo procesado (origen: '{}' -> destino: '{}', reversa: {}, tokens modificados: {}, export_md: {})",
+        "Studio: Archivo procesado (origen: '{}' -> destino: '{}', reversa: {}, tokens protegidos: {}, export_md: {})",
         input_path,
-        output_path,
+        effective_output_path,
         reverse,
         report.replacements_applied,
         export_md.unwrap_or(false)

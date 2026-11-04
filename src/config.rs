@@ -572,6 +572,18 @@ impl LexiConfig {
     }
 }
 
+/// Obtiene el nombre de usuario de la cuenta local del sistema operativo actual.
+#[must_use]
+pub fn get_system_username() -> Option<String> {
+    std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .ok()
+        .filter(|u| {
+            let trimmed = u.trim();
+            trimmed.len() >= 3 && trimmed != "root" && trimmed != "SYSTEM"
+        })
+}
+
 /// Obtiene el directorio de configuración del usuario (~/.lexishield).
 pub fn get_user_config_dir() -> Result<PathBuf, ObfuscationError> {
     let home = dirs::home_dir().ok_or_else(|| {

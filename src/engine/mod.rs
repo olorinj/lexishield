@@ -68,6 +68,23 @@ impl ObfuscatorEngine {
             }
         }
 
+        // Registrar automáticamente el nombre de usuario local del sistema si aparece en el contenido
+        if let Some(sys_user) = crate::config::get_system_username()
+            && content.contains(&sys_user)
+            && !self.manager.contains_original(&sys_user)
+        {
+            let pseudo = format!("user_{:04x}", rand::random::<u16>());
+            let user_mapping = Mapping::new(
+                &sys_user,
+                &pseudo,
+                crate::models::DetectorType::Custom("Username".to_string()),
+            );
+            if let Some(ref mut cb) = on_found {
+                cb(&user_mapping);
+            }
+            contextual_mappings.push(user_mapping);
+        }
+
         // Cargar mapeos contextuales en el manager primero para que sirvan de salvaguarda o prioridad
         let mut newly_added = Vec::new();
         if !contextual_mappings.is_empty() {
