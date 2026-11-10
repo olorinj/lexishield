@@ -2459,6 +2459,7 @@ dependencies = [
  "lexishield",
  "log",
  "mimalloc",
+ "rand 0.8.8",
  "rayon",
  "rpassword",
  "serde",

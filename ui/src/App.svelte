@@ -116,15 +116,27 @@
     };
   }
 
+  function getDetectorName(dt) {
+    if (!dt) return "Token";
+    if (typeof dt === "string") return dt;
+    if (typeof dt === "object") {
+      if (dt.Custom) return dt.Custom;
+      const keys = Object.keys(dt);
+      if (keys.length > 0) return String(dt[keys[0]] || keys[0]);
+    }
+    return String(dt);
+  }
+
   function getDetectorCategory(detectorType) {
-    const dt = (detectorType || "").toLowerCase();
-    if (dt.includes("ip") || dt.includes("mac") || dt.includes("domain") || dt.includes("url") || dt.includes("host") || dt.includes("red")) {
+    const name = getDetectorName(detectorType);
+    const dt = name.toLowerCase();
+    if (dt.includes("ip") || dt.includes("mac") || dt.includes("domain") || dt.includes("url") || dt.includes("host") || dt.includes("red") || dt.includes("server")) {
       return { name: "Red", icon: "🌐", color: "bg-blue-500", text: "text-blue-500", border: "border-blue-500/30", bgBadge: "bg-blue-500/10" };
     }
-    if (dt.includes("dni") || dt.includes("nie") || dt.includes("user") || dt.includes("usuario") || dt.includes("nombre") || dt.includes("ident")) {
+    if (dt.includes("dni") || dt.includes("nie") || dt.includes("user") || dt.includes("usuario") || dt.includes("nombre") || dt.includes("ident") || dt.includes("sid") || dt.includes("email") || dt.includes("logon")) {
       return { name: "Identidad", icon: "🪪", color: "bg-purple-500", text: "text-purple-500", border: "border-purple-500/30", bgBadge: "bg-purple-500/10" };
     }
-    if (dt.includes("path") || dt.includes("ruta") || dt.includes("file") || dt.includes("sistema") || dt.includes("sys") || dt.includes("process")) {
+    if (dt.includes("path") || dt.includes("ruta") || dt.includes("file") || dt.includes("sistema") || dt.includes("sys") || dt.includes("process") || dt.includes("guid") || dt.includes("uuid") || dt.includes("hex") || dt.includes("id")) {
       return { name: "Sistemas", icon: "🖥️", color: "bg-emerald-500", text: "text-emerald-500", border: "border-emerald-500/30", bgBadge: "bg-emerald-500/10" };
     }
     return { name: "Contacto / Claves", icon: "💳", color: "bg-amber-500", text: "text-amber-500", border: "border-amber-500/30", bgBadge: "bg-amber-500/10" };
@@ -733,7 +745,7 @@
       const matchedStr = match[0];
       const detType = termMap.get(matchedStr) || "Token";
       const cat = getDetectorCategory(detType);
-      const title = `Detectado como ${cat.name} (${detType})`;
+      const title = `Detectado como ${cat.name} (${getDetectorName(detType)})`;
       result += `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(title)}">${escapeHtml(matchedStr)}</mark>`;
       lastIdx = combinedRegex.lastIndex;
     }
@@ -1846,7 +1858,7 @@
     const matchesSearch = !pairSearch ||
       item.original.toLowerCase().includes(pairSearch.toLowerCase()) ||
       item.pseudonym.toLowerCase().includes(pairSearch.toLowerCase());
-    const matchesType = pairTypeFilter === "all" || item.detector_type === pairTypeFilter;
+    const matchesType = pairTypeFilter === "all" || getDetectorName(item.detector_type) === pairTypeFilter;
     return matchesSearch && matchesType;
   });
 
@@ -2935,7 +2947,7 @@
                       </td>
                       <td class="p-3">
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded {cat.bgBadge} {cat.text} text-[11px] font-semibold border {cat.border}">
-                          <span>{cat.icon}</span> {item.detector_type}
+                          <span>{cat.icon}</span> {getDetectorName(item.detector_type)}
                         </span>
                       </td>
                       <td class="p-3 text-amber-600 dark:text-amber-300 font-semibold select-text {privacyBlur ? 'privacy-blurred' : ''}">{item.original}</td>
@@ -3144,7 +3156,7 @@
                       </span>
                     {:else}
                       <span class="px-2 py-0.5 rounded bg-primary-500/10 text-primary-700 dark:text-primary-400 text-[11px] border border-primary-500/20">
-                        {item.detector_type}
+                        {getDetectorName(item.detector_type)}
                       </span>
                     {/if}
                   </td>
@@ -3584,7 +3596,7 @@
                       <div class="flex flex-wrap gap-1.5 pt-1">
                         {#each ev.tokens as tok}
                           <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-mono">
-                            <span class="text-[10px] px-1 py-0.2 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded font-semibold">{tok.detector_type || 'Token'}</span>
+                            <span class="text-[10px] px-1 py-0.2 bg-primary-500/20 text-primary-600 dark:text-primary-300 rounded font-semibold">{getDetectorName(tok.detector_type)}</span>
                             <span class="text-amber-600 dark:text-amber-400 font-semibold {privacyBlur ? 'privacy-blurred' : ''}">{tok.original}</span>
                             <span class="text-slate-400">→</span>
                             <span class="text-primary-600 dark:text-primary-400">{tok.pseudonym}</span>
