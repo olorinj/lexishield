@@ -726,7 +726,16 @@
     const escapedTerms = [];
     for (const t of terms) {
       termMap.set(t.original, t.detector_type);
-      escapedTerms.push(t.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+      const esc = t.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      escapedTerms.push(esc);
+      // Si el término original contiene puntos pero no barras invertidas (ej: 10.155.69.21),
+      // admitir también la variante escapada (ej: 10\.155\.69\.21) típica en expresiones regulares
+      if (t.original.includes('.') && !t.original.includes('\\')) {
+        const variantEsc = esc.replace(/\\\./g, '(?:\\\\\\.|\\.)');
+        if (variantEsc !== esc) {
+          escapedTerms.push(variantEsc);
+        }
+      }
     }
 
     const combinedRegex = new RegExp(`(${escapedTerms.join('|')})`, 'g');
@@ -743,7 +752,8 @@
         result += escapeHtml(text.slice(lastIdx, match.index));
       }
       const matchedStr = match[0];
-      const detType = termMap.get(matchedStr) || "Token";
+      const unescapedMatch = matchedStr.replace(/\\/g, '');
+      const detType = termMap.get(matchedStr) || termMap.get(unescapedMatch) || "Token";
       const cat = getDetectorCategory(detType);
       const title = `Detectado como ${cat.name} (${getDetectorName(detType)})`;
       result += `<mark class="inline-flex items-center gap-0.5 px-1 py-0.5 rounded font-mono font-bold text-[11px] ${cat.bgBadge} ${cat.text} border ${cat.border} shadow-xs align-baseline cursor-help" title="${escapeHtml(title)}">${escapeHtml(matchedStr)}</mark>`;
@@ -1510,19 +1520,6 @@
       const isReverse = (targetPanel === "obfuscated");
       const defaultSuffix = isReverse ? ".restaurado" : copySuffix;
       
-      // En modo protección (Texto claro), iniciar Inspección Previa automática
-      if (!isReverse) {
-        activeTab = "studio";
-        studioSubView = "audit";
-        if (isDir) {
-          await auditDirectoryPath(droppedPath);
-        } else {
-          await auditFilePath(droppedPath);
-        }
-        statusMessage = `🔍 Inspección previa completada para ${isDir ? 'la carpeta' : 'el archivo'}. Revisa los tokens antes de proteger.`;
-        return;
-      }
-
       studioDropModal = {
         path: droppedPath,
         name: itemName,
@@ -1535,6 +1532,9 @@
         exportMarkdown: hasPandoc && exportMarkdown,
         protectFilename: false
       };
+      activeTab = "studio";
+      studioSubView = "transform";
+      statusMessage = `📄 Elemento listo para procesar: ${itemName}. Configura opciones y pulsa ${isReverse ? 'Restaurar' : 'Proteger'}.`;
     } catch (err) {
       statusMessage = "Error al procesar elemento arrastrado: " + err;
     }
@@ -1721,6 +1721,51 @@
       }
     } catch (e) {
       statusMessage = "Error al cargar pares de la bóveda: " + e;
+    }
+  }
+
+  function autoGeneratePseudonym(val, type) {
+    const raw = (val || "").trim();
+    if (type === "IPv4") {
+      const parts = raw.split(/[.\\\\]+/).filter(Boolean);
+      const last = (parts.length > 0 && !isNaN(parts[parts.length - 1])) ? parts[parts.length - 1] : Math.floor(Math.random() * 253 + 1);
+      const isPrivate = parts.length > 0 && (parts[0] === "10" || parts[0] === "192" || parts[0] === "172");
+      if (isPrivate) {
+        return `10.${Math.floor(Math.random() * 254 + 1)}.${Math.floor(Math.random() * 254 + 1)}.${last}`;
+      }
+      return `${Math.floor(Math.random() * 220 + 1)}.${Math.floor(Math.random() * 254 + 1)}.${Math.floor(Math.random() * 254 + 1)}.${last}`;
+    }
+    if (type === "IPv6") {
+      const hex = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
+      return `fd${hex().substring(0, 2)}:${hex()}:${hex()}::${hex()}`;
+    }
+    if (type === "Email") {
+      const parts = raw.split("@");
+      const domain = parts[1] || "example.com";
+      const randHex = Math.random().toString(16).substring(2, 10);
+      return `user_${randHex}@${domain}`;
+    }
+    if (type === "SpanishDniNie") {
+      const num = Math.floor(Math.random() * 89999999 + 10000000);
+      const letters = "TRWAGMYFPDXBNJZSQVHLCKE";
+      return `${num}${letters[num % 23]}`;
+    }
+    if (type === "CreditCard") {
+      const p1 = Math.floor(Math.random() * 8999 + 1000);
+      const p2 = Math.floor(Math.random() * 8999 + 1000);
+      return `4532-****-****-${p2}`;
+    }
+    if (type === "GuidUuid") {
+      const rand4 = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
+      return `${rand4()}${rand4()}-${rand4()}-4${rand4().substring(1)}-a${rand4().substring(1)}-${rand4()}${rand4()}${rand4()}`;
+    }
+    const randHex = Math.random().toString(16).substring(2, 10).toUpperCase();
+    return `Token_${randHex}`;
+  }
+
+  function handleAddPairInputOrTypeChange() {
+    if (!newPairPseudo || newPairPseudo.startsWith("Token_") || newPairPseudo.startsWith("user_") || newPairPseudo.includes(".") || newPairPseudo.includes("::") || newPairPseudo.startsWith("4532-")) {
+      newPairPseudo = autoGeneratePseudonym(newPairOriginal, newPairType);
     }
   }
 
@@ -2170,12 +2215,33 @@
     }, 300);
   }
 
+  function sendSystemNotification(title, body) {
+    try {
+      if (typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission === "granted") {
+          new Notification(title, { body, icon: "/icons/32x32.png" });
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+              new Notification(title, { body, icon: "/icons/32x32.png" });
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("No se pudo emitir notificación nativa de sistema:", e);
+    }
+  }
+
   function triggerClipboardNotification(msg, count = 0, isDeobfuscate = false) {
     statusMessage = `📋 ${msg}`;
     if (count > 0) {
       showClipboardToast(msg, count, isDeobfuscate);
     }
-    const notifyType = appConfig?.gui?.clipboard?.notification_type || "toast";
+    const notifyType = appConfig?.gui?.clipboard?.notification_type || "native";
+    if (notifyType === "native" || notifyType === "toast") {
+      sendSystemNotification("LexiShield", msg);
+    }
     if (notifyType === "visual_flash") {
       clipboardFlash = true;
       setTimeout(() => { clipboardFlash = false; }, 400);
@@ -3856,7 +3922,8 @@
                   bind:value={appConfig.gui.clipboard.notification_type}
                   class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                 >
-                  <option value="toast">Mensaje emergente (Toast en barra inferior)</option>
+                  <option value="native">Notificación de sistema (Barra de tareas / reloj)</option>
+                  <option value="toast">Mensaje emergente (Toast en app)</option>
                   <option value="visual_flash">Parpadeo visual de ventana</option>
                   <option value="silent">Silencioso (Sin avisos)</option>
                 </select>
@@ -4234,13 +4301,24 @@
               id="add-pair-orig-input"
               type="text"
               bind:value={newPairOriginal}
+              on:input={handleAddPairInputOrTypeChange}
               placeholder="ej: Juan Pérez o 192.168.1.10"
               class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500 {privacyBlur ? 'privacy-blurred' : ''}"
             />
           </div>
 
           <div>
-            <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Seudónimo Protegido (o '=' para omitir):</label>
+            <div class="flex items-center justify-between mb-1">
+              <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400">Seudónimo Protegido (o '=' para omitir):</label>
+              <button
+                type="button"
+                on:click={() => { newPairPseudo = autoGeneratePseudonym(newPairOriginal, newPairType); }}
+                class="text-[11px] text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 font-semibold"
+                title="Generar nuevo seudónimo aleatorio"
+              >
+                <span>⚡ Regenerar</span>
+              </button>
+            </div>
             <input
               id="add-pair-pseudo-input"
               type="text"
@@ -4255,6 +4333,7 @@
             <select
               id="add-pair-type-select"
               bind:value={newPairType}
+              on:change={handleAddPairInputOrTypeChange}
               class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono"
             >
               <option value="GenericToken">Token Genérico</option>

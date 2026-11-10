@@ -307,6 +307,13 @@ mod tests {
 
         let pseudo = detector.generate_pseudonym("192.168.1.50");
         assert!(pseudo.parse::<Ipv4Addr>().is_ok());
+
+        // Probar coincidencia con delimitadores y escapes regex (^10\.155\.69\.21$)
+        let regex_matches = detector.find_matches(r"Regla: ^10\.155\.69\.21$ activa");
+        assert_eq!(regex_matches.len(), 1);
+        assert_eq!(regex_matches[0].2, r"10\.155\.69\.21");
+        let pseudo_escaped = detector.generate_pseudonym(regex_matches[0].2);
+        assert!(pseudo_escaped.contains(r"\."));
     }
 
     #[test]
