@@ -210,11 +210,41 @@ impl OfficeAdapter {
         }
     }
 
-    /// Desfragmenta y normaliza los elementos de texto en XML de Word (.docx).
-    /// Elimina marcas de corrección ortográfica (<w:proofErr>) y saltos de página cacheados que fracturan palabras,
-    /// y une etiquetas adyacentes <w:r><w:t> dentro del mismo párrafo (incluso con atributos w:rsidR, propiedades <w:rPr>
-    /// o saltos de línea <w:br/>) para evitar falsos negativos en fronteras de palabras y signos de puntuación terminales.
-    pub fn consolidate_word_xml_runs(xml: &str) -> String {
+    fn strip_rpr_metadata(rpr: &str) -> String {
+        static METADATA_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"<w:lang\b[^>]*/>|<w:noProof\b[^>]*/>|<w:rsidRPr\b[^>]*/>")
+                .expect("Regex metadata inválida")
+        });
+        static EMPTY_RPR_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"<w:rPr>\s*</w:rPr>").expect("Regex empty rpr inválida"));
+        static WS_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\s+").expect("Regex whitespace inválida"));
+        let without_metadata = METADATA_RE.replace_all(rpr, "");
+        let without_empty_rpr = EMPTY_RPR_RE.replace_all(&without_metadata, "");
+        WS_RE
+            .replace_all(without_empty_rpr.trim(), " ")
+            .into_owned()
+    }
+
+    fn are_rpr_compatible(rpr1: &str, rpr2: &str, t2: &str) -> bool {
+        let s1 = Self::strip_rpr_metadata(rpr1);
+        let s2 = Self::strip_rpr_metadata(rpr2);
+        if s1 == s2 {
+            return true;
+        }
+        // Si el segundo run es puntuación pura o espacios y no define estilos visuales propios,
+        // se fusiona con el run anterior para preservar la continuidad semántica del token.
+        if s2.is_empty()
+            && t2
+                .chars()
+                .all(|c| c.is_ascii_punctuation() || c.is_whitespace())
+        {
+            return true;
+        }
+        false
+    }
+
+    fn consolidate_paragraph_runs(paragraph: &str) -> String {
         static CLEANUP_RE: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(r"<w:proofErr\b[^>]*/>|<w:lastRenderedPageBreak\b[^>]*/>")
                 .expect("Regex cleanup inválida")
@@ -225,15 +255,13 @@ impl OfficeAdapter {
         });
         static ADJACENT_RUNS_RE: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
-                r"(?s)<w:r(\b[^>]*)>\s*(<w:rPr>.*?</w:rPr>)?\s*(<w:br\b[^>]*/>)?\s*<w:t(?:\b[^>]*)>([^<]*)</w:t>\s*</w:r>(?:\s*<(?:w:bookmark(?:Start|End)|w:commentRange(?:Start|End))\b[^>]*/>)*\s*<w:r(?:\b[^>]*)>\s*(?:<w:rPr>.*?</w:rPr>)?\s*<w:t(?:\b[^>]*)>([^<]*)</w:t>\s*(<w:br\b[^>]*/>)?\s*</w:r>",
+                r"(?s)<w:r(\b[^>]*)>\s*(<w:rPr>.*?</w:rPr>)?\s*(<w:br\b[^>]*/>)?\s*<w:t(?:\b[^>]*)>([^<]*)</w:t>\s*</w:r>(\s*(?:<(?:w:bookmark(?:Start|End)|w:commentRange(?:Start|End))\b[^>]*/>\s*)*)<w:r(?:\b[^>]*)>\s*(<w:rPr>.*?</w:rPr>)?\s*<w:t(?:\b[^>]*)>([^<]*)</w:t>\s*(<w:br\b[^>]*/>)?\s*</w:r>",
             )
             .expect("Regex adjacent runs inválida")
         });
 
-        // 1. Eliminar etiquetas no visuales o de corrección que cortan palabras
-        let cleaned = CLEANUP_RE.replace_all(xml, "");
+        let cleaned = CLEANUP_RE.replace_all(paragraph, "");
 
-        // 2. Unificar múltiples nodos <w:t> contiguos dentro de un mismo <w:r>
         let mut current = cleaned.into_owned();
         loop {
             let replaced =
@@ -249,17 +277,23 @@ impl OfficeAdapter {
             current = replaced.into_owned();
         }
 
-        // 3. Unificar ejecuciones <w:r> consecutivas en bucle hasta convergencia
         loop {
             let replaced = ADJACENT_RUNS_RE.replace_all(&current, |caps: &regex::Captures| {
                 let attrs = caps.get(1).map_or("", |m| m.as_str());
-                let rpr = caps.get(2).map_or("", |m| m.as_str());
+                let rpr1 = caps.get(2).map_or("", |m| m.as_str());
                 let leading_br = caps.get(3).map_or("", |m| m.as_str());
                 let t1 = &caps[4];
-                let t2 = &caps[5];
-                let trailing_br = caps.get(6).map_or("", |m| m.as_str());
+                let intermediate_tags = caps.get(5).map_or("", |m| m.as_str());
+                let rpr2 = caps.get(6).map_or("", |m| m.as_str());
+                let t2 = &caps[7];
+                let trailing_br = caps.get(8).map_or("", |m| m.as_str());
+
+                if !Self::are_rpr_compatible(rpr1, rpr2, t2) {
+                    return caps[0].to_string();
+                }
+
                 format!(
-                    r#"<w:r{attrs}>{rpr}{leading_br}<w:t xml:space="preserve">{t1}{t2}</w:t>{trailing_br}</w:r>"#
+                    r#"<w:r{attrs}>{rpr1}{leading_br}<w:t xml:space="preserve">{t1}{t2}</w:t>{trailing_br}</w:r>{intermediate_tags}"#
                 )
             });
             if replaced == current {
@@ -269,6 +303,22 @@ impl OfficeAdapter {
         }
 
         current
+    }
+
+    /// Desfragmenta y normaliza los elementos de texto en XML de Word (.docx).
+    /// Elimina marcas de corrección ortográfica (<w:proofErr>) y saltos de página cacheados que fracturan palabras,
+    /// y une etiquetas adyacentes <w:r><w:t> dentro del mismo párrafo (incluso con atributos w:rsidR, propiedades <w:rPr>
+    /// o saltos de línea <w:br/>) para evitar falsos negativos en fronteras de palabras y signos de puntuación terminales.
+    pub fn consolidate_word_xml_runs(xml: &str) -> String {
+        static PARAGRAPH_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(?s)<w:p\b[^>]*>.*?</w:p>").expect("Regex paragraph inválida")
+        });
+
+        PARAGRAPH_RE
+            .replace_all(xml, |caps: &regex::Captures| {
+                Self::consolidate_paragraph_runs(&caps[0])
+            })
+            .into_owned()
     }
 
     /// Extrae todo el texto plano de un documento Office para permitir su escaneo e identificación de entidades.
@@ -699,5 +749,120 @@ mod tests {
                 .unwrap()
                 .contains("El viaje termina en CiudadAnonima.")
         );
+    }
+
+    #[test]
+    fn test_docx_table_preservation() {
+        let adapter = OfficeAdapter::new();
+        let mut map = HashMap::new();
+        map.insert("servidor".to_string(), "host_anonimo".to_string());
+        map.insert("Directorios".to_string(), "Carpetas".to_string());
+
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                <w:p>
+                    <w:r><w:t>por el servidor.</w:t></w:r>
+                </w:p>
+                <w:tbl>
+                    <w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr>
+                    <w:tblGrid><w:gridCol w:w="9000"/></w:tblGrid>
+                    <w:tr>
+                        <w:tc>
+                            <w:tcPr><w:tcW w:w="9000" w:type="dxa"/></w:tcPr>
+                            <w:p>
+                                <w:r><w:t>Directorios</w:t></w:r>
+                            </w:p>
+                        </w:tc>
+                    </w:tr>
+                </w:tbl>
+                <w:p><w:r><w:t>Párrafo posterior.</w:t></w:r></w:p>
+            </w:body>
+        </w:document>"#;
+        let bytes = create_mock_docx(xml);
+        let (res, c, _) = adapter.process_office(&bytes, &map, false).unwrap();
+        assert_eq!(c, 2);
+
+        // Inspeccionar XML resultante
+        let cursor = Cursor::new(&res);
+        let mut archive = ZipArchive::new(cursor).unwrap();
+        let mut file = archive.by_name("word/document.xml").unwrap();
+        let mut doc_xml = String::new();
+        file.read_to_string(&mut doc_xml).unwrap();
+        println!("DOC_XML:\n{doc_xml}");
+
+        assert!(doc_xml.contains("<w:tbl>"));
+        assert!(doc_xml.contains("<w:tc>"));
+        assert!(doc_xml.contains("host_anonimo"));
+        assert!(doc_xml.contains("Carpetas"));
+    }
+
+    #[test]
+    fn test_docx_toc_bookmark_preservation() {
+        let adapter = OfficeAdapter::new();
+        let mut map = HashMap::new();
+        map.insert("IVH-001".to_string(), "VULN-999".to_string());
+
+        // Simular encabezado con bookmark de tabla de contenidos (_Toc) entre runs
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                <w:p>
+                    <w:bookmarkStart w:id="37" w:name="_Toc244678021"/>
+                    <w:r><w:t>IVH-0</w:t></w:r>
+                    <w:r><w:t>01</w:t></w:r>
+                    <w:r><w:t>. Creación no autorizada de usuarios</w:t></w:r>
+                    <w:bookmarkEnd w:id="37"/>
+                </w:p>
+            </w:body>
+        </w:document>"#;
+
+        let bytes = create_mock_docx(xml);
+        let (res, c, _) = adapter.process_office(&bytes, &map, false).unwrap();
+        assert_eq!(c, 1);
+
+        let cursor = Cursor::new(&res);
+        let mut archive = ZipArchive::new(cursor).unwrap();
+        let mut file = archive.by_name("word/document.xml").unwrap();
+        let mut doc_xml = String::new();
+        file.read_to_string(&mut doc_xml).unwrap();
+
+        // Los marcadores TOC deben permanecer 100% intactos
+        assert!(doc_xml.contains(r#"<w:bookmarkStart w:id="37" w:name="_Toc244678021"/>"#));
+        assert!(doc_xml.contains(r#"<w:bookmarkEnd w:id="37"/>"#));
+        assert!(doc_xml.contains("VULN-999. Creación no autorizada de usuarios"));
+    }
+
+    #[test]
+    fn test_docx_style_preservation_different_rpr() {
+        let adapter = OfficeAdapter::new();
+        let mut map = HashMap::new();
+        map.insert("TextoNormal".to_string(), "DatoAnonimo".to_string());
+
+        // Run 1 en negrita y Run 2 en texto normal
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                <w:p>
+                    <w:r><w:rPr><w:b/></w:rPr><w:t>Negrita</w:t></w:r>
+                    <w:r><w:t>TextoNormal</w:t></w:r>
+                </w:p>
+            </w:body>
+        </w:document>"#;
+
+        let bytes = create_mock_docx(xml);
+        let (res, c, _) = adapter.process_office(&bytes, &map, false).unwrap();
+        assert_eq!(c, 1);
+
+        let cursor = Cursor::new(&res);
+        let mut archive = ZipArchive::new(cursor).unwrap();
+        let mut file = archive.by_name("word/document.xml").unwrap();
+        let mut doc_xml = String::new();
+        file.read_to_string(&mut doc_xml).unwrap();
+
+        // Los runs con diferente rPr no deben fusionarse
+        assert!(doc_xml.contains("<w:b/>"));
+        assert!(doc_xml.contains("<w:t>Negrita</w:t>"));
+        assert!(doc_xml.contains("DatoAnonimo"));
     }
 }

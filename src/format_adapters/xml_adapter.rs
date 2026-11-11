@@ -70,8 +70,9 @@ impl XmlAdapter {
                         strict_word_boundaries,
                     );
                     total_replacements += count;
+                    let escaped = quick_xml::escape::escape(&replaced_text);
                     writer
-                        .write_event(Event::Text(BytesText::new(&replaced_text)))
+                        .write_event(Event::Text(BytesText::new(&escaped)))
                         .map_err(|e| ObfuscationError::XmlError(e.to_string()))?;
                 }
                 Ok(Event::CData(c)) => {
@@ -105,5 +106,26 @@ impl XmlAdapter {
             .map_err(|e| ObfuscationError::XmlError(e.to_string()))?;
 
         Ok((result_str, total_replacements))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_xml_escaping_ampersand_and_special_chars() {
+        let adapter = XmlAdapter::new();
+        let mut map = HashMap::new();
+        map.insert("Empresa".to_string(), "Compania & Co".to_string());
+
+        let input_xml = "<root><item>Empresa &amp; Asociados</item></root>";
+        let (output_xml, count) = adapter.process_xml(input_xml, &map, false).unwrap();
+
+        assert_eq!(count, 1);
+        // Debe re-escapar el & generado en el reemplazo y el &amp; original
+        assert!(output_xml.contains("&amp;"));
+        assert!(!output_xml.contains(" & "));
+        assert!(XmlAdapter::is_valid_xml(&output_xml));
     }
 }
