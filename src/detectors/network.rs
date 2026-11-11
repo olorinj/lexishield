@@ -31,6 +31,11 @@ static HOSTNAME_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         .expect("Regex Hostname inválida")
 });
 
+static RIMA_PTR_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^([0-9]{1,3})\.red-([0-9]{1,3})-([0-9]{1,3})-([0-9]{1,3})\.((?:[a-z0-9-]+\.)*rima-tde\.net)$")
+        .expect("Regex RIMA PTR inválida")
+});
+
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
@@ -242,8 +247,46 @@ impl DomainDetector {
             .collect()
     }
 
-    /// Genera un dominio RFC 2606 seguro (.example.com), preservando el sufijo .service-*.example.com si ya está presente.
-    pub fn generate_pseudonym(&self, original: &str) -> String {
+    /// Extrae la IP subyacente y el sufijo de dominio de un registro PTR de RIMA si coincide con el patrón.
+    pub fn extract_rima_ptr_ip(hostname: &str) -> Option<(String, String)> {
+        let caps = RIMA_PTR_REGEX.captures(hostname)?;
+        let d: u8 = caps.get(1)?.as_str().parse().ok()?;
+        let a: u8 = caps.get(2)?.as_str().parse().ok()?;
+        let b: u8 = caps.get(3)?.as_str().parse().ok()?;
+        let c: u8 = caps.get(4)?.as_str().parse().ok()?;
+        let suffix = caps.get(5)?.as_str().to_string();
+        Some((format!("{a}.{b}.{c}.{d}"), suffix))
+    }
+
+    /// Reconstruye el hostname PTR de RIMA a partir de una dirección IPv4 protegida y el sufijo de dominio.
+    pub fn reconstruct_rima_ptr(pseudo_ip: &str, suffix: &str) -> Option<String> {
+        let clean = pseudo_ip.replace('\\', "");
+        let ip: Ipv4Addr = clean.parse().ok()?;
+        let octets = ip.octets();
+        Some(format!(
+            "{}.red-{}-{}-{}.{suffix}",
+            octets[3], octets[0], octets[1], octets[2]
+        ))
+    }
+
+    /// Genera un seudónimo de dominio con soporte de coherencia IPv4 para registros PTR de RIMA.
+    pub fn generate_pseudonym_with_ipv4(
+        &self,
+        original: &str,
+        ipv4_detector: Option<&IPv4Detector>,
+    ) -> String {
+        if let Some((ip, suffix)) = Self::extract_rima_ptr_ip(original) {
+            let pseudo_ip = if let Some(det) = ipv4_detector {
+                det.generate_pseudonym(&ip)
+            } else {
+                let det = IPv4Detector::new();
+                det.generate_pseudonym(&ip)
+            };
+            if let Some(ptr) = Self::reconstruct_rima_ptr(&pseudo_ip, &suffix) {
+                return ptr;
+            }
+        }
+
         let orig_lower = original.to_lowercase();
         // Si el dominio ya termina en .service-[a-f0-9]+.example.com, anonimizar los prefijos y preservar el sufijo
         if let Some(pos) = orig_lower.find(".service-") {
@@ -258,6 +301,11 @@ impl DomainDetector {
         let mut rng = rand::thread_rng();
         let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
         format!("service-{id:08x}.example.com")
+    }
+
+    /// Genera un dominio RFC 2606 seguro (.example.com), preservando el sufijo .service-*.example.com si ya está presente.
+    pub fn generate_pseudonym(&self, original: &str) -> String {
+        self.generate_pseudonym_with_ipv4(original, None)
     }
 }
 
@@ -369,5 +417,31 @@ Servidor legítimo en 192.168.1.55 con gateway 10.0.0.1.
         assert_eq!(matches.len(), 2);
         let pseudo = detector.generate_pseudonym("srv-prod01");
         assert!(pseudo.starts_with("srv-anon-"));
+    }
+
+    #[test]
+    fn test_rima_ptr_hostname_coherence() {
+        let (extracted_ip, suffix) =
+            DomainDetector::extract_rima_ptr_ip("245.red-83-48-73.staticip.rima-tde.net")
+                .expect("Debería extraer IP de registro PTR de RIMA");
+        assert_eq!(extracted_ip, "83.48.73.245");
+        assert_eq!(suffix, "staticip.rima-tde.net");
+
+        let ipv4_det = IPv4Detector::new();
+        let domain_det = DomainDetector::new();
+
+        let pseudo_ip = ipv4_det.generate_pseudonym(&extracted_ip);
+        let pseudo_ptr = domain_det.generate_pseudonym_with_ipv4(
+            "245.red-83-48-73.staticip.rima-tde.net",
+            Some(&ipv4_det),
+        );
+
+        let ip_parts: Vec<&str> = pseudo_ip.split('.').collect();
+        assert_eq!(ip_parts.len(), 4);
+        let expected_ptr = format!(
+            "{}.red-{}-{}-{}.staticip.rima-tde.net",
+            ip_parts[3], ip_parts[0], ip_parts[1], ip_parts[2]
+        );
+        assert_eq!(pseudo_ptr, expected_ptr);
     }
 }

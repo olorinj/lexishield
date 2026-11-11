@@ -380,3 +380,42 @@ strategy = "mask"
 
     let _ = std::fs::remove_dir_all(&temp_dir);
 }
+
+#[test]
+fn test_rima_staticip_ptr_end_to_end() {
+    let config = LexiConfig::default();
+    let mut engine = ObfuscatorEngine::new(config);
+
+    let sample_text = "Conexión sospechosa desde 245.red-83-48-73.staticip.rima-tde.net [83.48.73.245] en puerto 443.";
+    let mappings = engine.scan_and_register_mappings(sample_text).unwrap();
+
+    let ip_m = mappings
+        .iter()
+        .find(|m| m.original == "83.48.73.245")
+        .expect("Debe detectar IPv4");
+    let ptr_m = mappings
+        .iter()
+        .find(|m| m.original == "245.red-83-48-73.staticip.rima-tde.net")
+        .expect("Debe detectar PTR");
+
+    let ip_octets: Vec<&str> = ip_m.pseudonym.split('.').collect();
+    assert_eq!(ip_octets.len(), 4);
+    let expected_ptr_pseudo = format!(
+        "{}.red-{}-{}-{}.staticip.rima-tde.net",
+        ip_octets[3], ip_octets[0], ip_octets[1], ip_octets[2]
+    );
+    assert_eq!(ptr_m.pseudonym, expected_ptr_pseudo);
+
+    let (obfuscated, _) = engine
+        .obfuscate_text(sample_text, FormatType::Plaintext)
+        .unwrap();
+    assert!(!obfuscated.contains("83.48.73.245"));
+    assert!(!obfuscated.contains("245.red-83-48-73"));
+    assert!(obfuscated.contains(&format!("{expected_ptr_pseudo} [{}]", ip_m.pseudonym)));
+
+    // Desofuscación biyectiva
+    let (restored, _) = engine
+        .deobfuscate_text(&obfuscated, FormatType::Plaintext)
+        .unwrap();
+    assert_eq!(restored, sample_text);
+}

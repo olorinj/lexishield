@@ -111,6 +111,19 @@ impl ObfuscatorEngine {
                 m.omitted = existing.omitted;
                 continue;
             }
+            if m.detector_type == crate::models::DetectorType::DomainFqdn
+                && let Some((orig_ip, suffix)) =
+                    crate::detectors::network::DomainDetector::extract_rima_ptr_ip(&m.original)
+                && let Some(existing_ip) = self.manager.get_mapping(&orig_ip)
+                && let Some(reconstructed) =
+                    crate::detectors::network::DomainDetector::reconstruct_rima_ptr(
+                        &existing_ip.pseudonym,
+                        &suffix,
+                    )
+            {
+                m.pseudonym = reconstructed;
+                continue;
+            }
             let mut attempts = 0;
             while self.manager.has_pseudonym(&m.pseudonym) && attempts < 1000 {
                 m.pseudonym = self

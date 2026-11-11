@@ -155,7 +155,9 @@ impl DetectorRegistry {
             DetectorType::IPv4 => self.ipv4.generate_pseudonym(original),
             DetectorType::IPv6 => self.ipv6.generate_pseudonym(original),
             DetectorType::Email => self.email.generate_pseudonym(original),
-            DetectorType::DomainFqdn => self.domain.generate_pseudonym(original),
+            DetectorType::DomainFqdn => self
+                .domain
+                .generate_pseudonym_with_ipv4(original, Some(&self.ipv4)),
             DetectorType::Hostname => self.hostname.generate_pseudonym(original),
             DetectorType::SpanishDniNie => self.dni_nie.generate_pseudonym(original),
             DetectorType::CreditCard => self.credit_card.generate_pseudonym(original),
