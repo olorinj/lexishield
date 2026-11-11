@@ -120,6 +120,9 @@ generate_valid_checksums = true
 default_vault = "default.lexi"
 
 [ignore]
+# Ignorar máscaras de red IPv4 estándar (255.255.255.0, 255.0.0.0, etc.) y default route (0.0.0.0)
+ignore_netmasks = true
+
 # Directorios ignorados automáticamente durante el escaneo recursivo
 ignored_directories = [
     ".git",
@@ -298,6 +301,8 @@ impl Default for VaultConfig {
 /// Configuración de exclusiones e ignorados durante escaneos.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IgnoreConfig {
+    #[serde(default = "default_true")]
+    pub ignore_netmasks: bool,
     #[serde(default = "default_ignored_directories")]
     pub ignored_directories: Vec<String>,
     #[serde(default = "default_ignored_extensions")]
@@ -378,6 +383,7 @@ fn default_ignored_domains() -> Vec<String> {
 impl Default for IgnoreConfig {
     fn default() -> Self {
         Self {
+            ignore_netmasks: true,
             ignored_directories: default_ignored_directories(),
             ignored_extensions: default_ignored_extensions(),
             ignored_domains: default_ignored_domains(),
@@ -752,6 +758,45 @@ pub fn load_ignored_domains_from_file(path: &Path) -> Vec<String> {
     domains
 }
 
+/// Guarda la lista de URLs y dominios ignorados en el archivo del usuario (~/.lexishield/ignored_domains.txt).
+pub fn save_ignored_domains_to_file(domains: &[String]) -> Result<(), ObfuscationError> {
+    let path = get_user_ignored_domains_path()?;
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let mut content = String::from(
+        "# ==============================================================================\n\
+         # URLs y Dominios Excluidos de Protección (~/.lexishield/ignored_domains.txt)\n\
+         # ==============================================================================\n\
+         # Los dominios o URLs listados a continuación no serán ofuscados por LexiShield.\n\
+         # Añade un dominio o URL por línea. Las líneas que empiezan por '#' son comentarios.\n\
+         # ==============================================================================\n\n",
+    );
+
+    let mut sorted_domains = Vec::new();
+    for d in domains {
+        if let Some(norm) = normalize_domain_or_url(d)
+            && !sorted_domains.contains(&norm)
+        {
+            sorted_domains.push(norm);
+        }
+    }
+    sorted_domains.sort();
+
+    for d in sorted_domains {
+        content.push_str(&d);
+        content.push('\n');
+    }
+
+    fs::write(&path, content).map_err(ObfuscationError::IoError)?;
+    log::info!(
+        "Lista de URLs/dominios excluidos guardada correctamente en {}",
+        path.display()
+    );
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RulesContainer {
     #[serde(default, alias = "rules")]
@@ -1022,14 +1067,14 @@ mod tests {
     fn test_load_ignored_domains_from_file() {
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join("test_ignored_domains_load.txt");
-        let content = r#"
+        let content = r"
 # Lista de dominios
 thehackernews.com
 www.first.org
 https://httpd.apache.org/download
 # Otro comentario
 www.incibe.es
-"#;
+";
         std::fs::write(&file_path, content).unwrap();
         let domains = load_ignored_domains_from_file(&file_path);
         let _ = std::fs::remove_file(&file_path);

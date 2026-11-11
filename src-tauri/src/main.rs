@@ -1172,6 +1172,26 @@ fn save_app_settings(config: lexishield::config::LexiConfig) -> Result<(), Strin
 }
 
 #[tauri::command]
+fn get_ignored_domains() -> Result<Vec<String>, String> {
+    let config = load_config_with_rules(None, None);
+    Ok(config.ignore.ignored_domains)
+}
+
+#[tauri::command]
+fn save_ignored_domains(domains: Vec<String>) -> Result<(), String> {
+    // 1. Guardar en ~/.lexishield/ignored_domains.txt
+    lexishield::config::save_ignored_domains_to_file(&domains).map_err(|e| e.to_string())?;
+
+    // 2. Sincronizar y persistir en ~/.lexishield/config.toml
+    let mut config = load_config_with_rules(None, None);
+    config.ignore.ignored_domains = domains;
+    lexishield::config::save_user_config(&config).map_err(|e| e.to_string())?;
+
+    log::info!("Configuración: URLs y dominios ignorados sincronizados en ignored_domains.txt y config.toml");
+    Ok(())
+}
+
+#[tauri::command]
 fn get_debug_mode() -> bool {
     is_debug_mode()
 }
@@ -1342,6 +1362,8 @@ fn main() {
             clear_system_clipboard,
             get_app_settings,
             save_app_settings,
+            get_ignored_domains,
+            save_ignored_domains,
             process_file_command,
             reset_config_command,
             get_debug_mode,

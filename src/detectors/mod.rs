@@ -66,6 +66,14 @@ impl DetectorRegistry {
         custom_rules: &[CustomRule],
         ignored_domains: &[String],
     ) -> Self {
+        Self::with_options(custom_rules, ignored_domains, true)
+    }
+
+    pub fn with_options(
+        custom_rules: &[CustomRule],
+        ignored_domains: &[String],
+        ignore_netmasks: bool,
+    ) -> Self {
         let mut compiled = Vec::new();
         for r in custom_rules {
             match CompiledCustomRule::try_from_rule(r) {
@@ -100,7 +108,7 @@ impl DetectorRegistry {
             sid: WindowsSidDetector::new(),
             logon_id: WindowsLogonIdDetector::new(),
             hex_id: WindowsHexIdDetector::new(),
-            ipv4: IPv4Detector::new(),
+            ipv4: IPv4Detector::with_ignore_netmasks(ignore_netmasks),
             ipv6: IPv6Detector::new(),
             email: EmailDetector::new(),
             domain: DomainDetector::new(),

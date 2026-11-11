@@ -284,6 +284,12 @@
   let backupPassword = "";
   let backupStatus = "";
 
+  // Estado del Modal de URLs y Dominios Excluidos
+  let showIgnoredDomainsModal = false;
+  let ignoredDomainsList = [];
+  let newIgnoredDomainInput = "";
+  let ignoredDomainSearch = "";
+
   // Estado del Desbloqueo e Inicialización de Bóveda
   let showUnlockModal = false;
   let unlockPassword = "";
@@ -879,6 +885,21 @@
           cfg.gui.show_token_badges = true;
         }
         showTokenBadges = cfg.gui.show_token_badges;
+        if (cfg.ignore) {
+          if (cfg.ignore.ignore_netmasks === undefined) {
+            cfg.ignore.ignore_netmasks = true;
+          }
+          if (!Array.isArray(cfg.ignore.ignored_domains)) {
+            cfg.ignore.ignored_domains = [];
+          }
+        } else {
+          cfg.ignore = {
+            ignore_netmasks: true,
+            ignored_directories: [],
+            ignored_extensions: [],
+            ignored_domains: [],
+          };
+        }
         appConfig = cfg;
         if (cfg.general && cfg.general.language) {
           $locale = cfg.general.language;
@@ -916,6 +937,77 @@
     } catch (e) {
       statusMessage = "❌ Error al guardar configuración: " + e;
     }
+  }
+
+  // Gestión de URLs y Dominios Excluidos
+  async function openIgnoredDomainsModal() {
+    try {
+      const domains = await invokeTauri("get_ignored_domains");
+      ignoredDomainsList = Array.isArray(domains) ? [...domains] : [];
+    } catch (e) {
+      console.warn("Error cargando dominios ignorados:", e);
+      if (appConfig?.ignore?.ignored_domains) {
+        ignoredDomainsList = [...appConfig.ignore.ignored_domains];
+      }
+    }
+    newIgnoredDomainInput = "";
+    ignoredDomainSearch = "";
+    showIgnoredDomainsModal = true;
+  }
+
+  function addIgnoredDomain() {
+    const raw = newIgnoredDomainInput.trim();
+    if (!raw) return;
+    const parts = raw.split(/[\s,;]+/);
+    let addedCount = 0;
+    for (let p of parts) {
+      let clean = p.trim().toLowerCase();
+      clean = clean.replace(/^[a-z]+:\/\//i, '');
+      clean = clean.split(/[\/?#:]/)[0];
+      clean = clean.replace(/\.$/, '');
+      if (clean && clean.includes('.') && !ignoredDomainsList.includes(clean)) {
+        ignoredDomainsList = [...ignoredDomainsList, clean];
+        addedCount++;
+      }
+    }
+    newIgnoredDomainInput = "";
+    if (addedCount > 0) {
+      statusMessage = `Dominio(s) añadido(s). Pulsa 'Guardar Cambios' para persistir.`;
+    }
+  }
+
+  function removeIgnoredDomain(domain) {
+    ignoredDomainsList = ignoredDomainsList.filter(d => d !== domain);
+  }
+
+  async function saveIgnoredDomains() {
+    try {
+      await invokeTauri("save_ignored_domains", { domains: ignoredDomainsList });
+      if (appConfig && appConfig.ignore) {
+        appConfig.ignore.ignored_domains = [...ignoredDomainsList];
+      }
+      showIgnoredDomainsModal = false;
+      statusMessage = `✅ Lista de URLs y dominios excluidos guardada (${ignoredDomainsList.length} dominios).`;
+    } catch (e) {
+      statusMessage = `❌ Error al guardar lista de dominios: ` + e;
+    }
+  }
+
+  function resetToDefaultIgnoredDomains() {
+    ignoredDomainsList = [
+      "thehackernews.com",
+      "first.org",
+      "apache.org",
+      "incibe.es",
+      "wazuh.com",
+      "github.com",
+      "owasp.org",
+      "nist.gov",
+      "rfc-editor.org",
+      "cve.org",
+      "mitre.org",
+    ];
+    statusMessage = "Lista de exclusiones restablecida a dominios de ciberseguridad recomendados. Pulsa Guardar.";
   }
 
   // Carga de Bóveda Inicial y Desbloqueo
@@ -3828,6 +3920,44 @@
                   <option value="botones">Solo Botones de Selección</option>
                 </select>
               </div>
+
+              <!-- Exclusión de máscaras de red IPv4 -->
+              {#if appConfig.ignore}
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5 text-xs space-y-1.5">
+                  <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      bind:checked={appConfig.ignore.ignore_netmasks}
+                      on:change={saveSettings}
+                      class="rounded accent-primary-500"
+                    />
+                    <span>Excluir máscaras de red IPv4 (255.255.255.0, 255.0.0.0, etc.)</span>
+                  </label>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400 pl-6">
+                    Evita que las máscaras de subred estándar (/8../32) y rutas por defecto (0.0.0.0) se confundan u ofusquen como IPs de host.
+                  </p>
+                </div>
+
+                <!-- Gestión de URLs y Dominios Excluidos -->
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="block text-xs font-medium text-slate-600 dark:text-slate-400">URLs y Dominios Excluidos:</span>
+                      <span class="text-[11px] text-slate-500 dark:text-slate-400">
+                        {appConfig.ignore?.ignored_domains?.length || 0} dominios y URLs exentas de protección
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      on:click={openIgnoredDomainsModal}
+                      class="px-2.5 py-1.5 rounded-lg bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 border border-primary-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
+                    >
+                      <span>🌐</span>
+                      <span>Gestionar Exclusiones</span>
+                    </button>
+                  </div>
+                </div>
+              {/if}
             </div>
 
             <!-- BLOQUE 2: VENTANA Y COMPORTAMIENTO DEL SISTEMA -->
@@ -5090,6 +5220,113 @@
               Proteger {studioDropModal.isDir ? 'Carpeta' : 'Archivo'}
             {/if}
           </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- MODAL GESTIÓN DE URLs Y DOMINIOS EXCLUIDOS -->
+  {#if showIgnoredDomainsModal}
+    <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-xl w-full shadow-2xl flex flex-col max-h-[85vh] space-y-4">
+        <!-- Encabezado -->
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="text-xl">🌐</span>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">URLs y Dominios Excluidos de Protección</h3>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                Estos sitios y FQDNs no se modificarán nunca durante la ofuscación. Se guardan en <code>~/.lexishield/ignored_domains.txt</code>.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            on:click={() => (showIgnoredDomainsModal = false)}
+            class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm px-2 py-1 rounded"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Entrada para añadir nuevo dominio -->
+        <form on:submit|preventDefault={addIgnoredDomain} class="flex gap-2">
+          <input
+            type="text"
+            bind:value={newIgnoredDomainInput}
+            placeholder="Añadir dominio o URL (ej. api.github.com, www.owasp.org)..."
+            class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500"
+          />
+          <button
+            type="submit"
+            class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shrink-0 flex items-center gap-1"
+          >
+            <span>+</span> Añadir
+          </button>
+        </form>
+
+        <!-- Filtro de búsqueda y contador -->
+        <div class="flex items-center justify-between gap-3 text-xs">
+          <div class="relative flex-1">
+            <input
+              type="text"
+              bind:value={ignoredDomainSearch}
+              placeholder="Buscar en la lista..."
+              class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-slate-900 dark:text-white"
+            />
+          </div>
+          <button
+            type="button"
+            on:click={resetToDefaultIgnoredDomains}
+            class="text-[11px] text-slate-500 hover:text-primary-400 transition underline shrink-0"
+            title="Restablecer a la lista de estándares y ciberseguridad recomendada"
+          >
+            Restablecer estándar
+          </button>
+        </div>
+
+        <!-- Lista scrollable de dominios -->
+        <div class="flex-1 overflow-y-auto space-y-1.5 pr-1 min-h-[160px] max-h-[300px]">
+          {#each ignoredDomainsList.filter(d => !ignoredDomainSearch || d.toLowerCase().includes(ignoredDomainSearch.toLowerCase())) as domain (domain)}
+            <div class="flex items-center justify-between px-3 py-1.5 bg-slate-50 dark:bg-slate-950/60 rounded-lg border border-slate-200/60 dark:border-white/5 text-xs">
+              <span class="font-mono text-slate-800 dark:text-slate-200 select-text">{domain}</span>
+              <button
+                type="button"
+                on:click={() => removeIgnoredDomain(domain)}
+                class="text-red-400 hover:text-red-500 dark:hover:text-red-300 text-xs px-1.5 py-0.5 rounded hover:bg-red-500/10 transition"
+                title="Eliminar de la lista de exclusiones"
+              >
+                ✕
+              </button>
+            </div>
+          {:else}
+            <div class="text-center py-8 text-xs text-slate-400">
+              {ignoredDomainSearch ? 'No se encontraron dominios coincidentes.' : 'No hay dominios excluidos. Añade uno arriba.'}
+            </div>
+          {/each}
+        </div>
+
+        <!-- Pie y botones de confirmación -->
+        <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-white/10">
+          <span class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+            {ignoredDomainsList.length} dominios activos
+          </span>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              on:click={() => (showIgnoredDomainsModal = false)}
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              on:click={saveIgnoredDomains}
+              class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-md shadow-primary-500/20"
+            >
+              Guardar Cambios
+            </button>
+          </div>
         </div>
       </div>
     </div>

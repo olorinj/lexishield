@@ -39,10 +39,34 @@ static RIMA_PTR_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Default)]
+/// Comprueba si una dirección IPv4 corresponde a una máscara de subred contigua (/8../32) o a la ruta por defecto (0.0.0.0).
+#[must_use]
+pub fn is_ipv4_netmask(ip: Ipv4Addr) -> bool {
+    let raw = u32::from(ip);
+    let k = raw.leading_ones();
+    if k == 0 {
+        raw == 0
+    } else if (8..=32).contains(&k) {
+        if k == 32 {
+            raw == u32::MAX
+        } else {
+            raw == (!0u32) << (32 - k)
+        }
+    } else {
+        false
+    }
+}
+
 pub struct IPv4Detector {
     subnet_map: RefCell<HashMap<String, String>>,
     used_subnets: RefCell<HashSet<String>>,
+    pub ignore_netmasks: bool,
+}
+
+impl Default for IPv4Detector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IPv4Detector {
@@ -50,6 +74,15 @@ impl IPv4Detector {
         Self {
             subnet_map: RefCell::new(HashMap::new()),
             used_subnets: RefCell::new(HashSet::new()),
+            ignore_netmasks: true,
+        }
+    }
+
+    pub fn with_ignore_netmasks(ignore_netmasks: bool) -> Self {
+        Self {
+            subnet_map: RefCell::new(HashMap::new()),
+            used_subnets: RefCell::new(HashSet::new()),
+            ignore_netmasks,
         }
     }
 
@@ -86,7 +119,10 @@ impl IPv4Detector {
                 }
 
                 let clean_str = m.as_str().replace('\\', "");
-                if clean_str.parse::<Ipv4Addr>().is_ok() {
+                if let Ok(ip) = clean_str.parse::<Ipv4Addr>() {
+                    if self.ignore_netmasks && is_ipv4_netmask(ip) {
+                        return None;
+                    }
                     Some((m.start(), m.end(), m.as_str()))
                 } else {
                     None
@@ -443,5 +479,72 @@ Servidor legítimo en 192.168.1.55 con gateway 10.0.0.1.
             ip_parts[3], ip_parts[0], ip_parts[1], ip_parts[2]
         );
         assert_eq!(pseudo_ptr, expected_ptr);
+    }
+
+    #[test]
+    fn test_is_ipv4_netmask() {
+        use std::str::FromStr;
+
+        // Máscaras estándar contiguas
+        assert!(is_ipv4_netmask(Ipv4Addr::from_str("0.0.0.0").unwrap()));
+        assert!(is_ipv4_netmask(Ipv4Addr::from_str("255.0.0.0").unwrap()));
+        assert!(is_ipv4_netmask(Ipv4Addr::from_str("255.128.0.0").unwrap()));
+        assert!(is_ipv4_netmask(Ipv4Addr::from_str("255.255.0.0").unwrap()));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.0").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.128").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.192").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.224").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.240").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.248").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.252").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.254").unwrap()
+        ));
+        assert!(is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.255").unwrap()
+        ));
+
+        // IPs normales de host (NO deben considerarse máscaras de red)
+        assert!(!is_ipv4_netmask(Ipv4Addr::from_str("192.168.1.1").unwrap()));
+        assert!(!is_ipv4_netmask(Ipv4Addr::from_str("10.0.0.1").unwrap()));
+        assert!(!is_ipv4_netmask(Ipv4Addr::from_str("172.16.5.4").unwrap()));
+        assert!(!is_ipv4_netmask(Ipv4Addr::from_str("8.8.8.8").unwrap()));
+        assert!(!is_ipv4_netmask(
+            Ipv4Addr::from_str("255.255.255.1").unwrap()
+        ));
+        assert!(!is_ipv4_netmask(Ipv4Addr::from_str("128.0.0.1").unwrap()));
+    }
+
+    #[test]
+    fn test_ipv4_detector_ignores_netmasks() {
+        let detector_ignoring = IPv4Detector::with_ignore_netmasks(true);
+        let sample = "IP: 192.168.1.50 Mask: 255.255.255.0 GW: 192.168.1.1 Default: 0.0.0.0";
+        let matches = detector_ignoring.find_matches(sample);
+
+        let matched_ips: Vec<&str> = matches.iter().map(|m| m.2).collect();
+        assert_eq!(matched_ips, vec!["192.168.1.50", "192.168.1.1"]);
+
+        // Con ignore_netmasks desactivado, sí debe detectar 255.255.255.0 y 0.0.0.0
+        let detector_all = IPv4Detector::with_ignore_netmasks(false);
+        let matches_all = detector_all.find_matches(sample);
+        let matched_all_ips: Vec<&str> = matches_all.iter().map(|m| m.2).collect();
+        assert_eq!(
+            matched_all_ips,
+            vec!["192.168.1.50", "255.255.255.0", "192.168.1.1", "0.0.0.0"]
+        );
     }
 }

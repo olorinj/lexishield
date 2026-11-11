@@ -419,3 +419,41 @@ fn test_rima_staticip_ptr_end_to_end() {
         .unwrap();
     assert_eq!(restored, sample_text);
 }
+
+#[test]
+fn test_ipv4_netmask_obviation_end_to_end() {
+    let config = LexiConfig::default();
+    assert!(config.ignore.ignore_netmasks);
+    let mut engine = ObfuscatorEngine::new(config);
+
+    let sample_text = "Configuración eth0: inet 192.168.1.50 netmask 255.255.255.0 gw 192.168.1.1 default 0.0.0.0";
+    let mappings = engine.scan_and_register_mappings(sample_text).unwrap();
+
+    // 255.255.255.0 y 0.0.0.0 deben haber sido obviadas por completo
+    assert!(!mappings.iter().any(|m| m.original == "255.255.255.0"));
+    assert!(!mappings.iter().any(|m| m.original == "0.0.0.0"));
+
+    // IPs normales de host sí deben ser detectadas y mapeadas
+    assert!(mappings.iter().any(|m| m.original == "192.168.1.50"));
+    assert!(mappings.iter().any(|m| m.original == "192.168.1.1"));
+
+    let (obfuscated, _) = engine
+        .obfuscate_text(sample_text, FormatType::Plaintext)
+        .unwrap();
+
+    // Las máscaras de red deben permanecer intactas en el texto resultante
+    assert!(obfuscated.contains("netmask 255.255.255.0"));
+    assert!(obfuscated.contains("default 0.0.0.0"));
+
+    // Las IPs de host sí deben estar ofuscadas
+    assert!(!obfuscated.contains("192.168.1.50"));
+    assert!(!obfuscated.contains("192.168.1.1"));
+
+    // Comprobamos con ignore_netmasks desactivado
+    let mut custom_cfg = LexiConfig::default();
+    custom_cfg.ignore.ignore_netmasks = false;
+    let mut engine_all = ObfuscatorEngine::new(custom_cfg);
+    let mappings_all = engine_all.scan_and_register_mappings(sample_text).unwrap();
+    assert!(mappings_all.iter().any(|m| m.original == "255.255.255.0"));
+    assert!(mappings_all.iter().any(|m| m.original == "0.0.0.0"));
+}
