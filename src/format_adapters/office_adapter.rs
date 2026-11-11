@@ -211,28 +211,55 @@ impl OfficeAdapter {
     }
 
     /// Desfragmenta y normaliza los elementos de texto en XML de Word (.docx).
-    /// Elimina marcas de corrección ortográfica (<w:proofErr>) que fracturan palabras
-    /// y une etiquetas adyacentes <w:r><w:t> dentro del mismo párrafo para evitar falsos negativos en fronteras de palabras.
+    /// Elimina marcas de corrección ortográfica (<w:proofErr>) y saltos de página cacheados que fracturan palabras,
+    /// y une etiquetas adyacentes <w:r><w:t> dentro del mismo párrafo (incluso con atributos w:rsidR, propiedades <w:rPr>
+    /// o saltos de línea <w:br/>) para evitar falsos negativos en fronteras de palabras y signos de puntuación terminales.
     pub fn consolidate_word_xml_runs(xml: &str) -> String {
-        static PROOF_ERR_RE: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"<w:proofErr\b[^>]*/>").expect("Regex proofErr inválida"));
+        static CLEANUP_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"<w:proofErr\b[^>]*/>|<w:lastRenderedPageBreak\b[^>]*/>")
+                .expect("Regex cleanup inválida")
+        });
+        static ADJACENT_TEXT_NODES_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(?s)<w:t(?:\b[^>]*)>([^<]*)</w:t>\s*<w:t(?:\b[^>]*)>([^<]*)</w:t>")
+                .expect("Regex adjacent text nodes inválida")
+        });
         static ADJACENT_RUNS_RE: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
-                r#"(?s)<w:r>\s*<w:t(?:\s+xml:space="preserve")?>([^<]*)</w:t>\s*</w:r>\s*<w:r>\s*<w:t(?:\s+xml:space="preserve")?>([^<]*)</w:t>\s*</w:r>"#,
+                r"(?s)<w:r(\b[^>]*)>\s*(<w:rPr>.*?</w:rPr>)?\s*(<w:br\b[^>]*/>)?\s*<w:t(?:\b[^>]*)>([^<]*)</w:t>\s*</w:r>(?:\s*<(?:w:bookmark(?:Start|End)|w:commentRange(?:Start|End))\b[^>]*/>)*\s*<w:r(?:\b[^>]*)>\s*(?:<w:rPr>.*?</w:rPr>)?\s*<w:t(?:\b[^>]*)>([^<]*)</w:t>\s*(<w:br\b[^>]*/>)?\s*</w:r>",
             )
             .expect("Regex adjacent runs inválida")
         });
 
-        // 1. Eliminar etiquetas proofErr que cortan palabras
-        let without_proof = PROOF_ERR_RE.replace_all(xml, "");
+        // 1. Eliminar etiquetas no visuales o de corrección que cortan palabras
+        let cleaned = CLEANUP_RE.replace_all(xml, "");
 
-        // 2. Unificar ejecuciones consecutivas simples en bucle hasta convergencia
-        let mut current = without_proof.into_owned();
+        // 2. Unificar múltiples nodos <w:t> contiguos dentro de un mismo <w:r>
+        let mut current = cleaned.into_owned();
+        loop {
+            let replaced =
+                ADJACENT_TEXT_NODES_RE.replace_all(&current, |caps: &regex::Captures| {
+                    format!(
+                        r#"<w:t xml:space="preserve">{}{}</w:t>"#,
+                        &caps[1], &caps[2]
+                    )
+                });
+            if replaced == current {
+                break;
+            }
+            current = replaced.into_owned();
+        }
+
+        // 3. Unificar ejecuciones <w:r> consecutivas en bucle hasta convergencia
         loop {
             let replaced = ADJACENT_RUNS_RE.replace_all(&current, |caps: &regex::Captures| {
+                let attrs = caps.get(1).map_or("", |m| m.as_str());
+                let rpr = caps.get(2).map_or("", |m| m.as_str());
+                let leading_br = caps.get(3).map_or("", |m| m.as_str());
+                let t1 = &caps[4];
+                let t2 = &caps[5];
+                let trailing_br = caps.get(6).map_or("", |m| m.as_str());
                 format!(
-                    r#"<w:r><w:t xml:space="preserve">{}{}</w:t></w:r>"#,
-                    &caps[1], &caps[2]
+                    r#"<w:r{attrs}>{rpr}{leading_br}<w:t xml:space="preserve">{t1}{t2}</w:t>{trailing_br}</w:r>"#
                 )
             });
             if replaced == current {
@@ -567,5 +594,110 @@ mod tests {
         assert_eq!(count, 1);
         let extracted_obf = adapter.extract_text(&obfuscated_bytes).unwrap();
         assert!(extracted_obf.contains(".... kjdhdakjdka."));
+    }
+
+    #[test]
+    fn test_docx_end_of_line_period_variations() {
+        let adapter = OfficeAdapter::new();
+        let mut map = HashMap::new();
+        map.insert("Madrid".to_string(), "CiudadAnonima".to_string());
+
+        // Variación 1: En una frase normal
+        let xml1 = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body><w:p><w:r><w:t>En Madrid hace sol.</w:t></w:r></w:p></w:body>
+        </w:document>"#;
+        let bytes1 = create_mock_docx(xml1);
+        let (res1, c1, _) = adapter.process_office(&bytes1, &map, true).unwrap();
+        assert_eq!(c1, 1, "Fallo en frase normal");
+        assert!(
+            adapter
+                .extract_text(&res1)
+                .unwrap()
+                .contains("En CiudadAnonima hace sol.")
+        );
+
+        // Variación 2: Al final de frase con punto en el mismo run
+        let xml2 = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body><w:p><w:r><w:t>La sede está en Madrid.</w:t></w:r></w:p></w:body>
+        </w:document>"#;
+        let bytes2 = create_mock_docx(xml2);
+        let (res2, c2, _) = adapter.process_office(&bytes2, &map, true).unwrap();
+        assert_eq!(c2, 1, "Fallo al final de frase con punto en mismo run");
+        assert!(
+            adapter
+                .extract_text(&res2)
+                .unwrap()
+                .contains("La sede está en CiudadAnonima.")
+        );
+
+        // Variación 3: Al final de frase donde el punto está en un run separado por formato o idioma
+        let xml3 = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                <w:p>
+                    <w:r><w:t>La sede está en </w:t></w:r>
+                    <w:r><w:rPr><w:lang w:val="es-ES"/></w:rPr><w:t>Madrid</w:t></w:r>
+                    <w:r><w:t>.</w:t></w:r>
+                </w:p>
+            </w:body>
+        </w:document>"#;
+        let bytes3 = create_mock_docx(xml3);
+        let (res3, c3, _) = adapter.process_office(&bytes3, &map, true).unwrap();
+        assert_eq!(c3, 1, "Fallo en punto separado en otro run");
+        assert!(
+            adapter
+                .extract_text(&res3)
+                .unwrap()
+                .contains("La sede está en CiudadAnonima.")
+        );
+
+        // Variación 4: Con salto de línea de Word <w:br/> justo tras el punto
+        let xml4 = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                <w:p>
+                    <w:r><w:t>La sede está en Madrid.</w:t><w:br/></w:r>
+                </w:p>
+            </w:body>
+        </w:document>"#;
+        let bytes4 = create_mock_docx(xml4);
+        let (res4, c4, _) = adapter.process_office(&bytes4, &map, true).unwrap();
+        assert_eq!(c4, 1, "Fallo con salto de línea <w:br/>");
+        assert!(
+            adapter
+                .extract_text(&res4)
+                .unwrap()
+                .contains("La sede está en CiudadAnonima.")
+        );
+
+        // Variación 5: Palabra fragmentada por Word al final de frase (Madri + d.) con rsidR, rPr y bookmarks
+        let xml5 = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+            <w:body>
+                <w:p>
+                    <w:r w:rsidR="00A12345">
+                        <w:rPr><w:lang w:val="es-ES"/></w:rPr>
+                        <w:t>El viaje termina en Madri</w:t>
+                    </w:r>
+                    <w:bookmarkStart w:id="0" w:name="_GoBack"/>
+                    <w:bookmarkEnd w:id="0"/>
+                    <w:r w:rsidR="00B23456">
+                        <w:rPr><w:lang w:val="es-ES"/></w:rPr>
+                        <w:t>d.</w:t>
+                    </w:r>
+                </w:p>
+            </w:body>
+        </w:document>"#;
+        let bytes5 = create_mock_docx(xml5);
+        let (res5, c5, _) = adapter.process_office(&bytes5, &map, true).unwrap();
+        assert_eq!(c5, 1, "Fallo en palabra fragmentada con rsidR y rPr");
+        assert!(
+            adapter
+                .extract_text(&res5)
+                .unwrap()
+                .contains("El viaje termina en CiudadAnonima.")
+        );
     }
 }
