@@ -24,7 +24,10 @@ pub struct ObfuscatorEngine {
 
 impl ObfuscatorEngine {
     pub fn new(config: LexiConfig) -> Self {
-        let detectors = DetectorRegistry::with_custom_rules(&config.custom_rules);
+        let detectors = DetectorRegistry::with_custom_rules_and_ignored_domains(
+            &config.custom_rules,
+            &config.ignore.ignored_domains,
+        );
         Self {
             config,
             manager: MappingManager::new(),

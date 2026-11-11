@@ -10,6 +10,43 @@ use std::path::{Path, PathBuf};
 pub const USER_CONFIG_DIR_NAME: &str = ".lexishield";
 pub const CONFIG_FILE_NAME: &str = "config.toml";
 pub const RULES_FILE_NAME: &str = "rules.toml";
+pub const IGNORED_DOMAINS_FILE_NAME: &str = "ignored_domains.txt";
+
+/// Plantilla predeterminada y comentada para URLs y dominios excluidos (~/.lexishield/ignored_domains.txt).
+pub const DEFAULT_IGNORED_DOMAINS_TXT: &str = r"# ==============================================================================
+# URLs y Dominios Excluidos de Protección (~/.lexishield/ignored_domains.txt)
+# ==============================================================================
+# Las URLs o dominios incluidos en esta lista NUNCA serán protegidos ni alterados
+# por LexiShield durante los escaneos (se marcarán automáticamente como omitidos '=').
+#
+# Puedes añadir un dominio, subdominio o URL completa por línea.
+# Las líneas vacías o que comiencen con '#' serán ignoradas.
+#
+# Ejemplos:
+# thehackernews.com
+# www.first.org
+# httpd.apache.org
+# www.incibe.es
+# wazuh.com
+# github.com
+# owasp.org
+# nvd.nist.gov
+# www.rfc-editor.org
+# www.cve.org
+# https://mitre.org/
+
+thehackernews.com
+www.first.org
+httpd.apache.org
+www.incibe.es
+wazuh.com
+github.com
+owasp.org
+nvd.nist.gov
+www.rfc-editor.org
+www.cve.org
+mitre.org
+";
 
 /// Plantilla predeterminada y comentada para reglas personalizadas de usuario (~/.lexishield/rules.toml).
 pub const DEFAULT_RULES_TOML: &str = r#"# ==============================================================================
@@ -103,6 +140,21 @@ ignored_extensions = [
     "pdf", "zip", "tar", "gz", "tgz", "bz2", "7z", "rar", "xz", "zst", "iso", "7zip",
     "exe", "bin", "dll", "so", "dylib", "lock",
     "woff", "woff2", "ttf", "eot", "mp4", "mp3", "avi", "mkv",
+]
+
+# Dominios y URLs públicas ignoradas (no se protegen nunca por defecto)
+ignored_domains = [
+    "thehackernews.com",
+    "first.org",
+    "apache.org",
+    "incibe.es",
+    "wazuh.com",
+    "github.com",
+    "owasp.org",
+    "nist.gov",
+    "rfc-editor.org",
+    "cve.org",
+    "mitre.org",
 ]
 
 [gui]
@@ -250,6 +302,8 @@ pub struct IgnoreConfig {
     pub ignored_directories: Vec<String>,
     #[serde(default = "default_ignored_extensions")]
     pub ignored_extensions: Vec<String>,
+    #[serde(default = "default_ignored_domains")]
+    pub ignored_domains: Vec<String>,
 }
 
 fn default_ignored_directories() -> Vec<String> {
@@ -305,11 +359,28 @@ fn default_ignored_extensions() -> Vec<String> {
     ]
 }
 
+fn default_ignored_domains() -> Vec<String> {
+    vec![
+        "thehackernews.com".into(),
+        "first.org".into(),
+        "apache.org".into(),
+        "incibe.es".into(),
+        "wazuh.com".into(),
+        "github.com".into(),
+        "owasp.org".into(),
+        "nist.gov".into(),
+        "rfc-editor.org".into(),
+        "cve.org".into(),
+        "mitre.org".into(),
+    ]
+}
+
 impl Default for IgnoreConfig {
     fn default() -> Self {
         Self {
             ignored_directories: default_ignored_directories(),
             ignored_extensions: default_ignored_extensions(),
+            ignored_domains: default_ignored_domains(),
         }
     }
 }
@@ -619,6 +690,68 @@ pub fn get_user_rules_path() -> Result<PathBuf, ObfuscationError> {
     Ok(dir.join(RULES_FILE_NAME))
 }
 
+/// Obtiene la ruta del archivo de URLs/dominios excluidos del usuario (~/.lexishield/ignored_domains.txt).
+pub fn get_user_ignored_domains_path() -> Result<PathBuf, ObfuscationError> {
+    let dir = get_user_config_dir()?;
+    Ok(dir.join(IGNORED_DOMAINS_FILE_NAME))
+}
+
+/// Normaliza una URL o dominio eliminando esquemas de protocolo (http/https), rutas, puertos y espacios.
+#[must_use]
+pub fn normalize_domain_or_url(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return None;
+    }
+
+    // Quitar protocolo si está presente
+    let without_proto = if let Some(idx) = trimmed.find("://") {
+        &trimmed[idx + 3..]
+    } else {
+        trimmed
+    };
+
+    // Tomar solo la parte del host (antes de '/', '?', '#')
+    let host_part = without_proto
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or(without_proto);
+
+    // Quitar puerto si existe (e.g. host:8080)
+    let domain = if let Some(idx) = host_part.find(':') {
+        &host_part[..idx]
+    } else {
+        host_part
+    };
+
+    let domain_clean = domain.trim().trim_end_matches('.').to_lowercase();
+    if domain_clean.is_empty() || !domain_clean.contains('.') {
+        None
+    } else {
+        Some(domain_clean)
+    }
+}
+
+/// Carga una lista de dominios y URLs a ignorar desde un archivo de texto plano (~/.lexishield/ignored_domains.txt).
+pub fn load_ignored_domains_from_file(path: &Path) -> Vec<String> {
+    if !path.exists() {
+        return Vec::new();
+    }
+    let Ok(content) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+
+    let mut domains = Vec::new();
+    for line in content.lines() {
+        if let Some(normalized) = normalize_domain_or_url(line)
+            && !domains.contains(&normalized)
+        {
+            domains.push(normalized);
+        }
+    }
+    domains
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RulesContainer {
     #[serde(default, alias = "rules")]
@@ -678,6 +811,9 @@ pub fn reset_config() -> Result<PathBuf, ObfuscationError> {
     let rules_path = config_dir.join(RULES_FILE_NAME);
     let _ = fs::write(&rules_path, DEFAULT_RULES_TOML);
 
+    let ignored_domains_path = config_dir.join(IGNORED_DOMAINS_FILE_NAME);
+    let _ = fs::write(&ignored_domains_path, DEFAULT_IGNORED_DOMAINS_TXT);
+
     log::info!(
         "Configuración y reglas restauradas a valores por defecto en: {}",
         config_path.display()
@@ -723,6 +859,15 @@ pub fn ensure_user_config_initialized() -> Result<PathBuf, ObfuscationError> {
         log::info!(
             "Plantilla de reglas personalizadas creada en {}",
             rules_path.display()
+        );
+    }
+
+    let ignored_domains_path = config_dir.join(IGNORED_DOMAINS_FILE_NAME);
+    if !ignored_domains_path.exists() {
+        let _ = fs::write(&ignored_domains_path, DEFAULT_IGNORED_DOMAINS_TXT);
+        log::info!(
+            "Plantilla de dominios ignorados creada en {}",
+            ignored_domains_path.display()
         );
     }
 
@@ -815,6 +960,18 @@ pub fn load_config_with_rules(
         }
     }
 
+    // Cargar dominios ignorados desde ~/.lexishield/ignored_domains.txt y fusionar con config.toml
+    if let Ok(ignored_path) = get_user_ignored_domains_path()
+        && ignored_path.exists()
+    {
+        let extra_domains = load_ignored_domains_from_file(&ignored_path);
+        for d in extra_domains {
+            if !cfg.ignore.ignored_domains.contains(&d) {
+                cfg.ignore.ignored_domains.push(d);
+            }
+        }
+    }
+
     cfg
 }
 
@@ -832,4 +989,55 @@ pub fn save_user_config(config: &LexiConfig) -> Result<(), ObfuscationError> {
     fs::write(&path, toml_str)?;
     log::info!("Configuración guardada con éxito en: {}", path.display());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_domain_or_url() {
+        assert_eq!(
+            normalize_domain_or_url("thehackernews.com"),
+            Some("thehackernews.com".to_string())
+        );
+        assert_eq!(
+            normalize_domain_or_url("https://www.first.org/cvss/v4.0"),
+            Some("www.first.org".to_string())
+        );
+        assert_eq!(
+            normalize_domain_or_url("http://httpd.apache.org:8080/docs/"),
+            Some("httpd.apache.org".to_string())
+        );
+        assert_eq!(
+            normalize_domain_or_url("  www.incibe.es/  "),
+            Some("www.incibe.es".to_string())
+        );
+        assert_eq!(normalize_domain_or_url("# comentario"), None);
+        assert_eq!(normalize_domain_or_url("   "), None);
+        assert_eq!(normalize_domain_or_url("sin_punto"), None);
+    }
+
+    #[test]
+    fn test_load_ignored_domains_from_file() {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join("test_ignored_domains_load.txt");
+        let content = r#"
+# Lista de dominios
+thehackernews.com
+www.first.org
+https://httpd.apache.org/download
+# Otro comentario
+www.incibe.es
+"#;
+        std::fs::write(&file_path, content).unwrap();
+        let domains = load_ignored_domains_from_file(&file_path);
+        let _ = std::fs::remove_file(&file_path);
+
+        assert!(domains.contains(&"thehackernews.com".to_string()));
+        assert!(domains.contains(&"www.first.org".to_string()));
+        assert!(domains.contains(&"httpd.apache.org".to_string()));
+        assert!(domains.contains(&"www.incibe.es".to_string()));
+        assert_eq!(domains.len(), 4);
+    }
 }

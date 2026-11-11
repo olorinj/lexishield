@@ -14,6 +14,7 @@ use guid::GuidDetector;
 use identity::{CreditCardDetector, SpanishDniNieDetector, TelephoneDetector};
 use network::{DomainDetector, EmailDetector, HostnameDetector, IPv4Detector, IPv6Detector};
 use o365::{AttachmentFileNameDetector, O365OriginatingServerDetector, O365SubjectDetector};
+use std::collections::HashSet;
 use windows::{WindowsHexIdDetector, WindowsLogonIdDetector, WindowsSidDetector};
 
 /// Coincidencia extraída por un detector antes de ser añadida a la tabla de mapeo.
@@ -43,6 +44,7 @@ pub struct DetectorRegistry {
     pub o365_server: O365OriginatingServerDetector,
     pub attachment: AttachmentFileNameDetector,
     pub custom_rules: Vec<CompiledCustomRule>,
+    pub ignored_domains: HashSet<String>,
 }
 
 impl Default for DetectorRegistry {
@@ -57,6 +59,13 @@ impl DetectorRegistry {
     }
 
     pub fn with_custom_rules(custom_rules: &[CustomRule]) -> Self {
+        Self::with_custom_rules_and_ignored_domains(custom_rules, &[])
+    }
+
+    pub fn with_custom_rules_and_ignored_domains(
+        custom_rules: &[CustomRule],
+        ignored_domains: &[String],
+    ) -> Self {
         let mut compiled = Vec::new();
         for r in custom_rules {
             match CompiledCustomRule::try_from_rule(r) {
@@ -78,6 +87,14 @@ impl DetectorRegistry {
             }
         }
 
+        let mut ignored_set = HashSet::with_capacity(ignored_domains.len());
+        for d in ignored_domains {
+            let clean = d.trim().trim_end_matches('.').to_lowercase();
+            if !clean.is_empty() {
+                ignored_set.insert(clean);
+            }
+        }
+
         Self {
             guid: GuidDetector::new(),
             sid: WindowsSidDetector::new(),
@@ -95,7 +112,37 @@ impl DetectorRegistry {
             o365_server: O365OriginatingServerDetector::new(),
             attachment: AttachmentFileNameDetector::new(),
             custom_rules: compiled,
+            ignored_domains: ignored_set,
         }
+    }
+
+    /// Comprueba si un dominio o FQDN está explícitamente ignorado por el usuario o es un proveedor conocido.
+    pub fn is_ignored_domain(&self, candidate: &str) -> bool {
+        if crate::stopwords::is_known_vendor_domain(candidate) {
+            return true;
+        }
+
+        let lower = candidate.trim().trim_end_matches('.').to_lowercase();
+        let clean = lower
+            .strip_prefix("http://")
+            .or_else(|| lower.strip_prefix("https://"))
+            .unwrap_or(&lower);
+        let domain_part = clean.split(['/', ':', '?', '#']).next().unwrap_or(clean);
+        let domain_no_www = domain_part.strip_prefix("www.").unwrap_or(domain_part);
+
+        if self.ignored_domains.contains(domain_part)
+            || self.ignored_domains.contains(domain_no_www)
+        {
+            return true;
+        }
+
+        for d in &self.ignored_domains {
+            let d_clean = d.strip_prefix("www.").unwrap_or(d);
+            if domain_part.ends_with(&format!(".{d_clean}")) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Genera un seudónimo apropiado según el tipo de detector.
@@ -236,7 +283,7 @@ impl DetectorRegistry {
                 if !seen_originals.contains(candidate) {
                     seen_originals.insert(candidate.to_string());
                     let pseudonym = if matches!(dtype, DetectorType::DomainFqdn)
-                        && crate::stopwords::is_known_vendor_domain(candidate)
+                        && self.is_ignored_domain(candidate)
                     {
                         "=".to_string()
                     } else {
@@ -270,5 +317,81 @@ impl DetectorRegistry {
         );
 
         found_mappings
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ignored_domains_assigned_equals_pseudonym() {
+        let registry = DetectorRegistry::new();
+        let priority = vec![DetectorType::DomainFqdn];
+
+        let text = "Consulta thehackernews.com, www.first.org, httpd.apache.org, www.incibe.es, wazuh.com, github.com, owasp.org, nvd.nist.gov, www.rfc-editor.org y www.cve.org junto con dominio.corporativo.privado.com";
+        let mappings = registry.scan_text(text, &priority, 4, None);
+
+        // Los dominios públicos conocidos deben estar marcados con "=" (omitidos)
+        for domain in [
+            "thehackernews.com",
+            "www.first.org",
+            "httpd.apache.org",
+            "www.incibe.es",
+            "wazuh.com",
+            "github.com",
+            "owasp.org",
+            "nvd.nist.gov",
+            "www.rfc-editor.org",
+            "www.cve.org",
+        ] {
+            let m = mappings.iter().find(|m| m.original == domain);
+            assert!(
+                m.is_some(),
+                "El dominio {domain} debería haber sido detectado"
+            );
+            let m_val = m.unwrap();
+            assert_eq!(
+                m_val.pseudonym, "=",
+                "El dominio {domain} debería tener seudónimo '=' para omisión"
+            );
+            assert!(
+                m_val.omitted,
+                "El dominio {domain} debería tener flag omitted=true"
+            );
+        }
+
+        // El dominio privado sí debe tener un seudónimo generado y no estar omitido
+        let priv_m = mappings
+            .iter()
+            .find(|m| m.original == "dominio.corporativo.privado.com");
+        assert!(priv_m.is_some());
+        assert_ne!(priv_m.unwrap().pseudonym, "=");
+        assert!(!priv_m.unwrap().omitted);
+    }
+
+    #[test]
+    fn test_custom_user_ignored_domains() {
+        let custom_domains = vec![
+            "customportal.org".to_string(),
+            "internallink.es".to_string(),
+        ];
+        let registry =
+            DetectorRegistry::with_custom_rules_and_ignored_domains(&[], &custom_domains);
+        let priority = vec![DetectorType::DomainFqdn];
+
+        let text = "Enlaces a sub.customportal.org y otro.es";
+        let mappings = registry.scan_text(text, &priority, 4, None);
+
+        let custom_m = mappings
+            .iter()
+            .find(|m| m.original == "sub.customportal.org");
+        assert!(custom_m.is_some());
+        assert_eq!(custom_m.unwrap().pseudonym, "=");
+        assert!(custom_m.unwrap().omitted);
+
+        let other_m = mappings.iter().find(|m| m.original == "otro.es");
+        assert!(other_m.is_some());
+        assert_ne!(other_m.unwrap().pseudonym, "=");
     }
 }

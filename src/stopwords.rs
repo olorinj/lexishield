@@ -396,6 +396,14 @@ pub static KNOWN_VENDOR_DOMAINS: LazyLock<HashSet<&'static str>> = LazyLock::new
         "crowdstrike.com",
         "sentinelone.com",
         "virustotal.com",
+        "thehackernews.com",
+        "first.org",
+        "incibe.es",
+        "owasp.org",
+        "nist.gov",
+        "rfc-editor.org",
+        "cve.org",
+        "mitre.org",
         "debian.org",
         "ubuntu.com",
         "redhat.com",
@@ -480,6 +488,14 @@ mod tests {
         assert!(is_known_vendor_domain("wazuh.com"));
         assert!(is_known_vendor_domain("google.com"));
         assert!(is_known_vendor_domain("s3.eu-west-1.amazonaws.com"));
+        assert!(is_known_vendor_domain("thehackernews.com"));
+        assert!(is_known_vendor_domain("www.first.org"));
+        assert!(is_known_vendor_domain("httpd.apache.org"));
+        assert!(is_known_vendor_domain("www.incibe.es"));
+        assert!(is_known_vendor_domain("owasp.org"));
+        assert!(is_known_vendor_domain("nvd.nist.gov"));
+        assert!(is_known_vendor_domain("www.rfc-editor.org"));
+        assert!(is_known_vendor_domain("www.cve.org"));
 
         // Dominios corporativos o de Active Directory NO son proveedores de software
         assert!(!is_known_vendor_domain("acme.local"));
