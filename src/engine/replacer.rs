@@ -1,7 +1,7 @@
 //! Motor de reemplazo de subcadenas en una sola pasada de alto rendimiento (Aho-Corasick Token Replacer).
 
 use aho_corasick::{AhoCorasick, MatchKind};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Estructura de reemplazo de tokens precompilada con el autómata Aho-Corasick.
 ///
@@ -13,18 +13,30 @@ pub struct CompiledReplacer {
     replacements: Vec<String>,
     strict_word_boundaries: bool,
     pattern_lengths: Vec<usize>,
+    skip_word_boundary: Vec<bool>,
 }
 
 impl CompiledReplacer {
     /// Construye una nueva instancia precompilada ordenando términos por longitud descendente
     /// y configurando coincidencia LeftmostLongest para dar precedencia a patrones específicos.
     pub fn new(replacement_map: &HashMap<String, String>, strict_word_boundaries: bool) -> Self {
+        Self::new_with_substring_keys(replacement_map, strict_word_boundaries, &HashSet::new())
+    }
+
+    /// Construye una instancia precompilada permitiendo omitir la comprobación de límites de palabra
+    /// para un conjunto específico de claves (p. ej. pares manuales/Custom de longitud >= 3).
+    pub fn new_with_substring_keys(
+        replacement_map: &HashMap<String, String>,
+        strict_word_boundaries: bool,
+        substring_keys: &HashSet<String>,
+    ) -> Self {
         if replacement_map.is_empty() {
             return Self {
                 automa: None,
                 replacements: Vec::new(),
                 strict_word_boundaries,
                 pattern_lengths: Vec::new(),
+                skip_word_boundary: Vec::new(),
             };
         }
 
@@ -36,11 +48,13 @@ impl CompiledReplacer {
         let mut patterns = Vec::with_capacity(entries.len());
         let mut replacements = Vec::with_capacity(entries.len());
         let mut pattern_lengths = Vec::with_capacity(entries.len());
+        let mut skip_word_boundary = Vec::with_capacity(entries.len());
 
         for (orig, repl) in entries {
             patterns.push(orig.as_str());
             replacements.push(repl.clone());
             pattern_lengths.push(orig.len());
+            skip_word_boundary.push(substring_keys.contains(orig.as_str()));
         }
 
         let automa = AhoCorasick::builder()
@@ -53,6 +67,7 @@ impl CompiledReplacer {
             replacements,
             strict_word_boundaries,
             pattern_lengths,
+            skip_word_boundary,
         }
     }
 
@@ -114,12 +129,15 @@ impl CompiledReplacer {
             let end = m.end();
 
             // Si se requiere word boundaries estrictos, comprobar los límites del match
-            if self.strict_word_boundaries {
-                let pat_len = self
-                    .pattern_lengths
-                    .get(m.pattern().as_usize())
-                    .copied()
-                    .unwrap_or(0);
+            // salvo que el patrón esté marcado para sustitución como subcadena.
+            let pat_idx = m.pattern().as_usize();
+            let skip_boundary = self
+                .skip_word_boundary
+                .get(pat_idx)
+                .copied()
+                .unwrap_or(false);
+            if self.strict_word_boundaries && !skip_boundary {
+                let pat_len = self.pattern_lengths.get(pat_idx).copied().unwrap_or(0);
                 if pat_len > 0 && !Self::is_word_boundary(text_bytes, start, end) {
                     continue;
                 }
@@ -165,4 +183,45 @@ pub fn apply_single_pass_replacements(
 ) -> (String, usize) {
     let replacer = CompiledReplacer::new(replacement_map, strict_word_boundaries);
     replacer.replace(text)
+}
+
+/// Variante de `apply_single_pass_replacements` que permite omitir límites de palabra
+/// para un conjunto específico de claves (p. ej. pares Custom/manuales >= 3 caracteres).
+pub fn apply_single_pass_replacements_with_substring_keys(
+    text: &str,
+    replacement_map: &HashMap<String, String>,
+    strict_word_boundaries: bool,
+    substring_keys: &HashSet<String>,
+) -> (String, usize) {
+    let replacer = CompiledReplacer::new_with_substring_keys(
+        replacement_map,
+        strict_word_boundaries,
+        substring_keys,
+    );
+    replacer.replace(text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_substring_keys_bypass_word_boundaries() {
+        let mut map = HashMap::new();
+        map.insert("ALFA".to_string(), "OMEGA".to_string());
+        map.insert("192.168.1.1".to_string(), "10.0.0.1".to_string());
+
+        let mut substring_keys = HashSet::new();
+        substring_keys.insert("ALFA".to_string());
+
+        let input = "Servidor SRV-ALFA01 y ALFAWEB, pero 192.168.1.10 y alfa no cambian.";
+        let (out, count) =
+            apply_single_pass_replacements_with_substring_keys(input, &map, true, &substring_keys);
+
+        assert_eq!(count, 2);
+        assert_eq!(
+            out,
+            "Servidor SRV-OMEGA01 y OMEGAWEB, pero 192.168.1.10 y alfa no cambian."
+        );
+    }
 }

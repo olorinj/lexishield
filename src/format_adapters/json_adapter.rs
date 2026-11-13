@@ -6,7 +6,7 @@
 
 use crate::detectors::network::{DomainDetector, HostnameDetector};
 use crate::detectors::windows::WindowsSidDetector;
-use crate::engine::replacer::apply_single_pass_replacements;
+use crate::engine::replacer::apply_single_pass_replacements_with_substring_keys;
 use crate::models::{DetectorType, Mapping, ObfuscationError};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -396,6 +396,22 @@ impl JsonAdapter {
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
     ) -> Result<(String, usize), ObfuscationError> {
+        self.process_json_with_substring_keys(
+            text,
+            replacement_map,
+            strict_word_boundaries,
+            &std::collections::HashSet::new(),
+        )
+    }
+
+    /// Variante de `process_json` que permite omitir límites de palabra para claves específicas.
+    pub fn process_json_with_substring_keys(
+        &self,
+        text: &str,
+        replacement_map: &HashMap<String, String>,
+        strict_word_boundaries: bool,
+        substring_keys: &std::collections::HashSet<String>,
+    ) -> Result<(String, usize), ObfuscationError> {
         let stream = Self::parse_json_stream(text);
         if stream.len() > 1 {
             let mut total_replacements = 0;
@@ -407,6 +423,7 @@ impl JsonAdapter {
                     &mut path_stack,
                     replacement_map,
                     strict_word_boundaries,
+                    substring_keys,
                     &mut total_replacements,
                 );
                 lines.push(serde_json::to_string(&item).map_err(ObfuscationError::JsonError)?);
@@ -423,6 +440,7 @@ impl JsonAdapter {
             &mut path_stack,
             replacement_map,
             strict_word_boundaries,
+            substring_keys,
             &mut total_replacements,
         );
 
@@ -441,6 +459,7 @@ impl JsonAdapter {
         path: &mut Vec<String>,
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
+        substring_keys: &std::collections::HashSet<String>,
         counter: &mut usize,
     ) {
         match val {
@@ -453,6 +472,7 @@ impl JsonAdapter {
                         path,
                         replacement_map,
                         strict_word_boundaries,
+                        substring_keys,
                         counter,
                     );
                     path.pop();
@@ -465,6 +485,7 @@ impl JsonAdapter {
                         path,
                         replacement_map,
                         strict_word_boundaries,
+                        substring_keys,
                         counter,
                     );
                 }
@@ -475,8 +496,12 @@ impl JsonAdapter {
                     return;
                 }
 
-                let (replaced, count) =
-                    apply_single_pass_replacements(s, replacement_map, strict_word_boundaries);
+                let (replaced, count) = apply_single_pass_replacements_with_substring_keys(
+                    s,
+                    replacement_map,
+                    strict_word_boundaries,
+                    substring_keys,
+                );
                 if count > 0 {
                     *s = replaced;
                     *counter += count;

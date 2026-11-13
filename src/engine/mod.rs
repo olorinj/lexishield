@@ -180,13 +180,16 @@ impl ObfuscatorEngine {
         let original_len = text.len();
 
         let replacement_map = self.manager.get_replacement_map(reverse);
+        let substring_keys = self.manager.get_substring_keys(reverse);
 
-        let (result_text, replacements_count, detected_format) =
-            self.format_orchestrator.process_content(
+        let (result_text, replacements_count, detected_format) = self
+            .format_orchestrator
+            .process_content_with_substring_keys(
                 text,
                 format,
                 &replacement_map,
                 self.config.strict_word_boundaries(),
+                &substring_keys,
             )?;
 
         let mut warnings = Vec::new();
@@ -308,12 +311,17 @@ impl ObfuscatorEngine {
             let start_time = Instant::now();
             let original_len = bytes.len();
             let replacement_map = self.manager.get_replacement_map(reverse);
+            let substring_keys = self.manager.get_substring_keys(reverse);
 
-            let (output_bytes, count, _) = self.format_orchestrator.office.process_office(
-                &bytes,
-                &replacement_map,
-                self.config.strict_word_boundaries(),
-            )?;
+            let (output_bytes, count, _) = self
+                .format_orchestrator
+                .office
+                .process_office_with_substring_keys(
+                    &bytes,
+                    &replacement_map,
+                    self.config.strict_word_boundaries(),
+                    &substring_keys,
+                )?;
 
             fs::write(output_path, &output_bytes)?;
             let elapsed_ms = start_time.elapsed().as_secs_f64() * 1000.0;

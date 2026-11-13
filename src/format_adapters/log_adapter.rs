@@ -44,11 +44,31 @@ impl LogAdapter {
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
     ) -> Result<(String, usize), ObfuscationError> {
+        self.process_log_with_substring_keys(
+            text,
+            replacement_map,
+            strict_word_boundaries,
+            &std::collections::HashSet::new(),
+        )
+    }
+
+    /// Variante de `process_log` que permite omitir límites de palabra para claves específicas.
+    pub fn process_log_with_substring_keys(
+        &self,
+        text: &str,
+        replacement_map: &HashMap<String, String>,
+        strict_word_boundaries: bool,
+        substring_keys: &std::collections::HashSet<String>,
+    ) -> Result<(String, usize), ObfuscationError> {
         if text.is_empty() || replacement_map.is_empty() {
             return Ok((text.to_string(), 0));
         }
 
-        let replacer = CompiledReplacer::new(replacement_map, strict_word_boundaries);
+        let replacer = CompiledReplacer::new_with_substring_keys(
+            replacement_map,
+            strict_word_boundaries,
+            substring_keys,
+        );
         let mut total_replacements = 0;
         let mut output_lines = Vec::new();
 

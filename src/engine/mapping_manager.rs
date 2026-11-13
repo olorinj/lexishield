@@ -129,6 +129,24 @@ impl MappingManager {
         map
     }
 
+    /// Devuelve las claves de mapeos manuales/Custom (con longitud >= 3 caracteres)
+    /// que deben sustituirse incluso dentro de otras cadenas sin exigir límites de palabra.
+    pub fn get_substring_keys(&self, reverse: bool) -> std::collections::HashSet<String> {
+        let mut keys = std::collections::HashSet::new();
+        for m in self.forward.values() {
+            if m.omitted || m.original == "=" || m.pseudonym == "=" {
+                continue;
+            }
+            if matches!(m.detector_type, crate::models::DetectorType::Custom(_)) {
+                let key = if reverse { &m.pseudonym } else { &m.original };
+                if key.chars().count() >= 3 {
+                    keys.insert(key.clone());
+                }
+            }
+        }
+        keys
+    }
+
     pub fn count(&self) -> usize {
         self.forward.len()
     }

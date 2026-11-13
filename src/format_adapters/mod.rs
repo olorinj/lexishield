@@ -61,6 +61,24 @@ impl FormatOrchestrator {
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
     ) -> Result<(String, usize, FormatType), ObfuscationError> {
+        self.process_content_with_substring_keys(
+            content,
+            format,
+            replacement_map,
+            strict_word_boundaries,
+            &std::collections::HashSet::new(),
+        )
+    }
+
+    /// Variante de `process_content` que permite omitir límites de palabra para claves específicas.
+    pub fn process_content_with_substring_keys(
+        &self,
+        content: &str,
+        format: FormatType,
+        replacement_map: &HashMap<String, String>,
+        strict_word_boundaries: bool,
+        substring_keys: &std::collections::HashSet<String>,
+    ) -> Result<(String, usize, FormatType), ObfuscationError> {
         let actual_format = match format {
             FormatType::Auto => self.detect_format(content),
             other => other,
@@ -69,21 +87,31 @@ impl FormatOrchestrator {
         log::debug!("Procesando contenido con adaptador de formato: {actual_format:?}");
 
         let (result_text, count) = match actual_format {
-            FormatType::Json => {
-                self.json
-                    .process_json(content, replacement_map, strict_word_boundaries)?
-            }
-            FormatType::Xml => {
-                self.xml
-                    .process_xml(content, replacement_map, strict_word_boundaries)?
-            }
-            FormatType::Log => {
-                self.log
-                    .process_log(content, replacement_map, strict_word_boundaries)?
-            }
+            FormatType::Json => self.json.process_json_with_substring_keys(
+                content,
+                replacement_map,
+                strict_word_boundaries,
+                substring_keys,
+            )?,
+            FormatType::Xml => self.xml.process_xml_with_substring_keys(
+                content,
+                replacement_map,
+                strict_word_boundaries,
+                substring_keys,
+            )?,
+            FormatType::Log => self.log.process_log_with_substring_keys(
+                content,
+                replacement_map,
+                strict_word_boundaries,
+                substring_keys,
+            )?,
             FormatType::Plaintext | FormatType::Auto => {
-                self.text
-                    .process_text(content, replacement_map, strict_word_boundaries)?
+                self.text.process_text_with_substring_keys(
+                    content,
+                    replacement_map,
+                    strict_word_boundaries,
+                    substring_keys,
+                )?
             }
         };
 

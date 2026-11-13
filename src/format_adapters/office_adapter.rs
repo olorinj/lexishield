@@ -9,7 +9,7 @@ use crate::models::ObfuscationError;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read, Write};
 use std::sync::LazyLock;
 use zip::write::SimpleFileOptions;
@@ -394,6 +394,22 @@ impl OfficeAdapter {
         replacement_map: &HashMap<String, String>,
         strict_word_boundaries: bool,
     ) -> Result<(Vec<u8>, usize, OfficeType), ObfuscationError> {
+        self.process_office_with_substring_keys(
+            input_bytes,
+            replacement_map,
+            strict_word_boundaries,
+            &HashSet::new(),
+        )
+    }
+
+    /// Variante de `process_office` que permite omitir límites de palabra para claves específicas.
+    pub fn process_office_with_substring_keys(
+        &self,
+        input_bytes: &[u8],
+        replacement_map: &HashMap<String, String>,
+        strict_word_boundaries: bool,
+        substring_keys: &HashSet<String>,
+    ) -> Result<(Vec<u8>, usize, OfficeType), ObfuscationError> {
         let office_type = Self::detect_office_type(input_bytes);
         if office_type == OfficeType::Unknown {
             return Err(ObfuscationError::XmlError(
@@ -439,10 +455,11 @@ impl OfficeAdapter {
                         xml_content
                     };
 
-                    let (replaced_xml, count) = self.xml_adapter.process_xml(
+                    let (replaced_xml, count) = self.xml_adapter.process_xml_with_substring_keys(
                         &normalized_xml,
                         replacement_map,
                         strict_word_boundaries,
+                        substring_keys,
                     )?;
                     total_replacements += count;
 
