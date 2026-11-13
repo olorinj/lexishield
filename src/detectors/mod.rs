@@ -209,6 +209,8 @@ impl DetectorRegistry {
         for custom_rule in &self.custom_rules {
             let matches = custom_rule.find_matches(text);
             let dtype = custom_rule.detector_type();
+            let batch_spans = Self::is_sorted_disjoint(&matches);
+            let mut pending_spans: Vec<(usize, usize)> = Vec::new();
 
             for (start, end, matched_str) in matches {
                 let idx = claimed_spans.partition_point(|&(s, _)| s < end);
@@ -222,8 +224,12 @@ impl DetectorRegistry {
                     continue;
                 }
 
-                let ins_idx = claimed_spans.partition_point(|&(s, _)| s < start);
-                claimed_spans.insert(ins_idx, (start, end));
+                if batch_spans {
+                    pending_spans.push((start, end));
+                } else {
+                    let ins_idx = claimed_spans.partition_point(|&(s, _)| s < start);
+                    claimed_spans.insert(ins_idx, (start, end));
+                }
 
                 if !seen_originals.contains(candidate) {
                     seen_originals.insert(candidate.to_string());
@@ -243,6 +249,7 @@ impl DetectorRegistry {
                     found_mappings.push(m);
                 }
             }
+            Self::commit_pending_spans(&mut claimed_spans, &pending_spans);
         }
 
         // 2. Ejecutar detectores estándar según el orden de prioridad
@@ -266,6 +273,9 @@ impl DetectorRegistry {
                 DetectorType::GenericToken | DetectorType::Custom(_) => Vec::new(),
             };
 
+            let batch_spans = Self::is_sorted_disjoint(&matches);
+            let mut pending_spans: Vec<(usize, usize)> = Vec::new();
+
             for (start, end, matched_str) in matches {
                 let idx = claimed_spans.partition_point(|&(s, _)| s < end);
                 let overlaps = idx > 0 && claimed_spans[idx - 1].1 > start;
@@ -287,8 +297,12 @@ impl DetectorRegistry {
                     continue;
                 }
 
-                let ins_idx = claimed_spans.partition_point(|&(s, _)| s < start);
-                claimed_spans.insert(ins_idx, (start, end));
+                if batch_spans {
+                    pending_spans.push((start, end));
+                } else {
+                    let ins_idx = claimed_spans.partition_point(|&(s, _)| s < start);
+                    claimed_spans.insert(ins_idx, (start, end));
+                }
 
                 if !seen_originals.contains(candidate) {
                     seen_originals.insert(candidate.to_string());
@@ -318,6 +332,7 @@ impl DetectorRegistry {
                     found_mappings.push(m);
                 }
             }
+            Self::commit_pending_spans(&mut claimed_spans, &pending_spans);
         }
 
         log::debug!(
@@ -328,11 +343,80 @@ impl DetectorRegistry {
 
         found_mappings
     }
+
+    /// Indica si los matches de un detector están ordenados y son disjuntos entre sí,
+    /// lo que permite diferir la inserción de sus spans a una única fusión por detector.
+    fn is_sorted_disjoint(matches: &[(usize, usize, &str)]) -> bool {
+        matches.windows(2).all(|w| w[0].1 <= w[1].0)
+    }
+
+    /// Fusiona los spans aceptados de un detector (ordenados) en `claimed_spans` (ordenado por inicio)
+    /// con una única pasada desde el final, en O(n + m), evitando m desplazamientos O(n) de `Vec::insert`.
+    fn commit_pending_spans(claimed_spans: &mut Vec<(usize, usize)>, pending: &[(usize, usize)]) {
+        if pending.is_empty() {
+            return;
+        }
+        let old_len = claimed_spans.len();
+        claimed_spans.resize(old_len + pending.len(), (0, 0));
+        let (mut i, mut j, mut k) = (old_len, pending.len(), old_len + pending.len());
+        while j > 0 {
+            if i > 0 && claimed_spans[i - 1].0 > pending[j - 1].0 {
+                claimed_spans[k - 1] = claimed_spans[i - 1];
+                i -= 1;
+            } else {
+                claimed_spans[k - 1] = pending[j - 1];
+                j -= 1;
+            }
+            k -= 1;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_commit_pending_spans_merges_sorted_runs() {
+        let mut claimed = vec![(5, 8), (20, 25), (40, 45)];
+        DetectorRegistry::commit_pending_spans(
+            &mut claimed,
+            &[(0, 2), (10, 12), (30, 33), (50, 60)],
+        );
+        assert_eq!(
+            claimed,
+            vec![
+                (0, 2),
+                (5, 8),
+                (10, 12),
+                (20, 25),
+                (30, 33),
+                (40, 45),
+                (50, 60)
+            ]
+        );
+
+        let mut empty: Vec<(usize, usize)> = Vec::new();
+        DetectorRegistry::commit_pending_spans(&mut empty, &[(3, 4), (9, 10)]);
+        assert_eq!(empty, vec![(3, 4), (9, 10)]);
+    }
+
+    #[test]
+    fn test_is_sorted_disjoint() {
+        assert!(DetectorRegistry::is_sorted_disjoint(&[
+            (0, 2, "a"),
+            (2, 5, "b"),
+            (7, 9, "c")
+        ]));
+        assert!(!DetectorRegistry::is_sorted_disjoint(&[
+            (0, 5, "a"),
+            (3, 6, "b")
+        ]));
+        assert!(!DetectorRegistry::is_sorted_disjoint(&[
+            (7, 9, "a"),
+            (0, 2, "b")
+        ]));
+    }
 
     #[test]
     fn test_ignored_domains_assigned_equals_pseudonym() {
