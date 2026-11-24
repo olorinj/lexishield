@@ -4,6 +4,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { open, save } from "@tauri-apps/plugin-dialog";
+  import { openUrl } from "@tauri-apps/plugin-opener";
   import { listen } from "@tauri-apps/api/event";
   import { locale, t } from "./i18n";
   import packageInfo from "../package.json";
@@ -133,7 +134,7 @@
     if (dt.includes("ip") || dt.includes("mac") || dt.includes("domain") || dt.includes("url") || dt.includes("host") || dt.includes("red") || dt.includes("server")) {
       return { name: "Red", icon: "🌐", color: "bg-blue-500", text: "text-blue-500", border: "border-blue-500/30", bgBadge: "bg-blue-500/10" };
     }
-    if (dt.includes("dni") || dt.includes("nie") || dt.includes("user") || dt.includes("usuario") || dt.includes("nombre") || dt.includes("ident") || dt.includes("sid") || dt.includes("email") || dt.includes("logon")) {
+    if (dt.includes("dni") || dt.includes("nie") || dt.includes("user") || dt.includes("usuario") || dt.includes("nombre") || dt.includes("person") || dt.includes("name") || dt.includes("ident") || dt.includes("sid") || dt.includes("email") || dt.includes("logon")) {
       return { name: "Identidad", icon: "🪪", color: "bg-purple-500", text: "text-purple-500", border: "border-purple-500/30", bgBadge: "bg-purple-500/10" };
     }
     if (dt.includes("path") || dt.includes("ruta") || dt.includes("file") || dt.includes("sistema") || dt.includes("sys") || dt.includes("process") || dt.includes("guid") || dt.includes("uuid") || dt.includes("hex") || dt.includes("id")) {
@@ -269,10 +270,21 @@
   let showAddPairModal = false;
   let newPairOriginal = "";
   let newPairPseudo = "";
-  let newPairType = "GenericToken";
+  let newPairType = "Auto";
+  let newPairManualOverride = "";
+  let newPairPseudoManuallyEdited = false;
+  let newPairDetectionConfirmed = false;
   let selectedPairKeys = [];
   let editingPairOriginal = null;
   let editingPairPseudo = "";
+
+  // Estado de Aprendizaje de Detectores (Zero-PII) y Envío a GitHub
+  const GITHUB_REPO_ISSUES_NEW = "https://github.com/olorinj/lexishield/issues/new";
+  let detectorLearningStore = { schema_version: 1, app_version: appVersion, os_family: "linux", rules: [] };
+  let detectorLearningPath = "";
+  let showLearningReviewModal = false;
+  let selectedLearningSkeletons = [];
+  let learningCopiedFlash = false;
 
   // Estado de la Pestaña Bóvedas Lexi y Backups
   let allVaultsList = [];
@@ -381,9 +393,10 @@
     // 2. Cargar configuración
     await loadSettings();
 
-    // 3. Cargar lista de bóvedas y bóveda inicial
+    // 3. Cargar lista de bóvedas, bóveda inicial y aprendizaje local de detectores
     await refreshVaultsList();
     await loadInitialVault();
+    await loadDetectorLearning();
 
     // 4. Registrar escuchas de progreso Tauri y verificar herramientas
     try {
@@ -499,6 +512,10 @@
         studioDropModal = null;
       } else if (showSessionHistoryModal) {
         showSessionHistoryModal = false;
+      } else if (showLearningReviewModal) {
+        showLearningReviewModal = false;
+      } else if (showAddPairModal) {
+        showAddPairModal = false;
       }
       return;
     }
@@ -1871,48 +1888,771 @@
     }
   }
 
-  function autoGeneratePseudonym(val, type) {
-    const raw = (val || "").trim();
-    if (type === "IPv4") {
-      const parts = raw.split(/[.\\\\]+/).filter(Boolean);
-      const last = (parts.length > 0 && !isNaN(parts[parts.length - 1])) ? parts[parts.length - 1] : Math.floor(Math.random() * 253 + 1);
-      const isPrivate = parts.length > 0 && (parts[0] === "10" || parts[0] === "192" || parts[0] === "172");
-      if (isPrivate) {
-        return `10.${Math.floor(Math.random() * 254 + 1)}.${Math.floor(Math.random() * 254 + 1)}.${last}`;
-      }
-      return `${Math.floor(Math.random() * 220 + 1)}.${Math.floor(Math.random() * 254 + 1)}.${Math.floor(Math.random() * 254 + 1)}.${last}`;
-    }
-    if (type === "IPv6") {
-      const hex = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
-      return `fd${hex().substring(0, 2)}:${hex()}:${hex()}::${hex()}`;
-    }
-    if (type === "Email") {
-      const parts = raw.split("@");
-      const domain = parts[1] || "example.com";
-      const randHex = Math.random().toString(16).substring(2, 10);
-      return `user_${randHex}@${domain}`;
-    }
-    if (type === "SpanishDniNie") {
-      const num = Math.floor(Math.random() * 89999999 + 10000000);
-      const letters = "TRWAGMYFPDXBNJZSQVHLCKE";
-      return `${num}${letters[num % 23]}`;
-    }
-    if (type === "CreditCard") {
-      const p1 = Math.floor(Math.random() * 8999 + 1000);
-      const p2 = Math.floor(Math.random() * 8999 + 1000);
-      return `4532-****-****-${p2}`;
-    }
-    if (type === "GuidUuid") {
-      const rand4 = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
-      return `${rand4()}${rand4()}-${rand4()}-4${rand4().substring(1)}-a${rand4().substring(1)}-${rand4()}${rand4()}${rand4()}`;
-    }
-    const randHex = Math.random().toString(16).substring(2, 10).toUpperCase();
-    return `Token_${randHex}`;
+  // Diccionarios Sintéticos Fijos en Inglés (Independientes del idioma activo)
+  const EN_FIRST_NAMES = [
+    "James", "Emma", "Oliver", "Sophia", "Liam", "Charlotte", "Ethan", "Amelia",
+    "Mason", "Harper", "Lucas", "Evelyn", "Logan", "Abigail", "Alex", "Jordan",
+    "Benjamin", "Mia", "Henry", "Ella", "Sebastian", "Grace", "Jack", "Chloe",
+    "Owen", "Victoria", "Daniel", "Riley", "Matthew", "Nora", "Samuel", "Hannah"
+  ];
+
+  const EN_LAST_NAMES = [
+    "Smith", "Johnson", "Carter", "Miller", "Davis", "Anderson", "Taylor", "Thomas",
+    "Moore", "Martin", "Thompson", "White", "Clark", "Walker", "Hall", "Turner",
+    "Wright", "Harris", "Hill", "Scott", "Green", "Adams", "Baker", "Nelson",
+    "Mitchell", "Roberts", "Phillips", "Campbell", "Parker", "Evans", "Edwards", "Collins"
+  ];
+
+  const EN_STREET_NAMES = [
+    "Oak", "Maple", "Baker", "Evergreen", "Pine", "Cedar", "Elm", "Sunset",
+    "Highland", "Willow", "Meadow", "River", "Park", "Chestnut", "Walnut", "Birch",
+    "Hawthorne", "Magnolia", "Sycamore", "Orchard", "Summit", "Valley", "Harbor", "Ridge"
+  ];
+
+  const EN_STREET_SUFFIXES = [
+    "Street", "Avenue", "Drive", "Road", "Lane", "Boulevard", "Way", "Court"
+  ];
+
+  const EN_USER_HANDLES = [
+    "jdoe", "areed", "mcarter", "sconnor", "tanderson", "oclark", "emiller", "lwalker",
+    "jsmith", "bwright", "hscott", "gadams", "dbaker", "cnelson", "kmitchell", "proberts",
+    "mphillips", "ecampbell", "rparker", "jevans", "tedwards", "acollins", "nharris", "sturner",
+    "lhall", "ewhite", "cmartin", "amoore", "pthomas", "jtaylor", "mdavis", "ojohnson"
+  ];
+
+  const EN_NETBIOS_DOMAINS = [
+    "CONTOSO", "FABRIKAM", "NORTHWIND", "LITWARE", "TAILSPIN", "WOODGROVE", "ALPINE", "ADVENTURE"
+  ];
+
+  const EN_MIDDLE_INITIALS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+  const STREET_KEYWORDS_SET = new Set([
+    "calle", "c/", "avda", "avda.", "av.", "avenida", "paseo", "plaza", "pza",
+    "camino", "carretera", "ctra", "ronda", "travesia", "travesía", "glorieta",
+    "street", "st", "st.", "avenue", "ave", "ave.", "road", "rd", "boulevard",
+    "blvd", "lane", "ln", "drive", "dr", "way", "court", "ct"
+  ]);
+
+  const INTERNAL_UPN_SUFFIXES = [
+    ".local", ".corp", ".internal", ".lan", ".intranet", ".priv", ".ad", ".home"
+  ];
+
+  function getFriendlyDetectorLabel(dt) {
+    const clean = getDetectorName(dt);
+    const map = {
+      IPv4: "Dirección IPv4",
+      IPv6: "Dirección IPv6",
+      Username: "Usuario / Cuenta",
+      PersonName: "Nombre / Apellido",
+      Address: "Dirección Postal",
+      Telephone: "Teléfono",
+      Email: "Correo Electrónico",
+      SpanishDniNie: "DNI / NIE",
+      "DNI/NIE": "DNI / NIE",
+      DomainFqdn: "Dominio / Host",
+      "Domain/FQDN": "Dominio / Host",
+      CreditCard: "Tarjeta Bancaria",
+      "Credit Card": "Tarjeta Bancaria",
+      GuidUuid: "GUID / UUID",
+      "GUID/UUID": "GUID / UUID",
+      GenericToken: "Token Genérico",
+      "Generic Token": "Token Genérico",
+    };
+    return map[clean] || clean;
   }
 
-  function handleAddPairInputOrTypeChange() {
-    if (!newPairPseudo || newPairPseudo.startsWith("Token_") || newPairPseudo.startsWith("user_") || newPairPseudo.includes(".") || newPairPseudo.includes("::") || newPairPseudo.startsWith("4532-")) {
+  function buildClientStructuralSkeleton(raw) {
+    const trimmed = (raw || "").trim();
+    if (!trimmed) return { sampleSkeleton: "", skeletonCompact: "", wordCount: 0, hints: [] };
+    const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+
+    let sampleSkeleton = "";
+    for (const ch of Array.from(trimmed).slice(0, 120)) {
+      if (ch >= "A" && ch <= "Z") sampleSkeleton += "A";
+      else if (ch >= "a" && ch <= "z") sampleSkeleton += "a";
+      else if (ch >= "0" && ch <= "9") sampleSkeleton += "9";
+      else if (/\p{Lu}/u.test(ch)) sampleSkeleton += "Á";
+      else if (/\p{L}/u.test(ch)) sampleSkeleton += "á";
+      else if ("\\@.-_/:+,$()[]".includes(ch)) sampleSkeleton += ch;
+      else if (/\s/.test(ch)) sampleSkeleton += " ";
+      else sampleSkeleton += "#";
+    }
+
+    let skeletonCompact = "";
+    for (let i = 0; i < sampleSkeleton.length; ) {
+      const ch = sampleSkeleton[i];
+      if ("AaÁá9 ".includes(ch)) {
+        let count = 1;
+        while (i + count < sampleSkeleton.length && sampleSkeleton[i + count] === ch) count++;
+        if (ch === " ") skeletonCompact += " ";
+        else skeletonCompact += count >= 2 ? `${ch}+` : ch;
+        i += count;
+      } else {
+        skeletonCompact += ch;
+        i += 1;
+      }
+    }
+
+    const hints = [];
+    const lower = trimmed.toLowerCase();
+    const bsIdx = trimmed.indexOf("\\");
+    if (bsIdx > 0 && bsIdx < trimmed.length - 1 && trimmed.indexOf("\\", bsIdx + 1) === -1) {
+      hints.push("backslash_domain_user");
+      if (trimmed.endsWith("$")) hints.push("machine_account_dollar");
+    }
+    const atIdx = lower.indexOf("@");
+    if (atIdx > 0 && atIdx < lower.length - 1) {
+      const dom = lower.slice(atIdx + 1);
+      if (INTERNAL_UPN_SUFFIXES.some(sfx => dom.endsWith(sfx))) hints.push("upn_internal_domain");
+      else if (dom.includes(".")) hints.push("email_at");
+    }
+    const wordsLower = lower.split(/\s+/).filter(Boolean);
+    if (wordsLower.length > 0 && (STREET_KEYWORDS_SET.has(wordsLower[0]) || lower.startsWith("c/") || wordsLower.some(w => STREET_KEYWORDS_SET.has(w)))) {
+      hints.push("street_prefix");
+    }
+    if (/^\+\d/.test(trimmed)) hints.push("plus_country_code");
+    if (/^(?:svc|adm|admin)[_-]/i.test(trimmed)) hints.push("service_prefix");
+    const lettersOnly = Array.from(trimmed).filter(c => /\p{L}/u.test(c));
+    if (lettersOnly.length > 0 && lettersOnly.every(c => /\p{Lu}/u.test(c))) hints.push("all_caps");
+    if (wordCount >= 2) hints.push("multi_word");
+
+    return { sampleSkeleton, skeletonCompact, wordCount, hints };
+  }
+
+  function lookupLearnedDetectorType(raw) {
+    const rules = detectorLearningStore?.rules;
+    if (!rules || rules.length === 0) return null;
+    const { sampleSkeleton, skeletonCompact, hints } = buildClientStructuralSkeleton(raw);
+    if (!skeletonCompact) return null;
+    const hintsKey = hints.join("|");
+
+    for (const r of rules) {
+      if (r.sample_skeleton === sampleSkeleton && (r.hints || []).join("|") === hintsKey) {
+        return r.user_confirmed;
+      }
+    }
+    for (const r of rules) {
+      if (r.skeleton_compact === skeletonCompact && (r.hints || []).join("|") === hintsKey) {
+        return r.user_confirmed;
+      }
+    }
+    return null;
+  }
+
+  function inferPairDetectorInfo(val, category, manualOverride = "") {
+    const trimmed = (val || "").trim();
+    const cleanIpCandidate = trimmed.replace(/\\\./g, ".");
+
+    const isIpv6Val = (s) => s.includes(":") && /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(s);
+    const isIpv4Val = (s) => {
+      if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(s)) return false;
+      return s.split(".").every(o => Number(o) >= 0 && Number(o) <= 255);
+    };
+
+    let autoPredicted = "GenericToken";
+    let fromLearning = false;
+
+    if (!trimmed) {
+      if (category === "Identity") autoPredicted = "PersonName";
+      else if (category === "Network") autoPredicted = "IPv4";
+      else autoPredicted = "GenericToken";
+    } else if (category === "GenericToken") {
+      autoPredicted = "GenericToken";
+    } else {
+      if (category === "Auto") {
+        const learned = lookupLearnedDetectorType(trimmed);
+        if (learned) {
+          autoPredicted = learned;
+          fromLearning = true;
+        }
+      }
+
+      if (!fromLearning) {
+        const words = trimmed.split(/\s+/).filter(Boolean);
+        const lower = trimmed.toLowerCase();
+        const digitsCount = (trimmed.match(/\d/g) || []).length;
+
+        if (isIpv4Val(cleanIpCandidate)) {
+          autoPredicted = "IPv4";
+        } else if (isIpv6Val(trimmed)) {
+          autoPredicted = "IPv6";
+        } else if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(trimmed)) {
+          autoPredicted = "GuidUuid";
+        } else if (/^[A-Za-z0-9._-]+\\[A-Za-z0-9._$-]+$/.test(trimmed)) {
+          autoPredicted = "Username";
+        } else if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) {
+          const dom = lower.split("@")[1] || "";
+          if (category === "Identity" || INTERNAL_UPN_SUFFIXES.some(sfx => dom.endsWith(sfx))) {
+            autoPredicted = "Username";
+          } else {
+            autoPredicted = "Email";
+          }
+        } else if (/^(?:\d{8}[A-Za-z]|[XYZxyz]\d{7}[A-Za-z])$/.test(trimmed)) {
+          autoPredicted = "SpanishDniNie";
+        } else if (digitsCount >= 13 && digitsCount <= 19 && /^(?:\d[ -]*?){13,19}$/.test(trimmed)) {
+          autoPredicted = "CreditCard";
+        } else if (digitsCount >= 7 && digitsCount <= 15 && /^\+?\d[\d\s().-]{5,18}\d$/.test(trimmed)) {
+          autoPredicted = "Telephone";
+        } else if (
+          lower.startsWith("c/") ||
+          words.some(w => STREET_KEYWORDS_SET.has(w.toLowerCase().replace(/[,.:;]$/, ""))) ||
+          (words.length >= 2 && /\p{L}{2,}/u.test(trimmed) && /\b\d{1,4}[A-Za-zºª]?\b/.test(trimmed) && /[,\s]/.test(trimmed))
+        ) {
+          autoPredicted = "Address";
+        } else if (
+          category !== "Identity" &&
+          words.length === 1 &&
+          /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:com|org|net|edu|gov|io|es|eu|co|uk|de|fr|it|pt|local|internal|corp|lan|intranet)$/i.test(trimmed)
+        ) {
+          autoPredicted = "DomainFqdn";
+        } else if (category === "Network") {
+          autoPredicted = trimmed.includes(":") ? "IPv6" : (trimmed.includes(".") ? "DomainFqdn" : "IPv4");
+        } else if (words.length === 1) {
+          if (/^[\p{L}][\p{L}'-]{1,30}$/u.test(trimmed) && /^\p{Lu}/u.test(trimmed)) {
+            autoPredicted = "PersonName";
+          } else if (/^[a-zA-Z0-9._$-]{3,36}$/.test(trimmed)) {
+            autoPredicted = "Username";
+          } else {
+            autoPredicted = category === "Identity" ? "PersonName" : "GenericToken";
+          }
+        } else if (words.length >= 2 && words.every(w => /^[\p{L}.'-]+$/u.test(w))) {
+          autoPredicted = "PersonName";
+        } else {
+          autoPredicted = category === "Identity" ? "PersonName" : "GenericToken";
+        }
+      }
+    }
+
+    let resolvedType = autoPredicted;
+    if (manualOverride) {
+      if (manualOverride === "IP") {
+        resolvedType = isIpv6Val(trimmed) ? "IPv6" : "IPv4";
+      } else {
+        resolvedType = manualOverride;
+      }
+    }
+
+    return { resolvedType, autoPredicted, fromLearning };
+  }
+
+  $: currentAddPairDetection = inferPairDetectorInfo(newPairOriginal, newPairType, newPairManualOverride);
+
+  function getUsedPseudonymsLowerSet() {
+    const used = new Set();
+    for (const m of (vaultMappings || [])) {
+      if (m && m.pseudonym && m.pseudonym !== "=") {
+        used.add(String(m.pseudonym).toLowerCase());
+      }
+    }
+    return used;
+  }
+
+  function pickUniqueFromListOrEscalate(baseCandidates, tier2Generator, tier3Prefix, usedSet) {
+    const freeBase = baseCandidates.filter(c => !usedSet.has(c.toLowerCase()));
+    if (freeBase.length > 0) {
+      return freeBase[Math.floor(Math.random() * freeBase.length)];
+    }
+    for (let i = 0; i < 64; i++) {
+      const candidate = tier2Generator(i);
+      if (candidate && !usedSet.has(candidate.toLowerCase())) {
+        return candidate;
+      }
+    }
+    let seq = 2;
+    while (seq < 100000) {
+      const fallback = `${tier3Prefix}${String(seq).padStart(2, "0")}`;
+      if (!usedSet.has(fallback.toLowerCase())) {
+        return fallback;
+      }
+      seq++;
+    }
+    return `${tier3Prefix}${Date.now()}`;
+  }
+
+  function resolveSyntheticNetbiosDomain(origDomain, usedSet) {
+    const upperOrig = origDomain.toUpperCase();
+    const occupiedDomains = new Set();
+    for (const m of (vaultMappings || [])) {
+      if (!m || !m.original || !m.pseudonym || m.pseudonym === "=") continue;
+      if (m.original.toUpperCase() === upperOrig && !m.pseudonym.includes("\\")) {
+        return m.pseudonym.toUpperCase();
+      }
+      if (m.original.includes("\\") && m.pseudonym.includes("\\")) {
+        const [mOrigDom] = m.original.split("\\");
+        const [mPseudoDom] = m.pseudonym.split("\\");
+        if (mOrigDom.toUpperCase() === upperOrig) {
+          return mPseudoDom.toUpperCase();
+        }
+        occupiedDomains.add(mPseudoDom.toUpperCase());
+      }
+    }
+    const freeDomains = EN_NETBIOS_DOMAINS.filter(d => !occupiedDomains.has(d) && !usedSet.has(d.toLowerCase()));
+    if (freeDomains.length > 0) {
+      return freeDomains[Math.floor(Math.random() * freeDomains.length)];
+    }
+    return `CORP${Math.floor(Math.random() * 89 + 10)}`;
+  }
+
+  function resolveSyntheticAtDomain(origDomain, isUpn) {
+    const lowerOrig = (origDomain || "").toLowerCase();
+    for (const m of (vaultMappings || [])) {
+      if (!m || !m.original || !m.pseudonym || m.pseudonym === "=") continue;
+      if (m.original.toLowerCase() === lowerOrig && m.pseudonym.includes(".")) {
+        return m.pseudonym.toLowerCase();
+      }
+      if (m.original.includes("@") && m.pseudonym.includes("@")) {
+        const origDom = m.original.split("@")[1]?.toLowerCase();
+        const pseudoDom = m.pseudonym.split("@")[1]?.toLowerCase();
+        if (origDom === lowerOrig && pseudoDom) {
+          return pseudoDom;
+        }
+      }
+    }
+    return isUpn ? "contoso.local" : "example.com";
+  }
+
+  function generateUniquePhone(raw, usedSet) {
+    const template = raw && /\d/.test(raw) ? raw : "+1 555 014 8290";
+    for (let attempt = 0; attempt < 80; attempt++) {
+      let digitIdx = 0;
+      const hasPlus34 = template.replace(/\s+/g, "").startsWith("+34");
+      let out = "";
+      for (let i = 0; i < template.length; i++) {
+        const ch = template[i];
+        if (ch >= "0" && ch <= "9") {
+          if (hasPlus34 && digitIdx < 2) {
+            out += ch;
+          } else if (digitIdx === (hasPlus34 ? 2 : 0) && "6789".includes(ch)) {
+            out += ch;
+          } else {
+            out += String(Math.floor(Math.random() * 10));
+          }
+          digitIdx++;
+        } else {
+          out += ch;
+        }
+      }
+      if (out !== raw && !usedSet.has(out.toLowerCase())) {
+        return out;
+      }
+    }
+    return `+1-555-${Math.floor(1000000 + Math.random() * 8999999)}`;
+  }
+
+  function autoGeneratePseudonym(val, typeOrCategory) {
+    const raw = (val || "").trim();
+    const usedSet = getUsedPseudonymsLowerSet();
+    const resolved = ["Auto", "Identity", "Network"].includes(typeOrCategory)
+      ? inferPairDetectorInfo(raw, typeOrCategory, newPairManualOverride).resolvedType
+      : (typeOrCategory === "IP" ? (raw.includes(":") ? "IPv6" : "IPv4") : typeOrCategory);
+
+    if (resolved === "IPv4") {
+      const hasEscapes = raw.includes("\\.");
+      const cleanRaw = raw.replace(/\\/g, "");
+      const parts = cleanRaw.split(".").filter(Boolean);
+      const isPrivate = parts.length === 4 && (parts[0] === "10" || parts[0] === "192" || parts[0] === "172");
+      for (let i = 0; i < 80; i++) {
+        const o2 = Math.floor(Math.random() * 253 + 1);
+        const o3 = Math.floor(Math.random() * 253 + 1);
+        const o4 = Math.floor(Math.random() * 253 + 1);
+        const ip = isPrivate
+          ? `10.${o2}.${o3}.${o4}`
+          : `${Math.floor(Math.random() * 210 + 11)}.${o2}.${o3}.${o4}`;
+        const formatted = hasEscapes ? ip.replace(/\./g, "\\.") : ip;
+        if (formatted !== raw && !usedSet.has(formatted.toLowerCase())) return formatted;
+      }
+    }
+
+    if (resolved === "IPv6") {
+      const hex = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
+      for (let i = 0; i < 64; i++) {
+        const candidate = `fd${hex().substring(0, 2)}:${hex()}:${hex()}::${hex()}`;
+        if (!usedSet.has(candidate.toLowerCase())) return candidate;
+      }
+    }
+
+    if (resolved === "Username") {
+      // Caso 1: Usuario de dominio NetBIOS / Active Directory (DOMAIN\user o DOMAIN\PC01$)
+      if (raw.includes("\\")) {
+        const [origDom, origUser = ""] = raw.split("\\");
+        const synDom = resolveSyntheticNetbiosDomain(origDom, usedSet);
+        const isMachine = origUser.endsWith("$");
+        if (isMachine) {
+          for (let i = 1; i < 999; i++) {
+            const candidate = `${synDom}\\WS${String(Math.floor(Math.random() * 899 + 100))}$`;
+            if (!usedSet.has(candidate.toLowerCase())) return candidate;
+          }
+        }
+        const domainCandidates = EN_USER_HANDLES.map(h => `${synDom}\\${h}`);
+        return pickUniqueFromListOrEscalate(
+          domainCandidates,
+          () => {
+            const fn = EN_FIRST_NAMES[Math.floor(Math.random() * EN_FIRST_NAMES.length)][0].toLowerCase();
+            const ln = EN_LAST_NAMES[Math.floor(Math.random() * EN_LAST_NAMES.length)].toLowerCase();
+            const num = String(Math.floor(Math.random() * 89 + 10));
+            return `${synDom}\\${fn}${ln}${num}`;
+          },
+          `${synDom}\\jdoe_`,
+          usedSet
+        );
+      }
+
+      // Caso 2: Cuenta de dominio UPN (user@corp.local / user@domain)
+      if (raw.includes("@")) {
+        const origDom = raw.split("@")[1] || "contoso.local";
+        const synDom = resolveSyntheticAtDomain(origDom, true);
+        const upnCandidates = EN_USER_HANDLES.map(h => `${h}@${synDom}`);
+        return pickUniqueFromListOrEscalate(
+          upnCandidates,
+          () => {
+            const fn = EN_FIRST_NAMES[Math.floor(Math.random() * EN_FIRST_NAMES.length)].toLowerCase();
+            const ln = EN_LAST_NAMES[Math.floor(Math.random() * EN_LAST_NAMES.length)].toLowerCase();
+            return `${fn}.${ln}${Math.floor(Math.random() * 89 + 10)}@${synDom}`;
+          },
+          `jdoe_`,
+          usedSet
+        );
+      }
+
+      // Caso 3: Cuenta simple (preservando prefijo svc_ / adm_ si existe)
+      const prefixMatch = raw.match(/^(svc[_-]|adm[_-]|admin[_-])/i);
+      const prefix = prefixMatch ? prefixMatch[1].toLowerCase() : "";
+      const baseHandles = EN_USER_HANDLES.map(h => `${prefix}${h}`);
+      return pickUniqueFromListOrEscalate(
+        baseHandles,
+        () => {
+          const fn = EN_FIRST_NAMES[Math.floor(Math.random() * EN_FIRST_NAMES.length)][0].toLowerCase();
+          const ln = EN_LAST_NAMES[Math.floor(Math.random() * EN_LAST_NAMES.length)].toLowerCase();
+          const num = String(Math.floor(Math.random() * 900 + 100));
+          return `${prefix}${fn}${ln}${num}`;
+        },
+        `${prefix}jdoe_`,
+        usedSet
+      );
+    }
+
+    if (resolved === "PersonName") {
+      const words = raw ? raw.split(/\s+/).filter(Boolean) : ["John", "Doe"];
+      const letters = Array.from(raw).filter(c => /\p{L}/u.test(c));
+      const isAllCaps = letters.length >= 2 && letters.every(c => /\p{Lu}/u.test(c));
+      const applyCase = (s) => (isAllCaps ? s.toUpperCase() : s);
+
+      if (words.length === 1) {
+        const singlePool = [...EN_FIRST_NAMES, ...EN_LAST_NAMES].map(applyCase);
+        return pickUniqueFromListOrEscalate(
+          singlePool,
+          () => {
+            const base = EN_FIRST_NAMES[Math.floor(Math.random() * EN_FIRST_NAMES.length)];
+            const mid = EN_MIDDLE_INITIALS[Math.floor(Math.random() * EN_MIDDLE_INITIALS.length)];
+            return applyCase(`${base}_${mid}`);
+          },
+          applyCase("Oliver_"),
+          usedSet
+        );
+      }
+
+      // 2 o más palabras -> Nombre completo en inglés (Nivel 1: First Last; Nivel 2: First M. Last)
+      const tier1FullNames = [];
+      for (let i = 0; i < 48; i++) {
+        const fn = EN_FIRST_NAMES[Math.floor(Math.random() * EN_FIRST_NAMES.length)];
+        const ln = EN_LAST_NAMES[Math.floor(Math.random() * EN_LAST_NAMES.length)];
+        tier1FullNames.push(applyCase(`${fn} ${ln}`));
+      }
+      // Si los 48 aleatorios colisionan, barrer sistemáticamente las 1.024 combinaciones antes de pasar a Nivel 2
+      const freeSample = tier1FullNames.filter(n => !usedSet.has(n.toLowerCase()));
+      if (freeSample.length > 0) {
+        return freeSample[0];
+      }
+      for (const fn of EN_FIRST_NAMES) {
+        for (const ln of EN_LAST_NAMES) {
+          const full = applyCase(`${fn} ${ln}`);
+          if (!usedSet.has(full.toLowerCase())) return full;
+        }
+      }
+      return pickUniqueFromListOrEscalate(
+        [],
+        () => {
+          const fn = EN_FIRST_NAMES[Math.floor(Math.random() * EN_FIRST_NAMES.length)];
+          const mid = EN_MIDDLE_INITIALS[Math.floor(Math.random() * EN_MIDDLE_INITIALS.length)];
+          const ln = EN_LAST_NAMES[Math.floor(Math.random() * EN_LAST_NAMES.length)];
+          return applyCase(`${fn} ${mid}. ${ln}`);
+        },
+        applyCase("Oliver Carter "),
+        usedSet
+      );
+    }
+
+    if (resolved === "Address") {
+      const tier1Addresses = [];
+      for (let i = 0; i < 48; i++) {
+        const num = Math.floor(Math.random() * 900 + 100);
+        const st = EN_STREET_NAMES[Math.floor(Math.random() * EN_STREET_NAMES.length)];
+        const sfx = EN_STREET_SUFFIXES[Math.floor(Math.random() * EN_STREET_SUFFIXES.length)];
+        tier1Addresses.push(`${num} ${st} ${sfx}`);
+      }
+      return pickUniqueFromListOrEscalate(
+        tier1Addresses,
+        () => {
+          const num = Math.floor(Math.random() * 900 + 100);
+          const st = EN_STREET_NAMES[Math.floor(Math.random() * EN_STREET_NAMES.length)];
+          const sfx = EN_STREET_SUFFIXES[Math.floor(Math.random() * EN_STREET_SUFFIXES.length)];
+          const aptNum = Math.floor(Math.random() * 40 + 1);
+          const aptLet = "ABCDEF"[Math.floor(Math.random() * 6)];
+          return `${num} ${st} ${sfx}, Apt ${aptNum}${aptLet}`;
+        },
+        "742 Evergreen Terrace, Unit ",
+        usedSet
+      );
+    }
+
+    if (resolved === "Telephone") {
+      return generateUniquePhone(raw, usedSet);
+    }
+
+    if (resolved === "Email") {
+      const origDom = raw.includes("@") ? raw.split("@")[1] : "example.com";
+      const safeDom = resolveSyntheticAtDomain(origDom, false);
+      const emailCandidates = EN_USER_HANDLES.map(h => `${h}@${safeDom}`);
+      return pickUniqueFromListOrEscalate(
+        emailCandidates,
+        () => {
+          const fn = EN_FIRST_NAMES[Math.floor(Math.random() * EN_FIRST_NAMES.length)].toLowerCase();
+          const ln = EN_LAST_NAMES[Math.floor(Math.random() * EN_LAST_NAMES.length)].toLowerCase();
+          return `${fn}.${ln}${Math.floor(Math.random() * 89 + 10)}@${safeDom}`;
+        },
+        `user_`,
+        usedSet
+      );
+    }
+
+    if (resolved === "DomainFqdn") {
+      for (let i = 0; i < 64; i++) {
+        const randHex = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, "0");
+        const candidate = `service-${randHex}.example.com`;
+        if (!usedSet.has(candidate.toLowerCase())) return candidate;
+      }
+    }
+
+    if (resolved === "SpanishDniNie") {
+      const letters = "TRWAGMYFPDXBNJZSQVHLCKE";
+      for (let i = 0; i < 64; i++) {
+        const num = Math.floor(Math.random() * 89999999 + 10000000);
+        const candidate = `${num}${letters[num % 23]}`;
+        if (candidate !== raw.toUpperCase() && !usedSet.has(candidate.toLowerCase())) return candidate;
+      }
+    }
+
+    if (resolved === "CreditCard") {
+      for (let i = 0; i < 64; i++) {
+        const p2 = Math.floor(Math.random() * 8999 + 1000);
+        const p3 = Math.floor(Math.random() * 8999 + 1000);
+        const candidate = `4532-${p2}-****-${p3}`;
+        if (!usedSet.has(candidate.toLowerCase())) return candidate;
+      }
+    }
+
+    if (resolved === "GuidUuid") {
+      const rand4 = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
+      for (let i = 0; i < 64; i++) {
+        const candidate = `${rand4()}${rand4()}-${rand4()}-4${rand4().substring(1)}-a${rand4().substring(1)}-${rand4()}${rand4()}${rand4()}`;
+        if (!usedSet.has(candidate.toLowerCase())) return candidate;
+      }
+    }
+
+    for (let i = 0; i < 64; i++) {
+      const randHex = Math.random().toString(16).substring(2, 10).toUpperCase();
+      const candidate = `Token_${randHex}`;
+      if (!usedSet.has(candidate.toLowerCase())) return candidate;
+    }
+    return `Token_${Date.now().toString(16).toUpperCase()}`;
+  }
+
+  function openAddPairModal() {
+    newPairOriginal = "";
+    newPairType = "Auto";
+    newPairManualOverride = "";
+    newPairPseudoManuallyEdited = false;
+    newPairDetectionConfirmed = false;
+    newPairPseudo = "";
+    showAddPairModal = true;
+  }
+
+  function handleAddPairOriginalInput() {
+    newPairDetectionConfirmed = false;
+    if (!newPairPseudoManuallyEdited) {
+      newPairPseudo = newPairOriginal.trim()
+        ? autoGeneratePseudonym(newPairOriginal, newPairType)
+        : "";
+    }
+  }
+
+  function handleAddPairCategoryChange() {
+    newPairManualOverride = "";
+    newPairDetectionConfirmed = false;
+    if (!newPairPseudoManuallyEdited) {
       newPairPseudo = autoGeneratePseudonym(newPairOriginal, newPairType);
+    }
+  }
+
+  function handleAddPairOverrideChange(e) {
+    newPairManualOverride = e.currentTarget.value;
+    newPairDetectionConfirmed = false;
+    newPairPseudoManuallyEdited = false;
+    newPairPseudo = autoGeneratePseudonym(newPairOriginal, newPairType);
+  }
+
+  function handleAddPairPseudoManualInput() {
+    newPairPseudoManuallyEdited = newPairPseudo.trim().length > 0;
+  }
+
+  function regenerateAddPairPseudo() {
+    newPairPseudoManuallyEdited = false;
+    newPairPseudo = autoGeneratePseudonym(newPairOriginal, newPairType);
+  }
+
+  async function loadDetectorLearning() {
+    try {
+      const res = await invokeTauri("get_detector_learning");
+      if (res && res.store) {
+        detectorLearningStore = res.store;
+        detectorLearningPath = res.file_path || "";
+      }
+    } catch (e) {
+      console.warn("No se pudo cargar el almacén de aprendizaje de detectores:", e);
+    }
+  }
+
+  async function confirmCurrentPairDetection() {
+    if (!newPairOriginal.trim()) return;
+    const { resolvedType, autoPredicted } = inferPairDetectorInfo(newPairOriginal, newPairType, newPairManualOverride);
+    try {
+      const res = await invokeTauri("record_detector_feedback", {
+        rawValue: newPairOriginal.trim(),
+        autoPredicted,
+        userConfirmed: resolvedType
+      });
+      if (res && res.store) {
+        detectorLearningStore = res.store;
+        detectorLearningPath = res.file_path || detectorLearningPath;
+      }
+      newPairDetectionConfirmed = true;
+      statusMessage = `🧠 Patrón estructural aprendido sin datos sensibles (${getFriendlyDetectorLabel(resolvedType)}).`;
+    } catch (e) {
+      console.warn("Error registrando aprendizaje:", e);
+    }
+  }
+
+  function openLearningReviewModal() {
+    selectedLearningSkeletons = (detectorLearningStore?.rules || []).map(r => r.skeleton_compact);
+    learningCopiedFlash = false;
+    showLearningReviewModal = true;
+  }
+
+  $: previewFilteredLearningObject = {
+    schema_version: detectorLearningStore?.schema_version || 1,
+    app_version: detectorLearningStore?.app_version || appVersion,
+    os_family: detectorLearningStore?.os_family || "linux",
+    rules: (detectorLearningStore?.rules || []).filter(r => selectedLearningSkeletons.includes(r.skeleton_compact))
+  };
+
+  $: previewShareableLearningJson = JSON.stringify(previewFilteredLearningObject, null, 2);
+
+  async function handleCopyLearningJson() {
+    try {
+      await navigator.clipboard.writeText(previewShareableLearningJson);
+      learningCopiedFlash = true;
+      statusMessage = "📋 JSON de calibración (sin datos sensibles) copiado al portapapeles.";
+      setTimeout(() => { learningCopiedFlash = false; }, 2000);
+    } catch (e) {
+      alert("No se pudo copiar al portapapeles: " + e);
+    }
+  }
+
+  async function handleSaveLearningJsonFile() {
+    try {
+      const dest = await save({
+        defaultPath: "lexishield_detector_learning.json",
+        filters: [{ name: "Aprendizaje LexiShield (JSON)", extensions: ["json"] }]
+      });
+      if (!dest) return;
+      const outPath = await invokeTauri("export_detector_learning", {
+        destPath: dest,
+        selectedSkeletons: selectedLearningSkeletons
+      });
+      statusMessage = `💾 Archivo de aprendizaje exportado en: ${outPath}`;
+    } catch (e) {
+      alert("Error al exportar archivo de aprendizaje: " + e);
+    }
+  }
+
+  async function handleSubmitLearningToGitHub() {
+    if (previewFilteredLearningObject.rules.length === 0) return;
+    const title = `[Detector Calibration] Patrones estructurales propuestos (v${appVersion})`;
+    const fullBody = [
+      "### Propuesta de calibración de detectores (Zero-PII)",
+      "",
+      "Adjunto patrones estructurales enmascarados revisados por el usuario para afinar la detección automática de LexiShield (sin datos reales ni rutas locales):",
+      "",
+      "```json",
+      previewShareableLearningJson,
+      "```"
+    ].join("\n");
+
+    let targetUrl = `${GITHUB_REPO_ISSUES_NEW}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(fullBody)}`;
+    let usedClipboardFallback = false;
+
+    if (targetUrl.length > 5800) {
+      try {
+        await navigator.clipboard.writeText(previewShareableLearningJson);
+        usedClipboardFallback = true;
+      } catch (_) {}
+      const compactBody = [
+        "### Propuesta de calibración de detectores (Zero-PII)",
+        "",
+        `Conjunto amplio de **${previewFilteredLearningObject.rules.length} reglas estructurales** (copiado automáticamente a tu portapapeles por límite de longitud de URL del navegador).`,
+        "",
+        "Por favor, pega aquí debajo con `Ctrl+V` el contenido JSON revisado:",
+        "",
+        "```json",
+        "// Pulsa Ctrl+V aquí para pegar el JSON revisado",
+        "```"
+      ].join("\n");
+      targetUrl = `${GITHUB_REPO_ISSUES_NEW}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(compactBody)}`;
+    }
+
+    try {
+      await openUrl(targetUrl);
+      statusMessage = usedClipboardFallback
+        ? "🚀 Abriendo GitHub Issues (el JSON completo se ha copiado al portapapeles para pegarlo con Ctrl+V)."
+        : "🚀 Abriendo Issue pre-rellenada en GitHub con el JSON exacto revisado.";
+    } catch (e) {
+      alert("No se pudo abrir el navegador automáticamente. Puedes usar 'Copiar JSON' o 'Guardar .json': " + e);
+    }
+  }
+
+  async function handleDeleteLearningRule(skeletonCompact) {
+    try {
+      const res = await invokeTauri("clear_detector_learning", { skeletonCompact });
+      if (res && res.store) {
+        detectorLearningStore = res.store;
+        selectedLearningSkeletons = selectedLearningSkeletons.filter(s => s !== skeletonCompact);
+      }
+    } catch (e) {
+      alert("Error al eliminar regla aprendida: " + e);
+    }
+  }
+
+  async function handleClearAllLearning() {
+    if (!confirm("¿Vaciar todos los patrones estructurales aprendidos localmente?")) return;
+    try {
+      const res = await invokeTauri("clear_detector_learning", { skeletonCompact: null });
+      if (res && res.store) {
+        detectorLearningStore = res.store;
+        selectedLearningSkeletons = [];
+        statusMessage = "🧹 Aprendizaje local de detectores reiniciado.";
+      }
+    } catch (e) {
+      alert("Error al reiniciar aprendizaje: " + e);
     }
   }
 
@@ -1921,19 +2661,42 @@
       alert("Por favor introduce el valor original y el valor protegido.");
       return;
     }
+    const { resolvedType, autoPredicted } = inferPairDetectorInfo(
+      newPairOriginal,
+      newPairType,
+      newPairManualOverride
+    );
     try {
       const updated = await invokeTauri("update_mapping_pair", {
         vaultPath: pairsSelectedVault || vaultPath,
         password: password || null,
         original: newPairOriginal.trim(),
         pseudonym: newPairPseudo.trim(),
-        detectorType: newPairType
+        detectorType: resolvedType
       });
+      if (newPairManualOverride && !newPairDetectionConfirmed) {
+        try {
+          const learnRes = await invokeTauri("record_detector_feedback", {
+            rawValue: newPairOriginal.trim(),
+            autoPredicted,
+            userConfirmed: resolvedType
+          });
+          if (learnRes && learnRes.store) {
+            detectorLearningStore = learnRes.store;
+            detectorLearningPath = learnRes.file_path || detectorLearningPath;
+          }
+        } catch (learnErr) {
+          console.warn("No se pudo registrar corrección de aprendizaje:", learnErr);
+        }
+      }
       vaultMappings = updated;
       showAddPairModal = false;
       newPairOriginal = "";
       newPairPseudo = "";
-      statusMessage = "✅ Par agregado con éxito a la bóveda.";
+      newPairManualOverride = "";
+      newPairPseudoManuallyEdited = false;
+      newPairDetectionConfirmed = false;
+      statusMessage = `✅ Par agregado con éxito a la bóveda (${getFriendlyDetectorLabel(resolvedType)}).`;
     } catch (e) {
       alert("Error al agregar par: " + e);
     }
@@ -2562,7 +3325,7 @@
         class="text-xs px-2.5 py-1 rounded-lg border font-mono flex items-center gap-1.5 transition {isVaultEncrypted ? (isVaultUnlocked ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse') : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300'}"
         title={vaultPath || "Bóveda por defecto"}
       >
-        <span>{isVaultEncrypted ? (isVaultUnlocked ? "🔓 Desbloqueada" : "🔒 Bloqueada") : "📄 Bóveda Plana"}</span>
+        <span>{isVaultEncrypted ? (isVaultUnlocked ? "🔓 Desbloqueada" : "🔒 Bloqueada") : "📄 Bóveda plana"}</span>
       </button>
 
       <!-- Botón Configuración -->
@@ -2634,7 +3397,7 @@
               title="Volver a los paneles de transformación"
             >
               <span>✨</span>
-              <span>Volver a Transformación</span>
+              <span>Volver a transformación</span>
             </button>
           {/if}
 
@@ -2924,7 +3687,7 @@
             <div class="flex flex-wrap items-center justify-between gap-4 mb-3 pb-2 border-b border-slate-200 dark:border-white/5">
               <div>
                 <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>🔍</span> Inspección Previa de Tokens
+                  <span>🔍</span> Inspección previa de tokens
                 </h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">Inspecciona y clasifica tokens detectados antes de proteger el archivo. Desmarca casillas si deseas omitir falsos positivos.</p>
               </div>
@@ -2935,7 +3698,7 @@
                   class="px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-md shadow-primary-500/20 flex items-center gap-1.5"
                   title="Volver a los editores de transformación"
                 >
-                  <span>✨</span> Volver a Transformación
+                  <span>✨</span> Volver a transformación
                 </button>
               </div>
             </div>
@@ -2953,7 +3716,7 @@
                   on:click={() => { isEditingInput = false; isEditingOutput = false; studioSubView = "transform"; }}
                   class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-primary-500/20"
                 >
-                  <span>✨</span> Volver a Transformación
+                  <span>✨</span> Volver a transformación
                 </button>
               </div>
             {/if}
@@ -3092,7 +3855,7 @@
                       class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-lg transition shadow-md flex items-center gap-1.5"
                       title="Proceder a proteger el archivo con los tokens verificados"
                     >
-                      <span>🛡️</span> Proteger Archivo...
+                      <span>🛡️</span> Proteger archivo...
                     </button>
                   {/if}
                   <button
@@ -3101,7 +3864,7 @@
                     class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-300 font-semibold rounded-lg transition flex items-center gap-1"
                     title="Limpiar los resultados y reiniciar la inspección previa"
                   >
-                    <span>🗑️</span> Limpiar Resultados
+                    <span>🗑️</span> Limpiar resultados
                   </button>
                   <button
                     type="button"
@@ -3109,7 +3872,7 @@
                     class="px-3.5 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold rounded-lg transition shadow-md shadow-primary-500/20 flex items-center gap-1.5"
                     title="Guardar todos los mapeos en la bóveda activa aplicando las omisiones seleccionadas"
                   >
-                    <span>💾</span> Guardar en Bóveda ({detectedItems.length})
+                    <span>💾</span> Guardar en bóveda ({detectedItems.length})
                   </button>
                 </div>
               </div>
@@ -3207,7 +3970,7 @@
             <div class="flex items-start gap-2.5">
               <span class="text-base">💡</span>
               <div>
-                <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Gestión de Pares de Tokens</p>
+                <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Gestión de pares de tokens</p>
                 <p>Cada par asocia un token confidencial (nombre, DNI, IBAN, correo o secreto) con su valor protegido generado. Puedes añadir pares manuales o editar los existentes. Toda modificación se sincroniza inmediatamente con el archivo cifrado de la bóveda.</p>
               </div>
             </div>
@@ -3218,7 +3981,7 @@
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
             <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>📑</span> Pares de Tokens ({filteredPairs.length})
+              <span>📑</span> Pares de tokens ({filteredPairs.length})
             </h2>
             <p class="text-xs text-slate-500 dark:text-slate-400">Gestiona, edita o añade correspondencias de tokens confidenciales y sus sustitutos en la bóveda activa.</p>
           </div>
@@ -3248,12 +4011,21 @@
             </button>
 
             <button
-              on:click={() => (showAddPairModal = true)}
+              on:click={openLearningReviewModal}
+              class="px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/60 dark:hover:bg-white/10 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+              title="Revisar patrones estructurales aprendidos (sin datos sensibles) y enviar propuestas a GitHub"
+            >
+              {#if toolbarButtonStyle !== 'text_only'}<span>🧠</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Aprendizaje ({detectorLearningStore?.rules?.length || 0})</span>{/if}
+            </button>
+
+            <button
+              on:click={openAddPairModal}
               class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
               title="Añadir nuevo par de sustitución a la bóveda"
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>➕</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Añadir Par</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Añadir par</span>{/if}
             </button>
 
             {#if selectedPairKeys.length > 0}
@@ -3449,7 +4221,7 @@
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
             <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <span>🗄️</span> Bóvedas Lexi y Copias de Seguridad Bzip2
+              <span>🗄️</span> Bóvedas lexi y copias de seguridad bzip2
             </h2>
             <p class="text-xs text-slate-500 dark:text-slate-400">Administra todas las bóvedas en tu perfil (~/.lexishield) y realiza copias de seguridad de alta compresión.</p>
           </div>
@@ -3468,14 +4240,14 @@
               class="px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>➕</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Nueva Bóveda</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Nueva bóveda</span>{/if}
             </button>
             <button
               on:click={handleImportVault}
               class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition flex items-center gap-1.5"
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>📥</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Importar Bóveda</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Importar bóveda</span>{/if}
             </button>
             <button
               on:click={() => (showBackupModal = true)}
@@ -3483,7 +4255,7 @@
               title="Crear un backup comprimido de todas las configuraciones y bóvedas de LexiShield"
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>📦</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Backup LexiShield</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Backup lexi shield</span>{/if}
             </button>
             <button
               on:click={handleRestoreBackup}
@@ -3491,7 +4263,7 @@
               title="Restaurar un archivo de backup de LexiShield (.tar.bz2 / .lexibak)"
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>♻️</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar LexiShield</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span>Restaurar lexi shield</span>{/if}
             </button>
           </div>
         </div>
@@ -3607,7 +4379,7 @@
           <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10 mb-6">
             <div>
               <h2 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>📋</span> Monitorización Activa del Portapapeles
+                <span>📋</span> Monitorización activa del portapapeles
               </h2>
               <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Captura texto copiado al portapapeles y aplica transformaciones automáticas instantáneas.</p>
             </div>
@@ -3641,7 +4413,7 @@
                 class="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl border border-rose-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
               >
                 {#if toolbarButtonStyle !== 'text_only'}<span>🧹</span>{/if}
-                {#if toolbarButtonStyle !== 'icons_only'}<span>Vaciar Portapapeles</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>Vaciar portapapeles</span>{/if}
               </button>
             </div>
           </div>
@@ -3650,9 +4422,9 @@
             <div class="mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3 text-xs text-amber-800 dark:text-amber-200">
               <span class="text-base">⚠️</span>
               <div class="flex-1">
-                <p class="font-bold text-slate-900 dark:text-white mb-0.5">Aviso de acceso al portapapeles de Linux</p>
+                <p class="font-bold text-slate-900 dark:text-white mb-0.5">Aviso de acceso al portapapeles de linux</p>
                 <p class="mb-1">{clipboardError}</p>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">Si utilizas Wayland (KDE Plasma/GNOME), instala el paquete <code class="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded font-mono">wl-clipboard</code> (<code class="font-mono">sudo apt install wl-clipboard</code> o <code class="font-mono">sudo pacman -S wl-clipboard</code>) o asegúrate de que Klipper/XWayland esté activo.</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Si utilizas wayland(KDE Plasma/GNOME), instala el paquete <code class="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded font-mono">wl-clipboard</code> (<code class="font-mono">sudo apt install wl-clipboard</code> o <code class="font-mono">sudo pacman -S wl-clipboard</code>) o asegúrate de que Klipper/XWayland esté activo.</p>
               </div>
             </div>
           {/if}
@@ -3660,7 +4432,7 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div class="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-white/5 space-y-3">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dirección de Transformación</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Dirección de transformación</span>
                 <span class="text-[10px] font-mono px-2 py-0.5 rounded-full {watchDirection === 'obfuscate' ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'}">
                   {watchDirection === 'obfuscate' ? 'Modo Proteger' : 'Modo Restaurar'}
                 </span>
@@ -4009,6 +4781,26 @@
                     >
                       <span>🌐</span>
                       <span>Gestionar Exclusiones</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Aprendizaje Local de Detectores (Zero-PII) y Mejora en GitHub -->
+                <div class="pt-2 border-t border-slate-200 dark:border-white/5">
+                  <div class="flex items-center justify-between gap-2">
+                    <div>
+                      <span class="block text-xs font-medium text-slate-600 dark:text-slate-400">Aprendizaje de Detectores (Zero-PII):</span>
+                      <span class="text-[11px] text-slate-500 dark:text-slate-400">
+                        {detectorLearningStore?.rules?.length || 0} patrones estructurales aprendidos sin datos reales
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      on:click={openLearningReviewModal}
+                      class="px-2.5 py-1.5 rounded-lg bg-primary-500/10 hover:bg-primary-500/20 text-primary-600 dark:text-primary-400 border border-primary-500/30 text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
+                    >
+                      <span>📤</span>
+                      <span>Revisar y Enviar</span>
                     </button>
                   </div>
                 </div>
@@ -4474,32 +5266,112 @@
   <!-- MODAL AÑADIR PAR MANUAL -->
   {#if showAddPairModal}
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <span>➕</span> Añadir Par de Sustitución
-        </h3>
-        
-        <form on:submit|preventDefault={handleAddPairSubmit} class="space-y-3 text-xs">
+      <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <span>➕</span> Añadir par de sustitución
+          </h3>
+          <button
+            type="button"
+            on:click={openLearningReviewModal}
+            class="text-[11px] text-slate-500 hover:text-primary-600 dark:hover:text-primary-400 flex items-center gap-1 transition"
+            title="Ver y compartir patrones aprendidos sin datos reales"
+          >
+            <span>🧠</span> Aprendizaje ({detectorLearningStore?.rules?.length || 0})
+          </button>
+        </div>
+
+        <form on:submit|preventDefault={handleAddPairSubmit} class="space-y-3.5 text-xs">
           <div>
             <label for="add-pair-orig-input" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Valor Original Confidencial:</label>
             <input
               id="add-pair-orig-input"
+              use:autofocus
               type="text"
               bind:value={newPairOriginal}
-              on:input={handleAddPairInputOrTypeChange}
-              placeholder="ej: Juan Pérez o 192.168.1.10"
+              on:input={handleAddPairOriginalInput}
+              placeholder="ej: Juan Pérez, CORP\jperez, Calle Mayor 14, +34 612 34 56 78, 192.168.1.10"
               class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500 {privacyBlur ? 'privacy-blurred' : ''}"
             />
           </div>
 
           <div>
+            <label for="add-pair-type-select" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Categoría de Detección:</label>
+            <select
+              id="add-pair-type-select"
+              bind:value={newPairType}
+              on:change={handleAddPairCategoryChange}
+              class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-sans font-medium"
+            >
+              <option value="Auto">✨ Detección Automática (Recomendado)</option>
+              <option value="Identity">🪪 Identidad Personal (Usuario, Nombre, Teléfono, Dirección, DNI)</option>
+              <option value="Network">🌐 Red y Sistemas (Dirección IP v4/v6, Email, Dominio, UUID)</option>
+              <option value="GenericToken">🏷️ Token Genérico</option>
+            </select>
+
+            {#if newPairOriginal.trim()}
+              <div class="mt-2 p-2.5 rounded-xl bg-slate-100/90 dark:bg-slate-950/80 border border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="text-[11px] text-slate-500 dark:text-slate-400">Detectado:</span>
+                  <span class="px-2 py-0.5 rounded-md bg-primary-500/15 text-primary-700 dark:text-primary-300 border border-primary-500/30 font-semibold text-[11px] truncate">
+                    {getFriendlyDetectorLabel(currentAddPairDetection.resolvedType)}
+                  </span>
+                  {#if currentAddPairDetection.fromLearning && !newPairManualOverride}
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-semibold" title="Reconocido gracias a tu aprendizaje previo">
+                      🧠 Aprendido
+                    </span>
+                  {/if}
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                  {#if newPairDetectionConfirmed}
+                    <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold px-2 py-0.5">
+                      ✓ Confirmado
+                    </span>
+                  {:else}
+                    <button
+                      type="button"
+                      on:click={confirmCurrentPairDetection}
+                      class="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold transition"
+                      title="Confirmar que el tipo detectado es correcto para reforzar el aprendizaje"
+                    >
+                      👍 Correcto
+                    </button>
+                  {/if}
+
+                  <select
+                    aria-label="Corregir tipo detectado"
+                    value={newPairManualOverride}
+                    on:change={handleAddPairOverrideChange}
+                    class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200"
+                    title="Si la detección automática no acertó, elige el tipo exacto para corregirlo y aprender"
+                  >
+                    <option value="">✏️ Corregir...</option>
+                    <option value="Username">Usuario (o DOMINIO\user)</option>
+                    <option value="PersonName">Nombre / Apellido</option>
+                    <option value="Address">Dirección Postal / Calle</option>
+                    <option value="Telephone">Teléfono</option>
+                    <option value="IP">Dirección IP (v4 / v6)</option>
+                    <option value="Email">Correo Electrónico</option>
+                    <option value="SpanishDniNie">DNI / NIE</option>
+                    <option value="DomainFqdn">Dominio / Host</option>
+                    <option value="CreditCard">Tarjeta Bancaria</option>
+                    <option value="GuidUuid">GUID / UUID</option>
+                    <option value="GenericToken">Token Genérico</option>
+                  </select>
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          <div>
             <div class="flex items-center justify-between mb-1">
-              <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400">Valor Protegido (o '=' para omitir):</label>
+              <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400">Valor Protegido en Inglés / Formato Seguro (o '=' para omitir):</label>
               <button
                 type="button"
-                on:click={() => { newPairPseudo = autoGeneratePseudonym(newPairOriginal, newPairType); }}
+                on:click={regenerateAddPairPseudo}
                 class="text-[11px] text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 font-semibold"
-                title="Generar nuevo valor protegido aleatorio"
+                title="Generar otro valor protegido único que no colisione con la bóveda"
               >
                 <span>⚡ Regenerar</span>
               </button>
@@ -4508,27 +5380,10 @@
               id="add-pair-pseudo-input"
               type="text"
               bind:value={newPairPseudo}
-              placeholder="ej: AnonUser_001 o 10.0.0.1"
+              on:input={handleAddPairPseudoManualInput}
+              placeholder="ej: Oliver Carter, CONTOSO\jdoe, 742 Oak Avenue o 10.24.81.12"
               class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:ring-1 focus:ring-primary-500"
             />
-          </div>
-
-          <div>
-            <label for="add-pair-type-select" class="block font-medium text-slate-600 dark:text-slate-400 mb-1">Tipo de Detector:</label>
-            <select
-              id="add-pair-type-select"
-              bind:value={newPairType}
-              on:change={handleAddPairInputOrTypeChange}
-              class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-white/10 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono"
-            >
-              <option value="GenericToken">Token Genérico</option>
-              <option value="IPv4">Dirección IPv4</option>
-              <option value="IPv6">Dirección IPv6</option>
-              <option value="Email">Correo Electrónico</option>
-              <option value="SpanishDniNie">DNI / NIE</option>
-              <option value="CreditCard">Tarjeta de Crédito</option>
-              <option value="GuidUuid">GUID / UUID</option>
-            </select>
           </div>
 
           <div class="flex items-center justify-end gap-2 pt-3">
@@ -4556,7 +5411,7 @@
     <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div in:slide={{ duration: 200 }} class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
         <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <span>➕</span> Crear Nueva Bóveda Lexi
+          <span>➕</span> Crear nueva bóveda lexi
         </h3>
         
         <form on:submit|preventDefault={handleCreateVaultSubmit} class="space-y-3 text-xs">
@@ -5563,6 +6418,181 @@
           >
             Cerrar
           </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- MODAL DE REVISIÓN TRANSPARENTE Y ENVÍO DE APRENDIZAJE A GITHUB -->
+  {#if showLearningReviewModal}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        class="fixed inset-0 bg-slate-950/80 backdrop-blur-md w-full h-full cursor-default"
+        on:click={() => (showLearningReviewModal = false)}
+        aria-label="Cerrar revisión de aprendizaje"
+      ></button>
+      <div in:slide={{ duration: 200 }} class="relative z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-3xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden text-xs">
+        <div class="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-slate-950/60">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-primary-500/10 border border-primary-500/20 text-primary-500 flex items-center justify-center text-xl shrink-0">
+              🧠
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Revisión y Envío de Aprendizaje de Detectores (Zero-PII)</h3>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                Revisa exactamente qué patrones enmascarados se van a compartir antes de enviarlos a <code>github.com/olorinj/lexishield</code>.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            on:click={() => (showLearningReviewModal = false)}
+            class="w-8 h-8 rounded-xl text-sm flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+            title="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 smooth-scroll-tokens">
+          <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-slate-700 dark:text-slate-200 space-y-1">
+            <p class="font-bold text-emerald-700 dark:text-emerald-400">🔒 Garantía de Privacidad Zero-Knowledge:</p>
+            <p class="text-[11px]">
+              Nunca se guardan textos originales ni rutas de tu equipo en el contenido exportado. Cada muestra se transforma en un <strong>esqueleto morfológico</strong> (<code>A</code> = mayúscula, <code>a</code> = minúscula, <code>9</code> = dígito). Nada se envía en segundo plano: al pulsar <em>Enviar a GitHub</em> se abrirá tu navegador con la Issue pre-rellenada para que tú decidas publicarla.
+            </p>
+            {#if detectorLearningPath}
+              <p class="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate" title={detectorLearningPath}>
+                Archivo local en este sistema: {detectorLearningPath}
+              </p>
+            {/if}
+          </div>
+
+          {#if !detectorLearningStore?.rules || detectorLearningStore.rules.length === 0}
+            <div class="p-8 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-center space-y-1.5">
+              <div class="text-2xl">✨</div>
+              <p class="font-bold text-slate-700 dark:text-slate-300">Todavía no hay patrones aprendidos registrados</p>
+              <p class="text-[11px] text-slate-400 max-w-md mx-auto">
+                Cuando añadas un par en la pestaña <strong>Pares</strong> y pulses <code>👍 Correcto</code> o corrijas el tipo con <code>✏️ Corregir...</code>, LexiShield aprenderá la estructura aquí.
+              </p>
+            </div>
+          {:else}
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="font-bold text-slate-700 dark:text-slate-300">
+                  1. Selecciona qué patrones incluir ({selectedLearningSkeletons.length} de {detectorLearningStore.rules.length}):
+                </span>
+                <button
+                  type="button"
+                  on:click={handleClearAllLearning}
+                  class="text-[11px] text-rose-600 dark:text-rose-400 hover:underline font-semibold"
+                >
+                  🗑️ Reiniciar todo el aprendizaje
+                </button>
+              </div>
+              <div class="rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden max-h-48 overflow-y-auto smooth-scroll-tokens">
+                <table class="w-full text-left font-mono text-[11px]">
+                  <thead class="bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 sticky top-0 border-b border-slate-200 dark:border-white/10">
+                    <tr>
+                      <th class="p-2 w-10 text-center">Inc.</th>
+                      <th class="p-2">Esqueleto Enmascarado</th>
+                      <th class="p-2">Predicho ➔ Confirmado</th>
+                      <th class="p-2 w-24 text-center">Veces</th>
+                      <th class="p-2 w-12 text-center">Quitar</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200 dark:divide-white/5">
+                    {#each detectorLearningStore.rules as rule (rule.skeleton_compact)}
+                      <tr class="hover:bg-black/5 dark:hover:bg-white/5">
+                        <td class="p-2 text-center">
+                          <input
+                            type="checkbox"
+                            value={rule.skeleton_compact}
+                            bind:group={selectedLearningSkeletons}
+                            class="rounded accent-primary-500 cursor-pointer"
+                          />
+                        </td>
+                        <td class="p-2 text-slate-800 dark:text-slate-200">
+                          <span class="font-bold">{rule.skeleton_compact}</span>
+                          <span class="text-slate-400 ml-1">({rule.sample_skeleton})</span>
+                        </td>
+                        <td class="p-2 font-sans">
+                          <span class="text-slate-500">{getFriendlyDetectorLabel(rule.auto_predicted)}</span>
+                          <span class="mx-1 text-slate-400">➔</span>
+                          <span class="font-bold {rule.was_correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">
+                            {getFriendlyDetectorLabel(rule.user_confirmed)}
+                          </span>
+                        </td>
+                        <td class="p-2 text-center text-slate-500">
+                          {(rule.confirmations || 0) + (rule.corrections || 0)}
+                        </td>
+                        <td class="p-2 text-center">
+                          <button
+                            type="button"
+                            on:click={() => handleDeleteLearningRule(rule.skeleton_compact)}
+                            class="text-rose-500 hover:text-rose-600 px-1"
+                            title="Eliminar este patrón local"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <span class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                2. Vista previa literal del JSON exacto que se enviará / exportará:
+              </span>
+              <pre class="p-3 rounded-xl bg-slate-950 text-emerald-300 border border-slate-800 dark:border-white/10 font-mono text-[11px] max-h-48 overflow-auto select-all smooth-scroll-tokens">{previewShareableLearningJson}</pre>
+            </div>
+          {/if}
+        </div>
+
+        <div class="p-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/60 flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            on:click={() => (showLearningReviewModal = false)}
+            class="px-4 py-2 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-800 dark:text-slate-200 font-semibold rounded-xl transition"
+          >
+            Cerrar
+          </button>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={previewFilteredLearningObject.rules.length === 0}
+              on:click={handleSaveLearningJsonFile}
+              class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition disabled:opacity-40"
+            >
+              💾 Guardar .json
+            </button>
+            <button
+              type="button"
+              disabled={previewFilteredLearningObject.rules.length === 0}
+              on:click={handleCopyLearningJson}
+              class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 font-semibold rounded-xl border border-slate-300 dark:border-white/10 transition disabled:opacity-40"
+            >
+              {learningCopiedFlash ? "✓ Copiado" : "📋 Copiar JSON"}
+            </button>
+            <button
+              type="button"
+              disabled={previewFilteredLearningObject.rules.length === 0}
+              on:click={handleSubmitLearningToGitHub}
+              class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition disabled:opacity-40 flex items-center gap-1.5"
+              title="Abre https://github.com/olorinj/lexishield/issues/new en tu navegador con este JSON pre-rellenado"
+            >
+              <span>🚀</span>
+              <span>Enviar a GitHub (Issue pre-rellenada)</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

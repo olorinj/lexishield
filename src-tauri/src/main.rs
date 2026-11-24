@@ -516,7 +516,7 @@ fn process_file_command(
         let parent = p.parent().unwrap_or_else(|| Path::new(""));
         let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
         let file_stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("archivo");
-        
+
         let protected_stem = if let Some(m) = engine.manager.get_mapping(file_stem) {
             m.pseudonym.clone()
         } else {
@@ -1187,7 +1187,9 @@ fn save_ignored_domains(domains: Vec<String>) -> Result<(), String> {
     config.ignore.ignored_domains = domains;
     lexishield::config::save_user_config(&config).map_err(|e| e.to_string())?;
 
-    log::info!("Configuración: URLs y dominios ignorados sincronizados en ignored_domains.txt y config.toml");
+    log::info!(
+        "Configuración: URLs y dominios ignorados sincronizados en ignored_domains.txt y config.toml"
+    );
     Ok(())
 }
 
@@ -1211,6 +1213,84 @@ fn get_debug_logs(limit: Option<usize>) -> Vec<LogEntry> {
 fn clear_debug_logs() -> Result<(), String> {
     clear_logs();
     Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DetectorLearningResponse {
+    pub store: lexishield::learning::DetectorLearningStore,
+    pub file_path: String,
+    pub shareable_json: String,
+}
+
+fn build_learning_response(
+    store: lexishield::learning::DetectorLearningStore,
+    path: &Path,
+) -> Result<DetectorLearningResponse, String> {
+    let shareable_json = lexishield::learning::build_shareable_learning_json(&store, None)
+        .map_err(|e| e.to_string())?;
+    Ok(DetectorLearningResponse {
+        store,
+        file_path: path.display().to_string(),
+        shareable_json,
+    })
+}
+
+#[tauri::command]
+fn get_detector_learning() -> Result<DetectorLearningResponse, String> {
+    let (store, path) = lexishield::learning::load_learning_store().map_err(|e| e.to_string())?;
+    build_learning_response(store, &path)
+}
+
+#[tauri::command]
+fn record_detector_feedback(
+    raw_value: String,
+    auto_predicted: String,
+    user_confirmed: String,
+) -> Result<DetectorLearningResponse, String> {
+    let (store, path) = lexishield::learning::record_user_detector_feedback(
+        &raw_value,
+        &auto_predicted,
+        &user_confirmed,
+    )
+    .map_err(|e| e.to_string())?;
+    log::info!(
+        "Aprendizaje: Patrón estructural actualizado (predicho: '{}', confirmado: '{}', total reglas: {})",
+        auto_predicted,
+        user_confirmed,
+        store.rules.len()
+    );
+    build_learning_response(store, &path)
+}
+
+#[tauri::command]
+fn export_detector_learning(
+    dest_path: String,
+    selected_skeletons: Option<Vec<String>>,
+) -> Result<String, String> {
+    let out = lexishield::learning::export_user_detector_learning(
+        Path::new(&dest_path),
+        selected_skeletons.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
+    log::info!(
+        "Aprendizaje: Reglas estructurales sin PII exportadas a '{}'",
+        out.display()
+    );
+    Ok(out.display().to_string())
+}
+
+#[tauri::command]
+fn clear_detector_learning(
+    skeleton_compact: Option<String>,
+) -> Result<DetectorLearningResponse, String> {
+    let (store, path) =
+        lexishield::learning::clear_user_detector_learning(skeleton_compact.as_deref())
+            .map_err(|e| e.to_string())?;
+    log::info!(
+        "Aprendizaje: Almacén actualizado (reglas restantes: {})",
+        store.rules.len()
+    );
+    build_learning_response(store, &path)
 }
 
 #[tauri::command]
@@ -1372,7 +1452,11 @@ fn main() {
             clear_debug_logs,
             clear_scan_cache_command,
             check_pandoc_available,
-            is_directory
+            is_directory,
+            get_detector_learning,
+            record_detector_feedback,
+            export_detector_learning,
+            clear_detector_learning
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
