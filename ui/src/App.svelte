@@ -196,6 +196,8 @@
   let outputText = "";
   let isEditingInput = false;
   let isEditingOutput = false;
+  let isPastingInput = false;
+  let isPastingOutput = false;
   let inputTextAreaEl = null;
   let outputTextAreaEl = null;
 
@@ -637,17 +639,28 @@
   function renderHighlightedTokens(text, isProtected = false, customItems = null) {
     if (!text) return "";
 
+    const mergedDefaultItems = () => {
+      const map = new Map();
+      for (const m of (vaultMappings || [])) {
+        if (m && m.original) map.set(m.original, m);
+      }
+      for (const d of (detectedItems || [])) {
+        if (d && d.original) map.set(d.original, d);
+      }
+      return Array.from(map.values());
+    };
+
     if (isProtected) {
-      const searchList = (customItems && customItems.length > 0) ? customItems : vaultMappings;
+      const searchList = (customItems && customItems.length > 0) ? customItems : mergedDefaultItems();
       if (!searchList || searchList.length === 0) {
         return escapeHtml(text);
       }
 
-      // Filtrar términos no vacíos y deduplicar por seudónimo
+      // Filtrar términos no vacíos, omitidos y deduplicar por seudónimo
       const terms = [];
       const seen = new Set();
       for (const item of searchList) {
-        if (!item.pseudonym || item.pseudonym === "=" || item.pseudonym.trim().length < 2) continue;
+        if (item.omitted || !item.pseudonym || item.pseudonym === "=" || item.pseudonym.trim().length < 2) continue;
         if (!seen.has(item.pseudonym)) {
           seen.add(item.pseudonym);
           terms.push({
@@ -702,16 +715,16 @@
     }
 
     // Para texto claro: búsqueda exacta en una sola pasada lineal sobre el string bruto original
-    const knownItems = (customItems && customItems.length > 0) ? customItems : ((detectedItems && detectedItems.length > 0) ? detectedItems : vaultMappings);
+    const knownItems = (customItems && customItems.length > 0) ? customItems : mergedDefaultItems();
     if (!knownItems || knownItems.length === 0) {
       return escapeHtml(text);
     }
 
-    // Filtrar términos no vacíos y deduplicar
+    // Filtrar términos no vacíos, omitidos y deduplicar
     const terms = [];
     const seen = new Set();
     for (const item of knownItems) {
-      if (!item.original || item.original.trim().length < 2) continue;
+      if (item.omitted || item.pseudonym === "=" || !item.original || item.original.trim().length < 2) continue;
       if (!seen.has(item.original)) {
         seen.add(item.original);
         terms.push({
@@ -772,6 +785,20 @@
 
     return result;
   }
+
+  $: activeHighlightMappings = (() => {
+    const map = new Map();
+    for (const m of (vaultMappings || [])) {
+      if (m && m.original) map.set(m.original, m);
+    }
+    for (const d of (detectedItems || [])) {
+      if (d && d.original) map.set(d.original, d);
+    }
+    return Array.from(map.values());
+  })();
+
+  $: highlightedInputHtml = renderHighlightedTokens(inputText, false, activeHighlightMappings);
+  $: highlightedOutputHtml = renderHighlightedTokens(outputText, true, activeHighlightMappings);
 
   function renderMarkdownPreview(rawText) {
     if (!rawText) return "<p class='text-slate-400 italic text-xs'>Sin contenido para previsualizar.</p>";
@@ -1172,6 +1199,8 @@
       lastReport = res.report;
       vaultMappings = res.mappings || [];
       studioDirection = "obfuscate";
+      isEditingInput = false;
+      isEditingOutput = false;
       statusMessage = `✅ Datos protegidos exitosamente: ${res.report.replacements_applied} tokens protegidos en ${res.report.elapsed_ms.toFixed(2)}ms`;
       if (autoCopyToClipboard && res.obfuscated_text) {
         try {
@@ -1213,6 +1242,8 @@
       inputText = res.deobfuscated_text;
       lastReport = res.report;
       studioDirection = "deobfuscate";
+      isEditingInput = false;
+      isEditingOutput = false;
       deobfuscateSuccessFlash = true;
       setTimeout(() => {
         deobfuscateSuccessFlash = false;
@@ -1446,7 +1477,13 @@
 
   async function handleClearTextPaste() {
     studioDirection = "obfuscate";
+    isPastingInput = true;
+    await tick();
     setTimeout(async () => {
+      isPastingInput = false;
+      if (showTokenBadges) {
+        isEditingInput = false;
+      }
       const textToScan = inputText.trim();
       if (!textToScan) return;
       try {
@@ -1473,18 +1510,32 @@
         };
 
         if (res.total_entities > 0) {
+          isEditingInput = false;
           studioSubView = "audit";
           showTextScanPanel = false; // Plegar automáticamente para dar máximo espacio vertical a la tabla
-          statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales detectados. Revisa la tabla para proteger u omitir.`;
+          statusMessage = `🔍 Texto analizado: ${res.total_entities} tokens confidenciales nuevos detectados. Revisa la tabla para proteger u omitir.`;
         } else {
-          statusMessage = "🔍 Análisis finalizado: No se identificaron tokens confidenciales en el texto pegado.";
+          isEditingInput = false;
+          statusMessage = "🔍 Análisis finalizado: Todos los tokens del texto ya están reconocidos en la bóveda activa.";
         }
       } catch (err) {
         statusMessage = "Error al auditar texto: " + err;
       } finally {
         loading = false;
       }
-    }, 50);
+    }, 0);
+  }
+
+  async function handleProtectedTextPaste() {
+    studioDirection = "deobfuscate";
+    isPastingOutput = true;
+    await tick();
+    setTimeout(() => {
+      isPastingOutput = false;
+      if (showTokenBadges) {
+        isEditingOutput = false;
+      }
+    }, 0);
   }
 
   async function scanCurrentStudioText() {
@@ -1588,6 +1639,8 @@
     auditSummary = null;
     selectedScanOriginals = [];
     textToAudit = "";
+    isEditingInput = false;
+    isEditingOutput = false;
     studioSubView = "transform";
     statusMessage = "Auditoría reiniciada. Regresando a Transformación.";
   }
@@ -1791,6 +1844,8 @@
       const savedOriginals = new Set(itemsToSave.map(it => it.original));
       detectedItems = detectedItems.filter(it => !savedOriginals.has(it.original));
       selectedScanOriginals = []; // Limpiar selección
+      isEditingInput = false;
+      isEditingOutput = false;
       studioSubView = "transform";
 
       await refreshVaultsList();
@@ -1863,7 +1918,7 @@
 
   async function handleAddPairSubmit() {
     if (!newPairOriginal.trim() || !newPairPseudo.trim()) {
-      alert("Por favor introduce el valor original y el seudónimo.");
+      alert("Por favor introduce el valor original y el valor protegido.");
       return;
     }
     try {
@@ -2464,7 +2519,7 @@
         <button
           on:click={() => { activeTab = "pairs"; loadPairsForVault(vaultPath); }}
           class="px-3 py-1.5 rounded-lg transition duration-150 flex items-center gap-1.5 {activeTab === 'pairs' ? 'bg-white dark:bg-primary-500/20 text-slate-950 dark:text-primary-300 border border-slate-200 dark:border-primary-500/40 shadow-sm font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white border border-transparent'}"
-          title="Pares de sustitución y seudónimos"
+          title="Pares de sustitución y protección"
         >
           {#if toolbarButtonStyle !== 'text_only'}<span>📑</span>{/if}
           {#if toolbarButtonStyle !== 'icons_only'}<span>Pares ({vaultMappings.length})</span>{/if}
@@ -2574,7 +2629,7 @@
           {:else}
             <button
               type="button"
-              on:click={() => (studioSubView = "transform")}
+              on:click={() => { isEditingInput = false; isEditingOutput = false; studioSubView = "transform"; }}
               class="px-3 py-1 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-500 text-slate-950 transition flex items-center gap-1.5 shadow-sm"
               title="Volver a los paneles de transformación"
             >
@@ -2742,7 +2797,7 @@
                     class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens cursor-text"
                     title="Haz clic para editar texto"
                   >
-                    {@html renderHighlightedTokens(inputText, false)}
+                    {@html highlightedInputHtml}
                   </div>
                 {:else}
                   <pre
@@ -2754,8 +2809,8 @@
                     bind:this={inputTextAreaEl}
                     bind:value={inputText}
                     on:paste={handleClearTextPaste}
-                    on:input={() => { isEditingInput = true; studioDirection = "obfuscate"; }}
-                    on:focus={() => { isEditingInput = true; if (inputText.trim()) studioDirection = "obfuscate"; }}
+                    on:input={() => { if (!isPastingInput) isEditingInput = true; studioDirection = "obfuscate"; }}
+                    on:focus={() => { if (!isPastingInput) isEditingInput = true; if (inputText.trim()) studioDirection = "obfuscate"; }}
                     on:blur={() => { isEditingInput = false; }}
                     on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
                     placeholder="Pega aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
@@ -2839,7 +2894,7 @@
                     class="flex-1 w-full min-w-0 max-w-full p-3 {editorFontSizeClass} font-mono leading-5 overflow-y-auto overflow-x-hidden select-text whitespace-pre-wrap break-words smooth-scroll-tokens cursor-text"
                     title="Haz clic para editar texto"
                   >
-                    {@html renderHighlightedTokens(outputText, true)}
+                    {@html highlightedOutputHtml}
                   </div>
                 {:else}
                   <pre
@@ -2850,9 +2905,9 @@
                   <textarea
                     bind:this={outputTextAreaEl}
                     bind:value={outputText}
-                    on:paste={() => { studioDirection = "deobfuscate"; }}
-                    on:input={() => { isEditingOutput = true; studioDirection = "deobfuscate"; }}
-                    on:focus={() => { isEditingOutput = true; if (outputText.trim()) studioDirection = "deobfuscate"; }}
+                    on:paste={handleProtectedTextPaste}
+                    on:input={() => { if (!isPastingOutput) isEditingOutput = true; studioDirection = "deobfuscate"; }}
+                    on:focus={() => { if (!isPastingOutput) isEditingOutput = true; if (outputText.trim()) studioDirection = "deobfuscate"; }}
                     on:blur={() => { isEditingOutput = false; }}
                     on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
                     placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
@@ -2876,7 +2931,7 @@
               
               <div class="flex items-center gap-3">
                 <button
-                  on:click={() => (studioSubView = "transform")}
+                  on:click={() => { isEditingInput = false; isEditingOutput = false; studioSubView = "transform"; }}
                   class="px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 text-xs font-bold rounded-xl transition duration-150 shadow-md shadow-primary-500/20 flex items-center gap-1.5"
                   title="Volver a los editores de transformación"
                 >
@@ -2895,7 +2950,7 @@
                   Los tokens confidenciales detectados se desglosan aquí automáticamente al pegar texto o arrastrar archivos en la pestaña de Transformación.
                 </p>
                 <button
-                  on:click={() => (studioSubView = "transform")}
+                  on:click={() => { isEditingInput = false; isEditingOutput = false; studioSubView = "transform"; }}
                   class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-slate-950 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-primary-500/20"
                 >
                   <span>✨</span> Volver a Transformación
@@ -3076,7 +3131,7 @@
                     <th class="p-3 w-32">Estado</th>
                     <th class="p-3 w-40">Tipo de Entidad</th>
                     <th class="p-3">Valor Original Confidencial</th>
-                    <th class="p-3">Seudónimo / Resultado</th>
+                    <th class="p-3">Protegido / Resultado</th>
                     <th class="p-3 w-28 text-center">Acción</th>
                   </tr>
                 </thead>
@@ -3153,7 +3208,7 @@
               <span class="text-base">💡</span>
               <div>
                 <p class="font-semibold text-slate-900 dark:text-white mb-0.5">Gestión de Pares de Tokens</p>
-                <p>Cada par asocia un token confidencial (nombre, DNI, IBAN, correo o secreto) con su seudónimo generado. Puedes añadir pares manuales o editar los existentes. Toda modificación se sincroniza inmediatamente con el archivo cifrado de la bóveda.</p>
+                <p>Cada par asocia un token confidencial (nombre, DNI, IBAN, correo o secreto) con su valor protegido generado. Puedes añadir pares manuales o editar los existentes. Toda modificación se sincroniza inmediatamente con el archivo cifrado de la bóveda.</p>
               </div>
             </div>
             <button on:click={() => dismissTip('pairs')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
@@ -3236,7 +3291,7 @@
             <input
               type="text"
               bind:value={pairSearch}
-              placeholder="Filtrar por original o seudónimo..."
+              placeholder="Filtrar por original o protegido..."
               class="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
             {#if pairSearch}
@@ -3286,7 +3341,7 @@
                 <th class="p-3 w-12 text-center">Sel</th>
                 <th class="p-3 w-40">Tipo / Estado</th>
                 <th class="p-3">Valor Original Confidencial</th>
-                <th class="p-3">Seudónimo</th>
+                <th class="p-3">Protegido</th>
                 <th class="p-3 w-36 text-center">Acciones</th>
               </tr>
             </thead>
@@ -3348,7 +3403,7 @@
                       <button
                         on:click={() => startInlineEditPair(item)}
                         class="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white transition"
-                        title="Editar seudónimo"
+                        title="Editar valor protegido"
                       >
                         ✏️
                       </button>
@@ -3623,7 +3678,7 @@
                     }
                   }}
                   class="p-3 rounded-xl border text-left transition duration-150 flex flex-col justify-between gap-2 cursor-pointer {watchDirection === 'obfuscate' ? 'bg-primary-500/15 border-primary-500/50 shadow-md ring-2 ring-primary-500/20 text-slate-900 dark:text-white' : 'bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-600 dark:text-slate-400'}"
-                  title="Proteger automáticamente: Detecta datos confidenciales y los reemplaza por seudónimos antes de enviar a IAs o chats"
+                  title="Proteger automáticamente: Detecta datos confidenciales y los reemplaza por valores protegidos antes de enviar a IAs o chats"
                 >
                   <div class="flex items-center justify-between gap-1">
                     {#if toolbarButtonStyle !== 'text_only'}
@@ -3640,7 +3695,7 @@
                       <p class="text-xs font-bold leading-tight">Proteger</p>
                     {/if}
                     <p class="text-[10px] font-mono mt-0.5 text-slate-500 dark:text-slate-400">
-                      Original ➔ Seudónimo
+                      Original ➔ Protegido
                     </p>
                   </div>
                 </button>
@@ -3655,7 +3710,7 @@
                     }
                   }}
                   class="p-3 rounded-xl border text-left transition duration-150 flex flex-col justify-between gap-2 cursor-pointer {watchDirection === 'deobfuscate' ? 'bg-indigo-500/15 border-indigo-500/50 shadow-md ring-2 ring-indigo-500/20 text-slate-900 dark:text-white' : 'bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-600 dark:text-slate-400'}"
-                  title="Restaurar automáticamente: Recupera los valores originales a partir de los seudónimos devueltos por la IA"
+                  title="Restaurar automáticamente: Recupera los valores originales a partir de los valores protegidos devueltos por la IA"
                 >
                   <div class="flex items-center justify-between gap-1">
                     {#if toolbarButtonStyle !== 'text_only'}
@@ -3672,7 +3727,7 @@
                       <p class="text-xs font-bold leading-tight">Restaurar</p>
                     {/if}
                     <p class="text-[10px] font-mono mt-0.5 text-slate-500 dark:text-slate-400">
-                      Seudónimo ➔ Original
+                      Protegido ➔ Original
                     </p>
                   </div>
                 </button>
@@ -4257,7 +4312,7 @@
     <!-- Derecha: Cápsulas modulares tipo VS Code / JetBrains -->
     <div class="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
       <!-- Bóveda activa -->
-      <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Bóveda de seudónimos activa">
+      <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title="Bóveda de protección activa">
         <span class="w-1.5 h-1.5 rounded-full {isVaultUnlocked ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
         <span class="font-semibold text-slate-700 dark:text-slate-300">{vaultPath ? vaultPath.split('/').pop() : 'default.lexi'}</span>
       </div>
@@ -4439,12 +4494,12 @@
 
           <div>
             <div class="flex items-center justify-between mb-1">
-              <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400">Seudónimo Protegido (o '=' para omitir):</label>
+              <label for="add-pair-pseudo-input" class="block font-medium text-slate-600 dark:text-slate-400">Valor Protegido (o '=' para omitir):</label>
               <button
                 type="button"
                 on:click={() => { newPairPseudo = autoGeneratePseudonym(newPairOriginal, newPairType); }}
                 class="text-[11px] text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 font-semibold"
-                title="Generar nuevo seudónimo aleatorio"
+                title="Generar nuevo valor protegido aleatorio"
               >
                 <span>⚡ Regenerar</span>
               </button>
@@ -4809,10 +4864,10 @@
                 <ol class="list-decimal list-inside space-y-1.5 pl-1">
                   <li><strong>Pega el contenido</strong> en el panel <em>Texto claro</em> (o arrastra y suelta un archivo o carpeta directamente encima).</li>
                   <li><strong>Detección automática:</strong> El motor identifica automáticamente la estructura sintáctica (JSON, XML, Logs o texto plano) sin que tengas que configurarlo.</li>
-                  <li><strong>Pulsa "Proteger":</strong> El botón direccional central reemplazará cada dato confidencial por un seudónimo consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
+                  <li><strong>Pulsa "Proteger":</strong> El botón direccional central reemplazará cada dato confidencial por un valor protegido consistente (por ejemplo, <code class="bg-primary-500/20 px-1 rounded font-mono">Dni_001</code> o <code class="bg-primary-500/20 px-1 rounded font-mono">AnonPerson_001</code>).</li>
                   <li><strong>Modo Markdown reactivo:</strong> Si pulsas el conmutador <em>"Markdown"</em> en la barra superior, LexiShield protegerá automáticamente el texto original y mostrará la vista previa formateada en ambos paneles.</li>
                   <li><strong>Usa el texto en la IA:</strong> Copia el <em>Texto protegido</em> y envíalo con total tranquilidad a cualquier modelo de IA o tercero.</li>
-                  <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los seudónimos, pega su respuesta en <em>Texto protegido</em> y pulsa <strong>"Restaurar"</strong> para recuperar al 100% los valores reales.</li>
+                  <li><strong>Restaura la respuesta de la IA:</strong> Cuando la IA responda citando los valores protegidos, pega su respuesta en <em>Texto protegido</em> y pulsa <strong>"Restaurar"</strong> para recuperar al 100% los valores reales.</li>
                 </ol>
               </div>
 
@@ -4847,13 +4902,13 @@
               <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>📑</span> Gestión de Pares de Tokens (Biyectividad 1:1)
               </h4>
-              <p>Cada vez que LexiShield detecta o sustituye un token sensible, crea una correspondencia biyectiva en la bóveda activa. Esto garantiza que la misma entidad confidencial siempre reciba exactamente el mismo seudónimo en todos tus documentos.</p>
+              <p>Cada vez que LexiShield detecta o sustituye un token sensible, crea una correspondencia biyectiva en la bóveda activa. Esto garantiza que la misma entidad confidencial siempre reciba exactamente el mismo valor protegido en todos tus documentos.</p>
               
               <div class="space-y-2">
                 <p><strong>Operaciones Principales:</strong></p>
                 <ul class="list-disc list-inside space-y-1 pl-1">
-                  <li><strong>Añadir Par:</strong> Permite precargar asociaciones personalizadas (ej. tu nombre con un seudónimo elegido por ti).</li>
-                  <li><strong>Búsqueda y Limpieza Rápida:</strong> Filtra por original o seudónimo y pulsa el botón <code>✕</code> para vaciar el buscador al instante.</li>
+                  <li><strong>Añadir Par:</strong> Permite precargar asociaciones personalizadas (ej. tu nombre con un valor protegido elegido por ti).</li>
+                  <li><strong>Búsqueda y Limpieza Rápida:</strong> Filtra por original o protegido y pulsa el botón <code>✕</code> para vaciar el buscador al instante.</li>
                   <li><strong>Omitir Token:</strong> Si una palabra clave o término técnico no debe sustituirse nunca, selecciónalo y pulsa "Omitir".</li>
                   <li><strong>Copias de Seguridad (.bak):</strong> Las copias automáticas generadas al modificar pares se pueden restaurar de forma individual desde la tabla de Bóvedas.</li>
                 </ul>
@@ -4915,7 +4970,7 @@
                 <p class="font-bold text-slate-900 dark:text-white">Principio Fundamental: Arquitectura de Cero Conocimiento (Zero-Knowledge)</p>
                 <p>LexiShield fue diseñado para proteger secretos de nivel empresarial y datos personales de máxima confidencialidad. Una contraseña es obligatoria por tres motivos arquitectónicos innegociables:</p>
                 <ul class="list-disc list-inside space-y-1.5 pl-1 text-[11px]">
-                  <li><strong>Imposibilidad de Ataques Físicos o Forenses:</strong> Si alguien te roba el equipo o accede a tu disco duro, sin la contraseña maestra es matemáticamente imposible reconstruir la relación entre los seudónimos y los nombres/IPs/secretos reales.</li>
+                  <li><strong>Imposibilidad de Ataques Físicos o Forenses:</strong> Si alguien te roba el equipo o accede a tu disco duro, sin la contraseña maestra es matemáticamente imposible reconstruir la relación entre los valores protegidos y los nombres/IPs/secretos reales.</li>
                   <li><strong>Criptografía Argon2id + ChaCha20-Poly1305:</strong> La clave de descifrado no se guarda en ningún fichero ni en memoria persistente; se deriva mediante Argon2id con parámetros intensivos en memoria RAM para neutralizar intentos de fuerza bruta con tarjetas gráficas (GPUs) y clústeres ASIC.</li>
                   <li><strong>Aislamiento Estricto por Proyecto o Cliente:</strong> Al asignar contraseñas distintas a diferentes bóvedas (<code class="font-mono">.lexi</code>), garantizas que cada cliente o entorno mantenga una muralla criptográfica impenetrable.</li>
                 </ul>
@@ -5115,7 +5170,7 @@
           {#if studioDropModal.isReverse}
             Has soltado un elemento en <strong>Texto protegido</strong>. Se restaurarán los datos originales utilizando tu bóveda local de mapeos.
           {:else}
-            Has soltado un elemento en <strong>Texto claro</strong>. Se protegerán los tokens confidenciales reemplazándolos por seudónimos seguros.
+            Has soltado un elemento en <strong>Texto claro</strong>. Se protegerán los tokens confidenciales reemplazándolos por valores protegidos seguros.
           {/if}
         </p>
 
@@ -5236,7 +5291,7 @@
             <div>
               <h3 class="text-sm font-bold text-slate-900 dark:text-white">URLs y Dominios Excluidos de Protección</h3>
               <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                Estos sitios y FQDNs no se modificarán nunca durante la ofuscación. Se guardan en <code>~/.lexishield/ignored_domains.txt</code>.
+                Estos sitios y FQDNs no se modificarán nunca durante la protección. Se guardan en <code>~/.lexishield/ignored_domains.txt</code>.
               </p>
             </div>
           </div>
@@ -5350,7 +5405,7 @@
               🛡️ Suelta aquí para PROTEGER
             </div>
             <p class="text-xs text-slate-300 max-w-xs">
-              Se protegerán los datos confidenciales (IPs, emails, nombres, claves) por seudónimos seguros. Admite archivos individuales o carpetas completas.
+              Se protegerán los datos confidenciales (IPs, emails, nombres, claves) por valores protegidos seguros. Admite archivos individuales o carpetas completas.
             </p>
           </div>
 
@@ -5366,7 +5421,7 @@
               🔄 Suelta aquí para RESTAURAR
             </div>
             <p class="text-xs text-slate-300 max-w-xs">
-              Se restaurarán los valores reales originales a partir de los seudónimos utilizando tu bóveda local de mapeos.
+              Se restaurarán los valores reales originales a partir de los valores protegidos utilizando tu bóveda local de mapeos.
             </p>
           </div>
         </div>
