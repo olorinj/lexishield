@@ -6,13 +6,24 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [3.0.0] - 2026-11-25
-*Lanzamiento Mayor: Arquitectura Integral de Internacionalización (i18n) estándar GNU Gettext (PO-First) para los 6 idiomas clave más hablados de Europa y el Mundo, motor de detección y expansión bidireccional de cargas codificadas (Base64, Hex, URL-encoding) y nuevos detectores de alta sensibilidad para secretos y rutas.*
+*Lanzamiento Mayor: Arquitectura Integral de Internacionalización (i18n) estándar GNU Gettext (PO-First) para los 6 idiomas clave más hablados de Europa y el Mundo, motor de detección y expansión bidireccional de cargas codificadas (Base64, Hex, URL-encoding), adaptador de formato SAP IDoc con delimitadores de control ASCII, exportación en texto plano decodificado y nuevos detectores de alta sensibilidad para secretos y rutas.*
 
 ### Añadido
+- **📑 Adaptador y Autodetección de Formato SAP IDoc (`src/format_adapters/idoc_adapter.rs`)**:
+  - Detección y procesamiento nativo de tramas SAP IDoc estructuradas mediante caracteres de control ASCII: `^A` (`0x01`, separador de campo), `^B` (`0x02`, separador de segmento) y `^C` (`0x03`, separador de registro).
+  - Preservación determinista de delimitadores de control durante transformaciones bidireccionales (`protect` / `restore`).
+  - Validación de esquema en `validator.rs` (`validate_idoc`) para verificar que el recuento de delimitadores no sufre mutaciones.
+  - Soporte explícito en CLI (`-f idoc`), backend Tauri y selectores de formato de la GUI.
+- **📄 Exportación y Guardado en Texto Plano Decodificado con Otro Nombre (`--save-plain-as`)**:
+  - Nueva capacidad para expandir contenidos codificados legibles (Base64, Hexadecimal, URL) y tramas SAP IDoc a texto plano legible sin ofuscar, guardándolos bajo una ruta o nombre independiente sin modificar el archivo original.
+  - Integración en CLI (`--save-plain-as <PATH>`) en comandos de protección.
+  - Nuevos comandos Tauri `save_plain_decoded_file` y `save_plain_decoded_text`.
+  - Integración en el modal unificado de soltar archivos en la GUI con casilla dedicada, configuración de sufijo (`.plain`), vista previa dinámica del nombre de archivo y botón directo de guardado en plano desde la cabecera de Studio.
 - **🌐 Arquitectura Multiidioma Completa (i18n) PO-First / GNU Gettext**:
   - Soporte nativo para 6 idiomas globales: **Inglés (`en`)**, **Español (`es`)**, **Francés (`fr`)**, **Alemán (`de`)**, **Italiano (`it`)** y **Chino Mandarín simplificado (`zh`)**.
   - Plantilla estándar de traducción `po/lexishield.pot` y catálogos en `po/*.po` compatibles con herramientas de la comunidad como **Poedit**, **Weblate** y **Crowdin**.
   - Script automatizado `scripts/sync_i18n.py` que compila bidireccionalmente los ficheros `.po` hacia diccionarios JSON reactivos en la GUI (`ui/src/locales/*.json`) y catálogos en Rust (`src/i18n/*.rs`) con 0 ms de latencia en tiempo de ejecución.
+  - Redacción estricta en modo oración / modo frase en español para textos de interfaz, botones, diálogos y tooltips.
   - Resolución inteligente de idioma según prioridad: CLI (`--lang`), configuración TOML (`~/.lexishield/config.toml`), variables de entorno del sistema (`LANG`, `LC_ALL`, `LC_MESSAGES`) y fallback a inglés.
   - Localización en la GUI de pestañas de navegación, paneles de texto claro y protegido, marcadores de posición, botones de acción, diálogos y selectores.
 - **🔐 Detección y Expansión Bidireccional de Cargas Codificadas (`src/encoded_content.rs`)**:
@@ -23,8 +34,14 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.
   - Detector de secretos y claves criptográficas (`SecretKey`): API keys, machineKey de IIS/ASP.NET, tokens de sesión y hashes de autenticación.
   - Detector de rutas de sistema de archivos (`FilePath`): Rutas absolutas Windows (`C:\inetpub\...`, UNC `\\servidor\...`) y Unix (`/var/log/...`, `/etc/...`).
 
+### Corregido
+- **🪟 Normalización de Rutas de Bóveda y Arranque en Windows**:
+  - Extracción robusta del nombre base de bóvedas (`vaultPath.split(/[/\\]/).pop()`) para evitar errores en Windows donde las rutas con separador `\` no identificaban correctamente la bóveda activa.
+  - Carga síncrona inicial de traducciones en `ui/src/i18n.js` para erradicar parpadeos de claves sin traducir durante el arranque de la GUI.
+  - Corrección de duplicación de clave `version` en `Cargo.toml` que bloqueaba la resolución de `cargo metadata` en entornos de compilación Windows.
+
 ### Modificado
-- Actualizada la interfaz de línea de comandos en `src/main.rs` con soporte global del argumento `--lang`.
+- Actualizada la interfaz de línea de comandos en `src/main.rs` con soporte global de `--lang`, `--format idoc` y `--save-plain-as`.
 - Actualizados los manifiestos del proyecto a la versión mayor `3.0.0` (`Cargo.toml`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `ui/package.json`).
 
 ## [2.2.0] - 2026-11-03

@@ -12,7 +12,7 @@ Aria se vio ante un dilema: Renunciar a la velocidad que le daban los asistentes
 ### El escudo inteligente de Aria
 Aria integró LexiShield como su camino local y seguro hacia la inteligencia artificial. La herramienta funcionaba de la siguiente manera:
 
-1. **Protección semántica inteligente:** Antes de enviar un archivo plagado de datos reales a la IA, Aria abría su terminal. El motor de LexiShield escaneaba el documento utilizando expresiones regulares avanzadas, detectando correos electrónicos, IPs, nombres de usuario y dominios.
+1. **Protección semántica inteligente:** Antes de enviar un archivo plagado de datos reales a la IA, Aria abría su terminal, el motor de LexiShield escaneaba el documento utilizando expresiones regulares avanzadas, detectando correos electrónicos, IPs, nombres de usuario y dominios.
 2. **Generación coherente:** El sistema no ponía asteriscos o texto tachado que confundieran al modelo de lenguaje (ya que la IA necesita saber que tal IP se conecta con tal servicio). En su lugar, usaba generadores sintéticos realistas. Una dirección IP real como `192.168.1.104` se transformaba en `192.168.22.84`, y el correo `marta.sanchez@empresa.com` se convertía en `email000001@acme.com`. Todo quedaba registrado de forma segura y privada en un diccionario local de mapeos JSON.
 3. **El envío a la IA:** Aria copiaba el texto ofuscado y lo enviaba al chat de la IA.
 4. **La respuesta del asistente:** La IA leía el texto y respondía de forma impecable: *"El problema reside en que el usuario user000001 tiene un conflicto de credenciales al intentar acceder al servidor IP000001 mediante el puerto 443"*.
@@ -32,15 +32,19 @@ El diseño sigue estrictamente los principios **SOLID**, buscando un alto rendim
 * **Paralelización multihilo:** Aprovecha todos los núcleos de tu CPU usando `rayon` para escanear directorios enteros en tiempo récord.
 * **Telemetría y observabilidad estructurada:** Ejecución silenciosa por defecto y modo de depuración detallada (`-v`) integrado para diagnósticos completos.
 * **Robusto (fuzz-tested):** Motor de parsing blindado y tolerante a fallos, verificado bajo escenarios de estrés (Fuzzing).
-* **Motor híbrido (formatos y reglas personalizadas):** Soporta XML, JSON, texto plano y permite inyectar reglas regex propias vía configuración TOML.
+* **Motor híbrido (formatos y reglas personalizadas):** Soporta XML, JSON, texto plano, documentos Office (`.docx`, `.xlsx`, `.pptx`), formato **SAP IDoc** (delimitadores de control ASCII `^A`, `^B`, `^C`) y permite inyectar reglas regex propias vía configuración TOML.
+* **Detección e inspección de cargas codificadas:** Decodificación biyectiva recursiva y tratamiento en memoria de cargas **Base64** (UTF-8 y UTF-16LE típico de PowerShell), **Hexadecimal** y **URL Percent-Encoding**.
+* **Exportación en texto plano decodificado:** Capacidad para extraer y guardar contenidos codificados e IDoc en texto plano legible con otro nombre sin modificar el fichero original.
+* **Internacionalización completa (i18n):** Arquitectura PO-First nativa estándar GNU Gettext con soporte oficial para 6 idiomas: Inglés, Español, Francés, Alemán, Italiano y Chino Mandarín.
 
 ### Flujo de operación (arquitectura)
 
 ```mermaid
 flowchart TD
     subgraph Local["Entorno local (Seguro)"]
-        A[Datos sensibles originales\nLogs / JSON / XML / DOCX] -->|lexishield protect / obfuscate| B(LexiShield engine)
+        A[Datos sensibles originales\nLogs / JSON / XML / DOCX / IDoc] -->|lexishield protect / obfuscate| B(LexiShield engine)
         B -->|Genera| C[Texto protegido con tokens]
+        B -->|Opcional: --save-plain-as| P[Copia en plano decodificada]
         B -->|Guarda| D[(Bóveda de mapeos .lexi)]
     end
 
@@ -87,6 +91,9 @@ flowchart LR
    * **Puente direccional dinámico:** Conmutador central interactivo (`[ 🛡️ Proteger ➔ ]` / `[ ⮜ Restaurar datos 🔄 ]`) entre paneles.
    * **Sub-vista de auditoría y desglose:** Análisis no destructivo de entidades confidenciales agrupadas por categorías semánticas (Red 🌐, Identidad 🪪, Sistemas 🖥️ y Contacto/Claves 💳) con barra de distribución cromática y opción de omitir falsos positivos antes de guardarlos.
    * **Arrastrar y soltar (*drag & drop*) dividido:** Arrastra archivos individuales o carpetas sobre la zona izquierda para proteger o sobre la derecha para restaurar datos con la bóveda.
+   * **Opciones integradas al soltar archivos:** Cuadro de diálogo unificado para configurar modo copia con sufijo, preservación estricta del original, tratamiento de cargas codificadas (`reencode`, `expand_clear`, `merge`, `off`) y la opción de **guardar una copia en texto plano decodificado con otro nombre** (desempaquetando Base64/Hex/URL o tramas SAP IDoc sin ofuscar).
+   * **Exportación en texto plano desde Studio:** Botón directo en la cabecera del editor para guardar el texto o cargas desempaquetadas en claro bajo una ruta personalizada.
+   * **Soporte y detección SAP IDoc:** Reconocimiento instantáneo en cabeceras y barra de estado de tramas SAP IDoc con delimitadores de control ASCII (`^A` campo, `^B` segmento, `^C` registro).
    * **Modo Markdown con protección automática:** Conmutador `[ Editor / Markdown ]` que dispara la protección automática y previsualiza el resultado estructurado.
    * **Auto-copiado conmutable:** Conmutador rápido (`📋` / `📄`) para copiar automáticamente el resultado de la transformación al portapapeles.
    * **Historial de sesión en memoria RAM:** Recuperación instantánea de estados anteriores con un solo clic sin persistencia en disco (Zero-Knowledge).
@@ -116,7 +123,8 @@ flowchart LR
    * Selección de pestaña predeterminada al arrancar, personalización de pestañas visibles en la barra superior y barra CLI docking en vivo.
    * Consola de telemetría y diagnóstico en vivo con niveles de filtrado (`INFO`, `WARN`, `ERROR`, `DEBUG`).
 
-### Ergonomía visual y accesibilidad
+### Ergonomía visual, accesibilidad e internacionalización
+* **Multiidioma completo (i18n):** Interfaz 100% traducida en **Español**, **Inglés**, **Francés**, **Alemán**, **Italiano** y **Chino Mandarín** (con redacción natural en modo frase para español). Selector de idioma instantáneo en Opciones.
 * **Modo claro / modo oscuro:** Conmutador de tema con paleta de alto contraste acorde a los más exigentes estándares de diseño de interfaces.
 * **Ayuda contextual integrada:** Manual navegable disponible en cualquier momento desde todas las pestañas con `?` o el botón de ayuda.
 * **Tarjetas de bienvenida e inducción:** Consejos de primer uso guiados y descartables de forma permanente.
@@ -135,6 +143,8 @@ lexishield [GLOBAL_OPTIONS] <COMMAND> [OPTIONS]
 # Opciones Globales:
 #  -v, --verbose    Activa el modo de depuración estructurada (Telemetría)
 #  --config <PATH>  Ruta a un archivo TOML de configuración personalizado
+#  --rules <PATH>   Ruta a un archivo TOML de reglas personalizadas
+#  --lang <LANG>    Idioma de la interfaz ('en', 'es', 'fr', 'de', 'it', 'zh')
 ```
 
 ### 1. Comando: `protect` (alias `obfuscate` / `p`)
@@ -147,7 +157,10 @@ Protege un archivo, un directorio completo (recursivamente), texto directo o el 
 * **`--export-md [PATH]`**: Exporta documentos Office (`.docx`, `.xlsx`, `.pptx`) protegidos a Markdown (`.md`) extrayendo imágenes mediante Pandoc para revisión contextual con IA.
 * **`-t, --text <STRING>`**: Texto directo a procesar (si no se especifica archivo).
 * **`-c, --clipboard`**: Procesa de forma atómica el contenido actual del portapapeles y copia el resultado de vuelta.
-* **`-f, --format <FORMAT>`**: Formato estructurado (`auto`, `json`, `xml`, `log`, `text`). Por defecto es `auto`.
+* **`-f, --format <FORMAT>`**: Formato estructurado (`auto`, `json`, `xml`, `log`, `text`, `idoc`). Por defecto es `auto` (detecta automáticamente JSON, XML, Logs y tramas SAP IDoc con delimitadores `0x01`, `0x02`, `0x03`).
+* **`--encoded-mode <MODE>`**: Tratamiento de cargas codificadas en Base64/Hex/URL (`reencode` para proteger el interior y re-codificar, `clear` para expandir o `off` para ignorar).
+* **`--merge-chunks`**: Une fragmentos multiparte codificados correlativos al expandir en claro.
+* **`--save-plain-as <PATH>`**: Guarda una versión del contenido decodificada a texto plano legible con otro nombre (sin ofuscar), preservando intacto el archivo original.
 * **`-s, --save-mappings <FILE>`**: Ruta donde guardar la tabla de mapeos generada (soporta JSON o bóvedas cifradas `.lexi`).
 * **`-p, --password <PASSWORD>`**: Contraseña para cifrar la tabla de mapeos guardada (Argon2id + ChaCha20-Poly1305).
 * **`--ask-password`**: Solicita la contraseña de cifrado interactivamente de forma oculta en consola.
@@ -180,7 +193,8 @@ Restaura un archivo, un directorio completo (recursivamente), texto o portapapel
 * **`-m, --mappings <FILE>`**: Archivo con los mapeos a aplicar (detecta automáticamente si está cifrado o en texto plano).
 * **`-p, --password <PASSWORD>`**: Contraseña de descifrado (si el archivo está protegido).
 * **`--ask-password`**: Pide la contraseña por consola. Si el archivo está cifrado y no pasas contraseña, te la pedirá automáticamente.
-* **`-f, --format <FORMAT>`**: Formato de lectura/escritura (`auto`, `json`, `xml`, `log`, `text`).
+* **`-f, --format <FORMAT>`**: Formato de lectura/escritura (`auto`, `json`, `xml`, `log`, `text`, `idoc`).
+* **`--save-plain-as <PATH>`**: Guarda una versión decodificada en texto plano con otro nombre.
 * **`-y, --yes`**: Confirma automáticamente advertencias de recursos en modo desatendido.
 
 *Ejemplos:*
