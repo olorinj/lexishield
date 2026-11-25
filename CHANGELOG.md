@@ -5,6 +5,28 @@ Todos los cambios notables de este proyecto se documentarán en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-11-25
+*Lanzamiento Mayor: Arquitectura Integral de Internacionalización (i18n) estándar GNU Gettext (PO-First) para los 6 idiomas clave más hablados de Europa y el Mundo, motor de detección y expansión bidireccional de cargas codificadas (Base64, Hex, URL-encoding) y nuevos detectores de alta sensibilidad para secretos y rutas.*
+
+### Añadido
+- **🌐 Arquitectura Multiidioma Completa (i18n) PO-First / GNU Gettext**:
+  - Soporte nativo para 6 idiomas globales: **Inglés (`en`)**, **Español (`es`)**, **Francés (`fr`)**, **Alemán (`de`)**, **Italiano (`it`)** y **Chino Mandarín simplificado (`zh`)**.
+  - Plantilla estándar de traducción `po/lexishield.pot` y catálogos en `po/*.po` compatibles con herramientas de la comunidad como **Poedit**, **Weblate** y **Crowdin**.
+  - Script automatizado `scripts/sync_i18n.py` que compila bidireccionalmente los ficheros `.po` hacia diccionarios JSON reactivos en la GUI (`ui/src/locales/*.json`) y catálogos en Rust (`src/i18n/*.rs`) con 0 ms de latencia en tiempo de ejecución.
+  - Resolución inteligente de idioma según prioridad: CLI (`--lang`), configuración TOML (`~/.lexishield/config.toml`), variables de entorno del sistema (`LANG`, `LC_ALL`, `LC_MESSAGES`) y fallback a inglés.
+  - Localización en la GUI de pestañas de navegación, paneles de texto claro y protegido, marcadores de posición, botones de acción, diálogos y selectores.
+- **🔐 Detección y Expansión Bidireccional de Cargas Codificadas (`src/encoded_content.rs`)**:
+  - Detección y decodificación automática de payloads Base64 (UTF-8 y UTF-16LE), cadenas Hexadecimales y URL-encoding en logs y ficheros estructurados (CSV, XML, JSON).
+  - Tres modos de operación: `reencode` (por defecto, desofusca, protege y vuelve a codificar biyectivamente), `clear` (expande a texto claro para inspección por la IA) y `off` (ignora).
+  - Integración en la GUI de botones interactivos para alternar entre texto en claro y re-codificación, con soporte para fusión de fragmentos (`merge_chunks`).
+- **🛡️ Nuevos Detectores de Secretos y Rutas de Archivos**:
+  - Detector de secretos y claves criptográficas (`SecretKey`): API keys, machineKey de IIS/ASP.NET, tokens de sesión y hashes de autenticación.
+  - Detector de rutas de sistema de archivos (`FilePath`): Rutas absolutas Windows (`C:\inetpub\...`, UNC `\\servidor\...`) y Unix (`/var/log/...`, `/etc/...`).
+
+### Modificado
+- Actualizada la interfaz de línea de comandos en `src/main.rs` con soporte global del argumento `--lang`.
+- Actualizados los manifiestos del proyecto a la versión mayor `3.0.0` (`Cargo.toml`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `ui/package.json`).
+
 ## [2.2.0] - 2026-11-03
 *Rediseño ergonómico de la pestaña Opciones (Smartbar Tier 2 fija, control de minimización a la bandeja, desplegables limpios y 4 bloques funcionales), estandarización terminológica universal a Proteger / Restaurar con soporte recursivo de directorios y blindaje activo de seguridad.*
 

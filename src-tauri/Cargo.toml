@@ -1,6 +1,6 @@
 [package]
 name = "lexishield-gui"
-version = "2.2.0"
+version = "3.0.0"
 description = "Interfaz Grafica de Usuario (GUI) de LexiShield"
 authors = ["Julio C. Semper"]
 edition = "2024"
