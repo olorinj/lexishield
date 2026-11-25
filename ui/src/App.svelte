@@ -9,7 +9,12 @@
   import { locale, t } from "./i18n";
   import packageInfo from "../package.json";
 
-  const appVersion = packageInfo.version || "2.0.0";
+  const appVersion = packageInfo.version || "3.0.0";
+
+  // Función auxiliar de traducción con fallback seguro
+  function tr(key, fallback = "") {
+    return $t ? $t(key) : fallback;
+  }
 
   // Control de Tema Claro / Oscuro
   let darkMode = true;
@@ -170,12 +175,12 @@
     try {
       await navigator.clipboard.writeText(outputText);
       copiedOutputFlash = true;
-      statusMessage = "📋 Copiado al portapapeles.";
+      statusMessage = tr('status.copied', "📋 Copiado al portapapeles.");
       setTimeout(() => {
         copiedOutputFlash = false;
       }, 2000);
     } catch (e) {
-      statusMessage = "❌ Error al copiar: " + e;
+      statusMessage = `${tr('status.copy_error', "❌ Error al copiar:")} ${e}`;
     }
   }
 
@@ -185,12 +190,12 @@
     try {
       await navigator.clipboard.writeText(inputText);
       copiedInputFlash = true;
-      statusMessage = "📋 Texto restaurado copiado al portapapeles.";
+      statusMessage = tr('status.copied_restored', "📋 Texto restaurado copiado al portapapeles.");
       setTimeout(() => {
         copiedInputFlash = false;
       }, 2000);
     } catch (e) {
-      statusMessage = "❌ Error al copiar: " + e;
+      statusMessage = `${tr('status.copy_error', "❌ Error al copiar:")} ${e}`;
     }
   }
 
@@ -245,13 +250,13 @@
     if (!encodedPasteResult || !rawEncodedPasteBuffer) return;
     if (mode === "reencode") {
       inputText = rawEncodedPasteBuffer;
-      statusMessage = `📦 Vista codificada activa: al pulsar Proteger se procesará el interior y se volverá a codificar.`;
+      statusMessage = tr('status.view_reencode', "📦 Vista codificada activa: al pulsar Proteger se procesará el interior y se volverá a codificar.");
     } else if (mode === "merge" && encodedPasteResult.merged_chunks_text) {
       inputText = encodedPasteResult.merged_chunks_text;
-      statusMessage = `🧩 Vista en claro con fragmentos unidos (${encodedPasteResult.multipart_groups_merged} grupo(s) ensamblados por índice).`;
+      statusMessage = `${tr('status.view_merge', "🧩 Vista en claro con fragmentos unidos.")} (${encodedPasteResult.multipart_groups_merged} grupo(s))`;
     } else {
       inputText = encodedPasteResult.expanded_text;
-      statusMessage = `🔓 Vista en claro activa (${encodedPasteResult.blocks_decoded} bloques codificados legibles expandidos).`;
+      statusMessage = `${tr('status.view_clear', "🔓 Vista en claro activa con bloques expandidos.")} (${encodedPasteResult.blocks_decoded} bloques)`;
     }
     isEditingInput = false;
   }
@@ -259,8 +264,8 @@
   function toggleStudioDirection() {
     studioDirection = studioDirection === "obfuscate" ? "deobfuscate" : "obfuscate";
     statusMessage = studioDirection === "obfuscate"
-      ? "Dirección activa: Proteger (Texto claro ➔ Texto protegido)"
-      : "Dirección activa: Restaurar (Texto protegido ➔ Texto claro)";
+      ? tr('status.direction_protect', "Dirección activa: proteger (texto claro ➔ texto protegido).")
+      : tr('status.direction_restore', "Dirección activa: restaurar (texto protegido ➔ texto claro).");
   }
 
   // Opciones de Protección
@@ -441,7 +446,7 @@
         }
       });
     } catch (err) {
-      console.warn("No se pudieron registrar eventos de Tauri:", err);
+      console.warn("Failed to register Tauri scan-progress listener:", err);
     }
 
     // 5. Escucha de eventos Drag & Drop de Tauri para arrastrar ficheros o carpetas
@@ -983,7 +988,7 @@
         }
       }
     } catch (e) {
-      console.warn("Error cargando configuración:", e);
+      console.warn("Failed to load configuration:", e);
     }
   }
 
@@ -1105,7 +1110,7 @@
         await checkAndLoadVault(targetPath, null);
       }
     } catch (err) {
-      console.warn("No se pudo cargar la bóveda inicial:", err);
+      console.warn("Failed to load initial vault:", err);
     }
   }
 
@@ -2595,7 +2600,7 @@
         detectorLearningPath = res.file_path || "";
       }
     } catch (e) {
-      console.warn("No se pudo cargar el almacén de aprendizaje de detectores:", e);
+      console.warn("Failed to load detector learning store:", e);
     }
   }
 
@@ -2763,7 +2768,7 @@
             detectorLearningPath = learnRes.file_path || detectorLearningPath;
           }
         } catch (learnErr) {
-          console.warn("No se pudo registrar corrección de aprendizaje:", learnErr);
+          console.warn("Failed to record learning feedback:", learnErr);
         }
       }
       vaultMappings = updated;
@@ -2899,7 +2904,7 @@
     try {
       allVaultsList = await invokeTauri("list_all_vaults");
     } catch (e) {
-      console.warn("Error listando bóvedas:", e);
+      console.warn("Failed to list vaults:", e);
     }
   }
 
@@ -3219,7 +3224,7 @@
         }
       }
     } catch (e) {
-      console.warn("No se pudo emitir notificación nativa de sistema:", e);
+      console.warn("Failed to dispatch native system notification:", e);
     }
   }
 
@@ -3330,7 +3335,7 @@
 
   function copyCurrentCliCommand() {
     navigator.clipboard.writeText(currentCliCommand);
-    statusMessage = "📋 Comando CLI copiado al portapapeles.";
+    statusMessage = tr('status.cli_copied', "📋 Comando CLI copiado al portapapeles.");
   }
 </script>
 

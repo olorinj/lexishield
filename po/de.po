@@ -169,6 +169,36 @@ msgstr "In Werten suchen..."
 msgid "pairs.title"
 msgstr "Ersetzungspaare und Regeln"
 
+msgid "status.cli_copied"
+msgstr "📋 CLI-Befehl in Zwischenablage kopiert."
+
+msgid "status.copied"
+msgstr "📋 In die Zwischenablage kopiert."
+
+msgid "status.copied_restored"
+msgstr "📋 Wiederhergestellter Text in Zwischenablage kopiert."
+
+msgid "status.copy_error"
+msgstr "❌ Fehler beim Kopieren:"
+
+msgid "status.direction_protect"
+msgstr "Aktive Richtung: Schützen (Klartext ➔ geschützter Text)."
+
+msgid "status.direction_restore"
+msgstr "Aktive Richtung: Wiederherstellen (geschützter Text ➔ Klartext)."
+
+msgid "status.ready"
+msgstr "Bereit. Fügen Sie Text ein oder wählen Sie eine Datei aus."
+
+msgid "status.view_clear"
+msgstr "🔓 Klartextansicht mit erweiterten Blöcken aktiv."
+
+msgid "status.view_merge"
+msgstr "🧩 Klartextansicht mit zusammengeführten Fragmenten."
+
+msgid "status.view_reencode"
+msgstr "📦 Kodierte Ansicht aktiv: Beim Klick auf Schützen wird der Inhalt bereinigt und neu kodiert."
+
 msgid "studio.autocopy_btn"
 msgstr "Auto-Kopieren"
 

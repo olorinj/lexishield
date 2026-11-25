@@ -169,6 +169,36 @@ msgstr "Rechercher dans les valeurs..."
 msgid "pairs.title"
 msgstr "Paires de remplacement et règles"
 
+msgid "status.cli_copied"
+msgstr "📋 Commande CLI copiée dans le presse-papiers."
+
+msgid "status.copied"
+msgstr "📋 Copié dans le presse-papiers."
+
+msgid "status.copied_restored"
+msgstr "📋 Texte restauré copié dans le presse-papiers."
+
+msgid "status.copy_error"
+msgstr "❌ Erreur de copie :"
+
+msgid "status.direction_protect"
+msgstr "Direction active : protéger (texte en clair ➔ texte protégé)."
+
+msgid "status.direction_restore"
+msgstr "Direction active : restaurar (texte protégé ➔ texte en clair)."
+
+msgid "status.ready"
+msgstr "Prêt. Collez votre texte ou choisissez un fichier à traiter."
+
+msgid "status.view_clear"
+msgstr "🔓 Vue en clair active avec blocs développés."
+
+msgid "status.view_merge"
+msgstr "🧩 Vue en clair avec fragments fusionnés."
+
+msgid "status.view_reencode"
+msgstr "📦 Vue encodée active : appuyer sur Protéger traitera l'intérieur et ré-encodera."
+
 msgid "studio.autocopy_btn"
 msgstr "Copie auto"
 

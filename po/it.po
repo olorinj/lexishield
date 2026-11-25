@@ -169,6 +169,36 @@ msgstr "Cerca nei valori..."
 msgid "pairs.title"
 msgstr "Coppie di sostituzione e regole"
 
+msgid "status.cli_copied"
+msgstr "📋 Comando CLI copiato negli appunti."
+
+msgid "status.copied"
+msgstr "📋 Copiato negli appunti."
+
+msgid "status.copied_restored"
+msgstr "📋 Testo ripristinato copiato negli appunti."
+
+msgid "status.copy_error"
+msgstr "❌ Errore durante la copia:"
+
+msgid "status.direction_protect"
+msgstr "Direzione attiva: proteggi (testo in chiaro ➔ testo protetto)."
+
+msgid "status.direction_restore"
+msgstr "Direzione attiva: ripristina (testo protetto ➔ testo in chiaro)."
+
+msgid "status.ready"
+msgstr "Pronto. Incolla il testo o seleziona un file da elaborare."
+
+msgid "status.view_clear"
+msgstr "🔓 Vista in chiaro attiva con blocchi espansi."
+
+msgid "status.view_merge"
+msgstr "🧩 Vista in chiaro con frammenti uniti."
+
+msgid "status.view_reencode"
+msgstr "📦 Vista codificata attiva: premendo Proteggi il contenuto interno verrà sanificato e ricodificato."
+
 msgid "studio.autocopy_btn"
 msgstr "Copia automatica"
 

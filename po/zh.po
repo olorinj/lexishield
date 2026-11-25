@@ -169,6 +169,36 @@ msgstr "搜索原始值或脱敏值..."
 msgid "pairs.title"
 msgstr "替换映射对与规则"
 
+msgid "status.cli_copied"
+msgstr "📋 CLI 命令已复制至剪贴板。"
+
+msgid "status.copied"
+msgstr "📋 已复制至剪贴板。"
+
+msgid "status.copied_restored"
+msgstr "📋 还原文本已复制至剪贴板。"
+
+msgid "status.copy_error"
+msgstr "❌ 复制失败："
+
+msgid "status.direction_protect"
+msgstr "当前运行流向：保护 (明文内容 ➔ 受保护文本)。"
+
+msgid "status.direction_restore"
+msgstr "当前运行流向：还原 (受保护文本 ➔ 明文内容)。"
+
+msgid "status.ready"
+msgstr "准备就绪。请粘贴文本或选择要处理的文件。"
+
+msgid "status.view_clear"
+msgstr "🔓 明文视图已激活，编码块已展开。"
+
+msgid "status.view_merge"
+msgstr "🧩 明文分片已合并视图。"
+
+msgid "status.view_reencode"
+msgstr "📦 编码视图处于活动状态：点击保护后将脱敏内部字段并重新编码。"
+
 msgid "studio.autocopy_btn"
 msgstr "自动复制"
 

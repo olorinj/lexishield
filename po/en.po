@@ -169,6 +169,36 @@ msgstr "Search original or protected values..."
 msgid "pairs.title"
 msgstr "Replacement Pairs & Rules"
 
+msgid "status.cli_copied"
+msgstr "📋 CLI command copied to clipboard."
+
+msgid "status.copied"
+msgstr "📋 Copied to clipboard."
+
+msgid "status.copied_restored"
+msgstr "📋 Restored text copied to clipboard."
+
+msgid "status.copy_error"
+msgstr "❌ Copy error:"
+
+msgid "status.direction_protect"
+msgstr "Active direction: protect (clear text ➔ protected text)."
+
+msgid "status.direction_restore"
+msgstr "Active direction: restore (protected text ➔ clear text)."
+
+msgid "status.ready"
+msgstr "Ready. Paste your text or choose a file to process."
+
+msgid "status.view_clear"
+msgstr "🔓 Clear-text view active with expanded blocks."
+
+msgid "status.view_merge"
+msgstr "🧩 Clear-text view with merged chunks."
+
+msgid "status.view_reencode"
+msgstr "📦 Encoded view active: pressing Protect will sanitize inner content and re-encode."
+
 msgid "studio.autocopy_btn"
 msgstr "Auto-copy"
 

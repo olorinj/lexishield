@@ -146,5 +146,17 @@
     "help_tooltip": "Aide et documentation contextuelle de la vue active",
     "options": "Options",
     "options_tooltip": "Configuration générale du système"
+  },
+  "status": {
+    "ready": "Prêt. Collez votre texte ou choisissez un fichier à traiter.",
+    "copied": "📋 Copié dans le presse-papiers.",
+    "copied_restored": "📋 Texte restauré copié dans le presse-papiers.",
+    "copy_error": "❌ Erreur de copie :",
+    "cli_copied": "📋 Commande CLI copiée dans le presse-papiers.",
+    "view_reencode": "📦 Vue encodée active : appuyer sur Protéger traitera l'intérieur et ré-encodera.",
+    "view_merge": "🧩 Vue en clair avec fragments fusionnés.",
+    "view_clear": "🔓 Vue en clair active avec blocs développés.",
+    "direction_protect": "Direction active : protéger (texte en clair ➔ texte protégé).",
+    "direction_restore": "Direction active : restaurar (texte protégé ➔ texte en clair)."
   }
 }

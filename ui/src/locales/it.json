@@ -146,5 +146,17 @@
     "help_tooltip": "Guida e documentazione contestuale per la vista attiva",
     "options": "Opzioni",
     "options_tooltip": "Configurazione generale del sistema"
+  },
+  "status": {
+    "ready": "Pronto. Incolla il testo o seleziona un file da elaborare.",
+    "copied": "📋 Copiato negli appunti.",
+    "copied_restored": "📋 Testo ripristinato copiato negli appunti.",
+    "copy_error": "❌ Errore durante la copia:",
+    "cli_copied": "📋 Comando CLI copiato negli appunti.",
+    "view_reencode": "📦 Vista codificata attiva: premendo Proteggi il contenuto interno verrà sanificato e ricodificato.",
+    "view_merge": "🧩 Vista in chiaro con frammenti uniti.",
+    "view_clear": "🔓 Vista in chiaro attiva con blocchi espansi.",
+    "direction_protect": "Direzione attiva: proteggi (testo in chiaro ➔ testo protetto).",
+    "direction_restore": "Direzione attiva: ripristina (testo protetto ➔ testo in chiaro)."
   }
 }

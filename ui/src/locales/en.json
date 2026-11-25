@@ -146,5 +146,17 @@
     "help_tooltip": "Contextual help and documentation for active view",
     "options": "Settings",
     "options_tooltip": "General system configuration"
+  },
+  "status": {
+    "ready": "Ready. Paste your text or choose a file to process.",
+    "copied": "📋 Copied to clipboard.",
+    "copied_restored": "📋 Restored text copied to clipboard.",
+    "copy_error": "❌ Copy error:",
+    "cli_copied": "📋 CLI command copied to clipboard.",
+    "view_reencode": "📦 Encoded view active: pressing Protect will sanitize inner content and re-encode.",
+    "view_merge": "🧩 Clear-text view with merged chunks.",
+    "view_clear": "🔓 Clear-text view active with expanded blocks.",
+    "direction_protect": "Active direction: protect (clear text ➔ protected text).",
+    "direction_restore": "Active direction: restore (protected text ➔ clear text)."
   }
 }

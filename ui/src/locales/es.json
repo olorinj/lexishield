@@ -146,5 +146,17 @@
     "help_tooltip": "Ayuda y documentación contextual de la vista activa",
     "options": "Opciones",
     "options_tooltip": "Configuración general del sistema"
+  },
+  "status": {
+    "ready": "Listo. Pega tu texto o selecciona un archivo para procesarlo.",
+    "copied": "📋 Copiado al portapapeles.",
+    "copied_restored": "📋 Texto restaurado copiado al portapapeles.",
+    "copy_error": "❌ Error al copiar:",
+    "cli_copied": "📋 Comando CLI copiado al portapapeles.",
+    "view_reencode": "📦 Vista codificada activa: al pulsar Proteger se procesará el interior y se volverá a codificar.",
+    "view_merge": "🧩 Vista en claro con fragmentos unidos.",
+    "view_clear": "🔓 Vista en claro activa con bloques expandidos.",
+    "direction_protect": "Dirección activa: proteger (texto claro ➔ texto protegido).",
+    "direction_restore": "Dirección activa: restaurar (texto protegido ➔ texto claro)."
   }
 }

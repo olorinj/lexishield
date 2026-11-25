@@ -146,5 +146,17 @@
     "help_tooltip": "当前活动视图的上下文帮助与文档",
     "options": "选项设置",
     "options_tooltip": "系统全局配置"
+  },
+  "status": {
+    "ready": "准备就绪。请粘贴文本或选择要处理的文件。",
+    "copied": "📋 已复制至剪贴板。",
+    "copied_restored": "📋 还原文本已复制至剪贴板。",
+    "copy_error": "❌ 复制失败：",
+    "cli_copied": "📋 CLI 命令已复制至剪贴板。",
+    "view_reencode": "📦 编码视图处于活动状态：点击保护后将脱敏内部字段并重新编码。",
+    "view_merge": "🧩 明文分片已合并视图。",
+    "view_clear": "🔓 明文视图已激活，编码块已展开。",
+    "direction_protect": "当前运行流向：保护 (明文内容 ➔ 受保护文本)。",
+    "direction_restore": "当前运行流向：还原 (受保护文本 ➔ 明文内容)。"
   }
 }

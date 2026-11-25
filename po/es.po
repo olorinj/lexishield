@@ -169,6 +169,36 @@ msgstr "Buscar en valores originales o protegidos..."
 msgid "pairs.title"
 msgstr "Pares de reemplazo y reglas"
 
+msgid "status.cli_copied"
+msgstr "📋 Comando CLI copiado al portapapeles."
+
+msgid "status.copied"
+msgstr "📋 Copiado al portapapeles."
+
+msgid "status.copied_restored"
+msgstr "📋 Texto restaurado copiado al portapapeles."
+
+msgid "status.copy_error"
+msgstr "❌ Error al copiar:"
+
+msgid "status.direction_protect"
+msgstr "Dirección activa: proteger (texto claro ➔ texto protegido)."
+
+msgid "status.direction_restore"
+msgstr "Dirección activa: restaurar (texto protegido ➔ texto claro)."
+
+msgid "status.ready"
+msgstr "Listo. Pega tu texto o selecciona un archivo para procesarlo."
+
+msgid "status.view_clear"
+msgstr "🔓 Vista en claro activa con bloques expandidos."
+
+msgid "status.view_merge"
+msgstr "🧩 Vista en claro con fragmentos unidos."
+
+msgid "status.view_reencode"
+msgstr "📦 Vista codificada activa: al pulsar Proteger se procesará el interior y se volverá a codificar."
+
 msgid "studio.autocopy_btn"
 msgstr "Auto-copiar"
 

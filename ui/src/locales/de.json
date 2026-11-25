@@ -146,5 +146,17 @@
     "help_tooltip": "Kontextbezogene Hilfe und Dokumentation der aktiven Ansicht",
     "options": "Optionen",
     "options_tooltip": "Allgemeine Systemkonfiguration"
+  },
+  "status": {
+    "ready": "Bereit. Fügen Sie Text ein oder wählen Sie eine Datei aus.",
+    "copied": "📋 In die Zwischenablage kopiert.",
+    "copied_restored": "📋 Wiederhergestellter Text in Zwischenablage kopiert.",
+    "copy_error": "❌ Fehler beim Kopieren:",
+    "cli_copied": "📋 CLI-Befehl in Zwischenablage kopiert.",
+    "view_reencode": "📦 Kodierte Ansicht aktiv: Beim Klick auf Schützen wird der Inhalt bereinigt und neu kodiert.",
+    "view_merge": "🧩 Klartextansicht mit zusammengeführten Fragmenten.",
+    "view_clear": "🔓 Klartextansicht mit erweiterten Blöcken aktiv.",
+    "direction_protect": "Aktive Richtung: Schützen (Klartext ➔ geschützter Text).",
+    "direction_restore": "Aktive Richtung: Wiederherstellen (geschützter Text ➔ Klartext)."
   }
 }
