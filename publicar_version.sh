@@ -117,7 +117,7 @@ fi
 
 # Verificar si el tag ya existe local o remotamente
 TAG_EXISTS=false
-if git rev-parse "$VERSION" >/dev/null 2>&1; then
+if git rev-parse --verify "refs/tags/$VERSION" >/dev/null 2>&1; then
     TAG_EXISTS=true
 fi
 
