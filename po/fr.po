@@ -3,6 +3,7 @@
 # This file is distributed under the same license as the LexiShield package.
 msgid ""
 msgstr ""
+"Project-Id-Version: LexiShield 2.2.0\n"
 "Project-Id-Version: LexiShield 3.0.0\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/olorinj/lexishield/issues\n"
 "POT-Creation-Date: 2026-11-25 14:00+0100\n"
@@ -96,6 +97,39 @@ msgstr "Système"
 msgid "config.title"
 msgstr "Paramètres du système"
 
+msgid "header.help"
+msgstr "Aide"
+
+msgid "header.help_tooltip"
+msgstr "Aide et documentation contextuelle de la vue active"
+
+msgid "header.options"
+msgstr "Options"
+
+msgid "header.options_tooltip"
+msgstr "Configuration générale du système"
+
+msgid "header.theme_dark"
+msgstr "Sombre"
+
+msgid "header.theme_light"
+msgstr "Clair"
+
+msgid "header.theme_toggle"
+msgstr "Basculer entre thème clair et sombre"
+
+msgid "header.vault_default"
+msgstr "Coffre par défaut"
+
+msgid "header.vault_locked"
+msgstr "Verrouillé"
+
+msgid "header.vault_plain"
+msgstr "Coffre simple"
+
+msgid "header.vault_unlocked"
+msgstr "Déverrouillé"
+
 msgid "pairs.btn_add_pair"
 msgstr "Ajouter une paire manuelle"
 
@@ -135,6 +169,24 @@ msgstr "Rechercher dans les valeurs..."
 msgid "pairs.title"
 msgstr "Paires de remplacement et règles"
 
+msgid "studio.autocopy_btn"
+msgstr "Copie auto"
+
+msgid "studio.autocopy_tooltip_active"
+msgstr "Copie auto active : copie le résultat lors de la protection ou restauration"
+
+msgid "studio.autocopy_tooltip_inactive"
+msgstr "Copie auto désactivée : cliquer pour activer"
+
+msgid "studio.badges_btn"
+msgstr "Badges"
+
+msgid "studio.badges_tooltip_active"
+msgstr "Badges actifs : jetons mis en évidence (cliquer pour désactiver)"
+
+msgid "studio.badges_tooltip_inactive"
+msgstr "Activer les badges sur les jetons confidentiels"
+
 msgid "studio.btn_anonymize"
 msgstr "Anonymiser"
 
@@ -159,8 +211,38 @@ msgstr "Ré-encoder"
 msgid "studio.btn_restore_title"
 msgstr "Restaurer les données protégées (Ctrl+Enter)"
 
+msgid "studio.clear_all"
+msgstr "Tout effacer"
+
+msgid "studio.clear_all_tooltip"
+msgstr "Effacer les deux panneaux (Ctrl+Shift+L)"
+
+msgid "studio.close_notice"
+msgstr "Fermer l'avis"
+
 msgid "studio.detecting"
 msgstr "Analyse du contenu..."
+
+msgid "studio.dismiss_tip"
+msgstr "Ne plus afficher"
+
+msgid "studio.encoded_clear"
+msgstr "En clair"
+
+msgid "studio.encoded_clear_tooltip"
+msgstr "Développer les blocs encodés en clair cellule par cellule"
+
+msgid "studio.encoded_merge"
+msgstr "Fusionner les fragments"
+
+msgid "studio.encoded_merge_tooltip"
+msgstr "Trier par index et fusionner les fragments multiparties en clair"
+
+msgid "studio.encoded_reencode"
+msgstr "Encodé"
+
+msgid "studio.encoded_reencode_tooltip"
+msgstr "Conserver le texte encodé : le contenu interne est traité et ré-encodé"
 
 msgid "studio.file_open"
 msgstr "Ouvrir un fichier"
@@ -170,6 +252,18 @@ msgstr "Enregistrer sous"
 
 msgid "studio.format_auto"
 msgstr "Détection automatique"
+
+msgid "studio.history_btn"
+msgstr "Historique"
+
+msgid "studio.history_tooltip"
+msgstr "Afficher l'historique temporaire en mémoire RAM"
+
+msgid "studio.how_to_text"
+msgstr "Collez du texte dans Texte en clair pour le protéger avant de l'envoyer à l'IA, ou glissez-déposez un fichier/dossier. Dès réception de la réponse de l'IA, collez-la dans Texte protégé et cliquez sur Restaurer pour récupérer les données originales."
+
+msgid "studio.how_to_title"
+msgstr "Comment utiliser la transformation ?"
 
 msgid "studio.input_placeholder"
 msgstr "Collez ici vos journaux ou données sensibles..."
@@ -186,8 +280,23 @@ msgstr "Texte en clair"
 msgid "studio.panel_protected"
 msgstr "Texte protégé"
 
+msgid "studio.privacy_active"
+msgstr "Confidentialité"
+
+msgid "studio.privacy_inactive"
+msgstr "Public"
+
+msgid "studio.privacy_tooltip_active"
+msgstr "Mode confidentialité actif : valeurs originales floutées"
+
+msgid "studio.privacy_tooltip_inactive"
+msgstr "Activer le mode confidentialité (flouter pour le partage d'écran)"
+
 msgid "studio.quick_samples"
 msgstr "Échantillons rapides"
+
+msgid "studio.see_details"
+msgstr "Voir les détails"
 
 msgid "studio.stats_entropy"
 msgstr "Entropie préservée"
@@ -197,6 +306,27 @@ msgstr "Jetons protégés"
 
 msgid "studio.title"
 msgstr "Studio d'anonymisation"
+
+msgid "studio.view_editor"
+msgstr "Éditeur"
+
+msgid "studio.view_editor_tooltip"
+msgstr "Mode éditeur (texte modifiable sur les deux panneaux)"
+
+msgid "studio.view_markdown"
+msgstr "Markdown"
+
+msgid "studio.view_markdown_tooltip"
+msgstr "Mode Markdown (protège automatiquement et affiche l'aperçu)"
+
+msgid "studio.view_return"
+msgstr "Retour à la transformation"
+
+msgid "studio.view_return_tooltip"
+msgstr "Revenir aux panneaux de transformation"
+
+msgid "studio.view_tokens"
+msgstr "Voir les jetons"
 
 msgid "tabs.config"
 msgstr "Paramètres"

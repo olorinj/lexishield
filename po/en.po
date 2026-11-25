@@ -3,6 +3,7 @@
 # This file is distributed under the same license as the LexiShield package.
 msgid ""
 msgstr ""
+"Project-Id-Version: LexiShield 2.2.0\n"
 "Project-Id-Version: LexiShield 3.0.0\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/olorinj/lexishield/issues\n"
 "POT-Creation-Date: 2026-11-25 14:00+0100\n"
@@ -96,6 +97,39 @@ msgstr "System"
 msgid "config.title"
 msgstr "System Settings"
 
+msgid "header.help"
+msgstr "Help"
+
+msgid "header.help_tooltip"
+msgstr "Contextual help and documentation for active view"
+
+msgid "header.options"
+msgstr "Settings"
+
+msgid "header.options_tooltip"
+msgstr "General system configuration"
+
+msgid "header.theme_dark"
+msgstr "Dark"
+
+msgid "header.theme_light"
+msgstr "Light"
+
+msgid "header.theme_toggle"
+msgstr "Toggle light or dark theme"
+
+msgid "header.vault_default"
+msgstr "Default vault"
+
+msgid "header.vault_locked"
+msgstr "Locked"
+
+msgid "header.vault_plain"
+msgstr "Plain vault"
+
+msgid "header.vault_unlocked"
+msgstr "Unlocked"
+
 msgid "pairs.btn_add_pair"
 msgstr "Add Manual Pair"
 
@@ -135,6 +169,24 @@ msgstr "Search original or protected values..."
 msgid "pairs.title"
 msgstr "Replacement Pairs & Rules"
 
+msgid "studio.autocopy_btn"
+msgstr "Auto-copy"
+
+msgid "studio.autocopy_tooltip_active"
+msgstr "Auto-copy active: copies result on protect or restore"
+
+msgid "studio.autocopy_tooltip_inactive"
+msgstr "Auto-copy inactive: click to enable automatic copying"
+
+msgid "studio.badges_btn"
+msgstr "Badges"
+
+msgid "studio.badges_tooltip_active"
+msgstr "Badges active: tokens visually highlighted (click to disable)"
+
+msgid "studio.badges_tooltip_inactive"
+msgstr "Enable badges on confidential tokens"
+
 msgid "studio.btn_anonymize"
 msgstr "Anonymize"
 
@@ -159,8 +211,38 @@ msgstr "Re-encode"
 msgid "studio.btn_restore_title"
 msgstr "Restore protected data (Ctrl+Enter)"
 
+msgid "studio.clear_all"
+msgstr "Clear all"
+
+msgid "studio.clear_all_tooltip"
+msgstr "Clear both panels (Ctrl+Shift+L)"
+
+msgid "studio.close_notice"
+msgstr "Dismiss notice"
+
 msgid "studio.detecting"
 msgstr "Analyzing content..."
+
+msgid "studio.dismiss_tip"
+msgstr "Do not show again"
+
+msgid "studio.encoded_clear"
+msgstr "Clear text"
+
+msgid "studio.encoded_clear_tooltip"
+msgstr "Expand encoded blocks to clear text cell by cell"
+
+msgid "studio.encoded_merge"
+msgstr "Merge chunks"
+
+msgid "studio.encoded_merge_tooltip"
+msgstr "Sort by index and merge multipart chunks in clear text"
+
+msgid "studio.encoded_reencode"
+msgstr "Encoded"
+
+msgid "studio.encoded_reencode_tooltip"
+msgstr "Keep text encoded: inner content is sanitized and re-encoded"
 
 msgid "studio.file_open"
 msgstr "Load File"
@@ -170,6 +252,18 @@ msgstr "Save As"
 
 msgid "studio.format_auto"
 msgstr "Auto Detect"
+
+msgid "studio.history_btn"
+msgstr "History"
+
+msgid "studio.history_tooltip"
+msgstr "View temporary in-memory session history"
+
+msgid "studio.how_to_text"
+msgstr "Paste text into Clear text to protect it before sending to AI, or drag any file/folder over it. When you get the AI response, paste it into Protected text and click Restore data to recover the original values."
+
+msgid "studio.how_to_title"
+msgstr "How to use Transform?"
 
 msgid "studio.input_placeholder"
 msgstr "Paste your logs or sensitive data here..."
@@ -186,8 +280,23 @@ msgstr "Clear text"
 msgid "studio.panel_protected"
 msgstr "Protected text"
 
+msgid "studio.privacy_active"
+msgstr "Privacy"
+
+msgid "studio.privacy_inactive"
+msgstr "Public"
+
+msgid "studio.privacy_tooltip_active"
+msgstr "Privacy mode active: original values blurred"
+
+msgid "studio.privacy_tooltip_inactive"
+msgstr "Enable privacy mode (blur data for screen sharing)"
+
 msgid "studio.quick_samples"
 msgstr "Quick Samples"
+
+msgid "studio.see_details"
+msgstr "View details"
 
 msgid "studio.stats_entropy"
 msgstr "Preserved entropy"
@@ -197,6 +306,27 @@ msgstr "Protected tokens"
 
 msgid "studio.title"
 msgstr "Anonymization Studio"
+
+msgid "studio.view_editor"
+msgstr "Editor"
+
+msgid "studio.view_editor_tooltip"
+msgstr "Editor mode (editable text on both panels)"
+
+msgid "studio.view_markdown"
+msgstr "Markdown"
+
+msgid "studio.view_markdown_tooltip"
+msgstr "Markdown mode (auto-protects and renders formatted preview)"
+
+msgid "studio.view_return"
+msgstr "Return to transform"
+
+msgid "studio.view_return_tooltip"
+msgstr "Return to transform panels"
+
+msgid "studio.view_tokens"
+msgstr "View tokens"
 
 msgid "tabs.config"
 msgstr "Settings"

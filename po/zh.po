@@ -3,6 +3,7 @@
 # This file is distributed under the same license as the LexiShield package.
 msgid ""
 msgstr ""
+"Project-Id-Version: LexiShield 2.2.0\n"
 "Project-Id-Version: LexiShield 3.0.0\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/olorinj/lexishield/issues\n"
 "POT-Creation-Date: 2026-11-25 14:00+0100\n"
@@ -96,6 +97,39 @@ msgstr "跟随系统"
 msgid "config.title"
 msgstr "系统参数设置"
 
+msgid "header.help"
+msgstr "帮助"
+
+msgid "header.help_tooltip"
+msgstr "当前活动视图的上下文帮助与文档"
+
+msgid "header.options"
+msgstr "选项设置"
+
+msgid "header.options_tooltip"
+msgstr "系统全局配置"
+
+msgid "header.theme_dark"
+msgstr "深色"
+
+msgid "header.theme_light"
+msgstr "浅色"
+
+msgid "header.theme_toggle"
+msgstr "切换浅色或深色主题"
+
+msgid "header.vault_default"
+msgstr "默认保管库"
+
+msgid "header.vault_locked"
+msgstr "已锁定"
+
+msgid "header.vault_plain"
+msgstr "明文保管库"
+
+msgid "header.vault_unlocked"
+msgstr "已解锁"
+
 msgid "pairs.btn_add_pair"
 msgstr "手动添加映射"
 
@@ -135,6 +169,24 @@ msgstr "搜索原始值或脱敏值..."
 msgid "pairs.title"
 msgstr "替换映射对与规则"
 
+msgid "studio.autocopy_btn"
+msgstr "自动复制"
+
+msgid "studio.autocopy_tooltip_active"
+msgstr "自动复制已启用：保护或还原后结果自动进入剪贴板"
+
+msgid "studio.autocopy_tooltip_inactive"
+msgstr "自动复制未开启：点击启用自动写入剪贴板"
+
+msgid "studio.badges_btn"
+msgstr "标记徽章"
+
+msgid "studio.badges_tooltip_active"
+msgstr "徽章高亮已启用：敏感标记直观高亮展示 (点击关闭)"
+
+msgid "studio.badges_tooltip_inactive"
+msgstr "在保密标记上启用高亮微章"
+
 msgid "studio.btn_anonymize"
 msgstr "执行脱敏"
 
@@ -159,8 +211,38 @@ msgstr "重新编码"
 msgid "studio.btn_restore_title"
 msgstr "恢复受保护数据 (Ctrl+Enter)"
 
+msgid "studio.clear_all"
+msgstr "清空全部"
+
+msgid "studio.clear_all_tooltip"
+msgstr "清空双侧面板内容 (Ctrl+Shift+L)"
+
+msgid "studio.close_notice"
+msgstr "关闭提示"
+
 msgid "studio.detecting"
 msgstr "正在分析内容..."
+
+msgid "studio.dismiss_tip"
+msgstr "不再提示"
+
+msgid "studio.encoded_clear"
+msgstr "明文查看"
+
+msgid "studio.encoded_clear_tooltip"
+msgstr "逐单元格将编码数据块展开为明文文本"
+
+msgid "studio.encoded_merge"
+msgstr "合并分片"
+
+msgid "studio.encoded_merge_tooltip"
+msgstr "按索引排序并将多段分片拼接为连续明文"
+
+msgid "studio.encoded_reencode"
+msgstr "编码存储"
+
+msgid "studio.encoded_reencode_tooltip"
+msgstr "保留编码格式：仅脱敏内部敏感字段并重新生成编码串"
 
 msgid "studio.file_open"
 msgstr "打开文件"
@@ -170,6 +252,18 @@ msgstr "另存为"
 
 msgid "studio.format_auto"
 msgstr "自动检测格式"
+
+msgid "studio.history_btn"
+msgstr "会话历史"
+
+msgid "studio.history_tooltip"
+msgstr "查看当前内存临时会话处理快照"
+
+msgid "studio.how_to_text"
+msgstr "在「明文内容」中粘贴文本或拖入文件/文件夹，点击保护后再发送给 AI。当 AI 回复后，将其粘贴至「受保护文本」并点击还原，即可百分百恢复真实原始数据。"
+
+msgid "studio.how_to_title"
+msgstr "如何使用转换工作台？"
 
 msgid "studio.input_placeholder"
 msgstr "在此粘贴您的日志或敏感数据..."
@@ -186,8 +280,23 @@ msgstr "明文内容"
 msgid "studio.panel_protected"
 msgstr "受保护文本"
 
+msgid "studio.privacy_active"
+msgstr "防窥保护"
+
+msgid "studio.privacy_inactive"
+msgstr "公开展示"
+
+msgid "studio.privacy_tooltip_active"
+msgstr "防窥保护运行中：原始敏感值已应用模糊遮蔽"
+
+msgid "studio.privacy_tooltip_inactive"
+msgstr "开启防窥保护模式 (屏幕共享时自动虚化敏感数据)"
+
 msgid "studio.quick_samples"
 msgstr "快速示例"
+
+msgid "studio.see_details"
+msgstr "查看详情"
 
 msgid "studio.stats_entropy"
 msgstr "保留信息熵"
@@ -197,6 +306,27 @@ msgstr "已受保护标记"
 
 msgid "studio.title"
 msgstr "脱敏工作台"
+
+msgid "studio.view_editor"
+msgstr "编辑器"
+
+msgid "studio.view_editor_tooltip"
+msgstr "编辑器模式 (双侧面板文本可编辑)"
+
+msgid "studio.view_markdown"
+msgstr "Markdown"
+
+msgid "studio.view_markdown_tooltip"
+msgstr "Markdown 模式 (自动保护并展示格式化渲染预览)"
+
+msgid "studio.view_return"
+msgstr "返回转换面板"
+
+msgid "studio.view_return_tooltip"
+msgstr "返回数据转换工作台"
+
+msgid "studio.view_tokens"
+msgstr "查看标记"
 
 msgid "tabs.config"
 msgstr "系统设置"

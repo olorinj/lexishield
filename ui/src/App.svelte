@@ -3408,39 +3408,39 @@
           }
         }}
         class="text-xs px-2.5 py-1 rounded-lg border font-mono flex items-center gap-1.5 transition {isVaultEncrypted ? (isVaultUnlocked ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 animate-pulse') : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300'}"
-        title={vaultPath || "Bóveda por defecto"}
+        title={vaultPath || ($t ? $t('header.vault_default') : "Bóveda predeterminada")}
       >
-        <span>{isVaultEncrypted ? (isVaultUnlocked ? "🔓 Desbloqueada" : "🔒 Bloqueada") : "📄 Bóveda plana"}</span>
+        <span>{isVaultEncrypted ? (isVaultUnlocked ? `🔓 ${$t ? $t('header.vault_unlocked') : 'Desbloqueada'}` : `🔒 ${$t ? $t('header.vault_locked') : 'Bloqueada'}`) : `📄 ${$t ? $t('header.vault_plain') : 'Bóveda plana'}`}</span>
       </button>
 
       <!-- Botón Configuración -->
       <button
         on:click={() => (activeTab = "config")}
         class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {activeTab === 'config' ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400' : 'bg-slate-200 dark:bg-white/5 border-slate-300 dark:border-white/10 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'}"
-        title="Configuración general del sistema"
+        title={$t ? $t('header.options_tooltip') : "Configuración general del sistema"}
       >
         {#if toolbarButtonStyle !== 'text_only'}<span>⚙️</span>{/if}
-        {#if toolbarButtonStyle !== 'icons_only'}<span>Opciones</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('header.options') : 'Opciones'}</span>{/if}
       </button>
 
       <!-- Botón Tema Claro/Oscuro -->
       <button
         on:click={toggleTheme}
         class="px-2.5 py-1 rounded-xl text-xs bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center gap-1.5 transition font-semibold"
-        title="Alternar Tema Claro / Oscuro"
+        title={$t ? $t('header.theme_toggle') : "Alternar tema claro u oscuro"}
       >
         {#if toolbarButtonStyle !== 'text_only'}<span>{darkMode ? "☀️" : "🌙"}</span>{/if}
-        {#if toolbarButtonStyle !== 'icons_only'}<span>{darkMode ? "Claro" : "Oscuro"}</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>{darkMode ? ($t ? $t('header.theme_light') : "Claro") : ($t ? $t('header.theme_dark') : "Oscuro")}</span>{/if}
       </button>
 
       <!-- Botón Ayuda Global Contextual Fijo (A la derecha del todo) -->
       <button
         on:click={() => openHelp(activeTab)}
         class="px-2.5 py-1 rounded-xl text-xs bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/10 flex items-center justify-center gap-1.5 transition font-semibold"
-        title="Ayuda y documentación contextual de la vista activa"
+        title={$t ? $t('header.help_tooltip') : "Ayuda y documentación contextual de la vista activa"}
       >
         {#if toolbarButtonStyle !== 'text_only'}<span>❔</span>{/if}
-        {#if toolbarButtonStyle !== 'icons_only'}<span>Ayuda</span>{/if}
+        {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('header.help') : 'Ayuda'}</span>{/if}
       </button>
     </div>
   </header>
@@ -3459,19 +3459,19 @@
                 type="button"
                 on:click={() => (studioUnifiedViewMode = "editor")}
                 class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'editor' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                title="Modo Editor (texto editable en ambos paneles)"
+                title={$t ? $t('studio.view_editor_tooltip') : "Modo editor (texto editable en ambos paneles)"}
               >
                 {#if toolbarButtonStyle !== 'text_only'}<span>📄</span>{/if}
-                {#if toolbarButtonStyle !== 'icons_only'}<span>Editor</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('studio.view_editor') : 'Editor'}</span>{/if}
               </button>
               <button
                 type="button"
                 on:click={selectMarkdownViewMode}
                 class="px-2.5 py-1 rounded-lg font-semibold transition flex items-center gap-1 {studioUnifiedViewMode === 'markdown' ? 'bg-white dark:bg-brand-surface text-primary-600 dark:text-primary-300 shadow-xs border border-slate-200/50 dark:border-white/10' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-                title="Modo Markdown (protege automáticamente el texto original y muestra la vista previa formateada)"
+                title={$t ? $t('studio.view_markdown_tooltip') : "Modo Markdown (protege automáticamente y muestra vista previa formateada)"}
               >
                 {#if toolbarButtonStyle !== 'text_only'}<span>👁️</span>{/if}
-                {#if toolbarButtonStyle !== 'icons_only'}<span>Markdown</span>{/if}
+                {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('studio.view_markdown') : 'Markdown'}</span>{/if}
               </button>
             </div>
           {:else}
@@ -3479,10 +3479,10 @@
               type="button"
               on:click={() => { isEditingInput = false; isEditingOutput = false; studioSubView = "transform"; }}
               class="px-3 py-1 rounded-xl text-xs font-bold bg-primary-600 hover:bg-primary-500 text-slate-950 transition flex items-center gap-1.5 shadow-sm"
-              title="Volver a los paneles de transformación"
+              title={$t ? $t('studio.view_return_tooltip') : "Volver a los paneles de transformación"}
             >
               <span>✨</span>
-              <span>Volver a transformación</span>
+              <span>{$t ? $t('studio.view_return') : 'Volver a transformación'}</span>
             </button>
           {/if}
 
@@ -3494,30 +3494,30 @@
                   type="button"
                   on:click={() => applyStudioEncodedViewMode("clear")}
                   class="px-2 py-0.5 rounded-lg font-semibold transition flex items-center gap-1 {studioEncodedViewMode === 'clear' ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300 shadow-xs border border-amber-500/30 font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}"
-                  title="Expandir bloques codificados a texto en claro celda a celda"
+                  title={$t ? $t('studio.encoded_clear_tooltip') : "Expandir bloques codificados a texto en claro celda a celda"}
                 >
                   <span>🔓</span>
-                  <span>En claro ({encodedPasteResult.blocks_decoded})</span>
+                  <span>{$t ? $t('studio.encoded_clear') : 'En claro'} ({encodedPasteResult.blocks_decoded})</span>
                 </button>
                 {#if encodedPasteResult.multipart_groups_merged > 0 && encodedPasteResult.merged_chunks_text}
                   <button
                     type="button"
                     on:click={() => applyStudioEncodedViewMode("merge")}
                     class="px-2 py-0.5 rounded-lg font-semibold transition flex items-center gap-1 {studioEncodedViewMode === 'merge' ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300 shadow-xs border border-amber-500/30 font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}"
-                    title="Ordenar por índice y unir fragmentos multiparte en claro"
+                    title={$t ? $t('studio.encoded_merge_tooltip') : "Ordenar por índice y unir fragmentos multiparte en claro"}
                   >
                     <span>🧩</span>
-                    <span>Unir fragmentos</span>
+                    <span>{$t ? $t('studio.encoded_merge') : 'Unir fragmentos'}</span>
                   </button>
                 {/if}
                 <button
                   type="button"
                   on:click={() => applyStudioEncodedViewMode("reencode")}
                   class="px-2 py-0.5 rounded-lg font-semibold transition flex items-center gap-1 {studioEncodedViewMode === 'reencode' ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300 shadow-xs border border-amber-500/30 font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}"
-                  title="Mantener el texto codificado en el editor: al pulsar Proteger se procesará el interior y se volverá a codificar"
+                  title={$t ? $t('studio.encoded_reencode_tooltip') : "Mantener el texto codificado en el editor"}
                 >
                   <span>📦</span>
-                  <span>Codificado</span>
+                  <span>{$t ? $t('studio.encoded_reencode') : 'Codificado'}</span>
                 </button>
               </div>
             {/if}
@@ -3537,10 +3537,10 @@
               }}
               disabled={!inputText && !outputText}
               class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Limpiar ambos paneles (Ctrl+Shift+L)"
+              title={$t ? $t('studio.clear_all_tooltip') : "Limpiar ambos paneles (Ctrl+Shift+L)"}
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>🗑️</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Limpiar todo</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{$t ? $t('studio.clear_all') : 'Limpiar todo'}</span>{/if}
             </button>
 
             <!-- Botón Modo Privacidad / Desenfoque de Pantalla (Tier 2 Transformación) -->
@@ -3551,10 +3551,10 @@
                 saveSettings();
               }}
               class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {privacyBlur ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-600 dark:text-indigo-400 font-bold' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}"
-              title={privacyBlur ? "Modo Privacidad ACTIVO: Valores originales desenfocados (Pasa el cursor por encima para verlos)" : "Activar Modo Privacidad (Desenfocar datos originales para compartir pantalla)"}
+              title={privacyBlur ? ($t ? $t('studio.privacy_tooltip_active') : "Modo privacidad activo: valores originales desenfocados") : ($t ? $t('studio.privacy_tooltip_inactive') : "Activar modo privacidad")}
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>{privacyBlur ? "🙈" : "👁️"}</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{privacyBlur ? "Privacidad" : "Público"}</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{privacyBlur ? ($t ? $t('studio.privacy_active') : "Privacidad") : ($t ? $t('studio.privacy_inactive') : "Público")}</span>{/if}
             </button>
 
             <!-- Botón Insignias / Badges de Tokens -->
@@ -3562,10 +3562,10 @@
               type="button"
               on:click={toggleTokenBadges}
               class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {showTokenBadges ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
-              title={showTokenBadges ? "Insignias (Badges) ACTIVAS: Tokens resaltados visualmente (Clic para desactivar)" : "Activar Insignias (Badges) en tokens confidenciales"}
+              title={showTokenBadges ? ($t ? $t('studio.badges_tooltip_active') : "Insignias activas") : ($t ? $t('studio.badges_tooltip_inactive') : "Activar insignias")}
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>🏷️</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Insignias</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{$t ? $t('studio.badges_btn') : 'Insignias'}</span>{/if}
             </button>
 
             <!-- Botón Conmutable de Auto-copiado -->
@@ -3578,10 +3578,10 @@
                   : "📄 Auto-copiado al portapapeles DESACTIVADO.";
               }}
               class="px-2.5 py-1 rounded-xl text-xs flex items-center justify-center gap-1.5 transition border font-semibold {autoCopyToClipboard ? 'bg-primary-500/20 border-primary-500/40 text-primary-600 dark:text-primary-400 font-bold shadow-xs' : 'bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}"
-              title={autoCopyToClipboard ? "Auto-copiar ACTIVO: Copia el resultado automáticamente al proteger o restaurar (Clic para desactivar)" : "Auto-copiar DESACTIVADO: Clic para activar copiado automático"}
+              title={autoCopyToClipboard ? ($t ? $t('studio.autocopy_tooltip_active') : "Auto-copiar activo") : ($t ? $t('studio.autocopy_tooltip_inactive') : "Auto-copiar desactivado")}
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>{autoCopyToClipboard ? "📋" : "📄"}</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Auto-copiar</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{$t ? $t('studio.autocopy_btn') : 'Auto-copiar'}</span>{/if}
             </button>
 
             <!-- Botón Historial de Sesión -->
@@ -3589,10 +3589,10 @@
               type="button"
               on:click={() => (showSessionHistoryModal = true)}
               class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl border border-slate-200 dark:border-white/10 font-semibold transition flex items-center gap-1.5 shadow-xs text-xs"
-              title="Ver historial temporal de sesiones en memoria RAM"
+              title={$t ? $t('studio.history_tooltip') : "Ver historial temporal de sesiones en memoria RAM"}
             >
               {#if toolbarButtonStyle !== 'text_only'}<span>⏱️</span>{/if}
-              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">Historial</span>{/if}
+              {#if toolbarButtonStyle !== 'icons_only'}<span class="hidden sm:inline">{$t ? $t('studio.history_btn') : 'Historial'}</span>{/if}
               {#if sessionHistory.length > 0}
                 <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-primary-500 text-slate-950 font-bold">
                   {sessionHistory.length}
@@ -3630,12 +3630,12 @@
               <div class="flex items-center gap-3">
                 <span class="text-base shrink-0">✨</span>
                 <p class="text-slate-700 dark:text-slate-300">
-                  <strong class="text-primary-600 dark:text-primary-400">¿Cómo usar Transformación?</strong> Pega texto en <em>Texto claro</em> para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en <em>Texto protegido</em> y pulsa <em>Restaurar datos</em> para recuperar los valores originales.
+                  <strong class="text-primary-600 dark:text-primary-400">{$t ? $t('studio.how_to_title') : '¿Cómo usar Transformación?'}</strong> {$t ? $t('studio.how_to_text') : 'Pega texto en Texto claro para protegerlo antes de enviarlo a la IA, o arrastra cualquier archivo o carpeta encima. Al recibir la respuesta de la IA, pégala en Texto protegido y pulsa Restaurar datos para recuperar los valores originales.'}
                 </p>
               </div>
               <div class="flex items-center gap-2 shrink-0">
-                <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">Ver detalles</button>
-                <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title="No volver a mostrar">✕</button>
+                <button on:click={() => openHelp('studio')} class="text-[11px] font-bold text-primary-600 dark:text-primary-400 hover:underline">{$t ? $t('studio.see_details') : 'Ver detalles'}</button>
+                <button on:click={() => dismissTip('studio')} class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5" title={$t ? $t('studio.dismiss_tip') : 'No volver a mostrar'}>✕</button>
               </div>
             </div>
           {/if}
