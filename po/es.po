@@ -1,0 +1,280 @@
+# LexiShield Translation Catalog - Language: es
+# Copyright (C) 2026 Julio C. Semper & LexiShield Contributors
+# This file is distributed under the same license as the LexiShield package.
+msgid ""
+msgstr ""
+"Project-Id-Version: LexiShield 3.0.0\n"
+"Report-Msgid-Bugs-To: https://gitlab.com/olorinj/lexishield/issues\n"
+"POT-Creation-Date: 2026-11-25 14:00+0100\n"
+"PO-Revision-Date: 2026-11-25 14:00+0100\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "common.cancel"
+msgstr "Cancelar"
+
+msgid "common.close"
+msgstr "Cerrar"
+
+msgid "common.confirm"
+msgstr "Confirmar"
+
+msgid "common.delete"
+msgstr "Eliminar"
+
+msgid "common.edit"
+msgstr "Editar"
+
+msgid "common.error"
+msgstr "Ha ocurrido un error"
+
+msgid "common.info"
+msgstr "Información"
+
+msgid "common.loading"
+msgstr "Cargando..."
+
+msgid "common.no"
+msgstr "No"
+
+msgid "common.save"
+msgstr "Guardar"
+
+msgid "common.success"
+msgstr "Operación completada con éxito"
+
+msgid "common.warning"
+msgstr "Advertencia"
+
+msgid "common.yes"
+msgstr "Sí"
+
+msgid "config.btn_reset"
+msgstr "Restaurar valores predeterminados"
+
+msgid "config.btn_save"
+msgstr "Guardar configuración"
+
+msgid "config.font_size"
+msgstr "Tamaño de fuente"
+
+msgid "config.language"
+msgstr "Idioma de la interfaz"
+
+msgid "config.privacy_blur"
+msgstr "Desenfoque de privacidad (ocultar datos al perder el foco)"
+
+msgid "config.section_appearance"
+msgstr "4. Apariencia, idioma y seguridad"
+
+msgid "config.section_encoded"
+msgstr "3. Cargas codificadas (Base64 / Hex)"
+
+msgid "config.section_general"
+msgstr "1. Configuración general"
+
+msgid "config.section_studio"
+msgstr "2. Ergonomía del estudio"
+
+msgid "config.show_badges"
+msgstr "Insignias de tokens destacadas"
+
+msgid "config.theme"
+msgstr "Tema visual"
+
+msgid "config.theme_dark"
+msgstr "Oscuro"
+
+msgid "config.theme_light"
+msgstr "Claro"
+
+msgid "config.theme_system"
+msgstr "Sistema"
+
+msgid "config.title"
+msgstr "Ajustes del sistema"
+
+msgid "pairs.btn_add_pair"
+msgstr "Añadir par manual"
+
+msgid "pairs.btn_delete_selected"
+msgstr "Eliminar seleccionados"
+
+msgid "pairs.btn_export_csv"
+msgstr "Exportar CSV"
+
+msgid "pairs.btn_import_csv"
+msgstr "Importar CSV"
+
+msgid "pairs.col_actions"
+msgstr "Acciones"
+
+msgid "pairs.col_omitted"
+msgstr "Omitido"
+
+msgid "pairs.col_original"
+msgstr "Valor original"
+
+msgid "pairs.col_protected"
+msgstr "Valor protegido"
+
+msgid "pairs.col_type"
+msgstr "Tipo de entidad"
+
+msgid "pairs.filter_all"
+msgstr "Todas las entidades"
+
+msgid "pairs.no_pairs"
+msgstr "No hay pares registrados en la bóveda activa"
+
+msgid "pairs.search_placeholder"
+msgstr "Buscar en valores originales o protegidos..."
+
+msgid "pairs.title"
+msgstr "Pares de reemplazo y reglas"
+
+msgid "studio.btn_anonymize"
+msgstr "Anonimizar"
+
+msgid "studio.btn_clear"
+msgstr "Limpiar"
+
+msgid "studio.btn_clear_text"
+msgstr "Ver en claro"
+
+msgid "studio.btn_copy"
+msgstr "Copiar"
+
+msgid "studio.btn_deanonymize"
+msgstr "Desanonimizar"
+
+msgid "studio.btn_protect_title"
+msgstr "Proteger datos confidenciales (Ctrl+Enter)"
+
+msgid "studio.btn_reencode"
+msgstr "Re-codificar"
+
+msgid "studio.btn_restore_title"
+msgstr "Restaurar datos protegidos (Ctrl+Enter)"
+
+msgid "studio.detecting"
+msgstr "Analizando contenido..."
+
+msgid "studio.file_open"
+msgstr "Cargar archivo"
+
+msgid "studio.file_save"
+msgstr "Guardar como"
+
+msgid "studio.format_auto"
+msgstr "Detección automática"
+
+msgid "studio.input_placeholder"
+msgstr "Pega aquí tus logs o datos sensibles..."
+
+msgid "studio.merge_chunks"
+msgstr "Fusionar fragmentos"
+
+msgid "studio.output_placeholder"
+msgstr "El resultado sanitizado aparecerá aquí..."
+
+msgid "studio.panel_clear"
+msgstr "Texto claro"
+
+msgid "studio.panel_protected"
+msgstr "Texto protegido"
+
+msgid "studio.quick_samples"
+msgstr "Ejemplos rápidos"
+
+msgid "studio.stats_entropy"
+msgstr "Entropía preservada"
+
+msgid "studio.stats_tokens"
+msgstr "Tokens protegidos"
+
+msgid "studio.title"
+msgstr "Estudio de anonimización"
+
+msgid "tabs.config"
+msgstr "Configuración"
+
+msgid "tabs.logs"
+msgstr "Registros"
+
+msgid "tabs.pairs"
+msgstr "Pares y Reglas"
+
+msgid "tabs.scanner"
+msgstr "Escáner"
+
+msgid "tabs.studio"
+msgstr "Estudio"
+
+msgid "tabs.vaults"
+msgstr "Bóvedas"
+
+msgid "tabs.watch"
+msgstr "Centinela"
+
+msgid "vaults.active_vault"
+msgstr "Bóveda activa"
+
+msgid "vaults.btn_backup"
+msgstr "Crear copia (.bak)"
+
+msgid "vaults.btn_export"
+msgstr "Exportar bóveda"
+
+msgid "vaults.btn_import"
+msgstr "Importar bóveda"
+
+msgid "vaults.btn_lock"
+msgstr "Bloquear"
+
+msgid "vaults.btn_new"
+msgstr "Nueva bóveda"
+
+msgid "vaults.btn_restore"
+msgstr "Restaurar copia"
+
+msgid "vaults.btn_unlock"
+msgstr "Desbloquear"
+
+msgid "vaults.security_note"
+msgstr "Cifrado ChaCha20-Poly1305 con derivación Argon2id"
+
+msgid "vaults.title"
+msgstr "Gestión de bóvedas cifradas"
+
+msgid "vaults.vault_name"
+msgstr "Nombre de la bóveda"
+
+msgid "vaults.vault_pass"
+msgstr "Contraseña de la bóveda"
+
+msgid "watch.auto_clear"
+msgstr "Borrado automático de seguridad"
+
+msgid "watch.btn_start"
+msgstr "Iniciar centinela"
+
+msgid "watch.btn_stop"
+msgstr "Detener centinela"
+
+msgid "watch.notification_silent"
+msgstr "Silencioso"
+
+msgid "watch.notification_toast"
+msgstr "Notificación emergente (toast)"
+
+msgid "watch.status_active"
+msgstr "Supervisión activa del portapapeles"
+
+msgid "watch.status_inactive"
+msgstr "Centinela pausado"
+
+msgid "watch.title"
+msgstr "Modo centinela (portapapeles en tiempo real)"

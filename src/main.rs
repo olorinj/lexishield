@@ -5,6 +5,7 @@ use lexishield::clipboard::{
     WatchDirection, get_clipboard_text, set_clipboard_text, watch_clipboard_loop,
 };
 use lexishield::config::{LexiConfig, load_config_with_rules};
+use lexishield::encoded_content::EncodedPayloadMode;
 use lexishield::engine::ObfuscatorEngine;
 use lexishield::logger::init_logger;
 use lexishield::models::{DetectorType, FormatType, Mapping};
@@ -43,7 +44,7 @@ struct Cli {
     #[arg(value_parser = parse_path, long, global = true)]
     rules: Option<PathBuf>,
 
-    /// Display language / Idioma de interfaz ('en', 'es').
+    /// Display language / Idioma de interfaz ('en', 'es', 'fr', 'de', 'it', 'zh').
     #[arg(long, global = true)]
     lang: Option<String>,
 
@@ -68,6 +69,27 @@ impl From<CliFormat> for FormatType {
             CliFormat::Xml => FormatType::Xml,
             CliFormat::Log => FormatType::Log,
             CliFormat::Text => FormatType::Plaintext,
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug)]
+enum CliEncodedMode {
+    /// Decodifica, protege/restaura el interior y vuelve a codificar en Base64/Hex/URL.
+    Reencode,
+    /// Expande las cargas codificadas legibles a texto en claro.
+    #[value(name = "clear", alias = "expand")]
+    Clear,
+    /// No procesa cargas codificadas.
+    Off,
+}
+
+impl From<CliEncodedMode> for EncodedPayloadMode {
+    fn from(m: CliEncodedMode) -> Self {
+        match m {
+            CliEncodedMode::Reencode => EncodedPayloadMode::Reencode,
+            CliEncodedMode::Clear => EncodedPayloadMode::ExpandClear,
+            CliEncodedMode::Off => EncodedPayloadMode::Off,
         }
     }
 }
@@ -391,6 +413,14 @@ enum Commands {
         /// Confirmar automáticamente advertencias de recursos o procesamiento masivo sin preguntar.
         #[arg(short = 'y', long)]
         yes: bool,
+
+        /// Modo para cargas codificadas legibles (Base64/Hex/URL): reencode, clear u off.
+        #[arg(long, value_enum)]
+        encoded_mode: Option<CliEncodedMode>,
+
+        /// Ordenar y unir fragmentos multiparte codificados al expandir en claro.
+        #[arg(long)]
+        merge_chunks: bool,
     },
 
     /// Restaura un archivo, directorio completo (procesamiento recursivo concurrente), texto o portapapeles reemplazando los tokens por sus valores originales.
@@ -447,6 +477,14 @@ enum Commands {
         /// Confirmar automáticamente advertencias de recursos o procesamiento masivo sin preguntar.
         #[arg(short = 'y', long)]
         yes: bool,
+
+        /// Modo para cargas codificadas legibles (Base64/Hex/URL): reencode, clear u off.
+        #[arg(long, value_enum)]
+        encoded_mode: Option<CliEncodedMode>,
+
+        /// Ordenar y unir fragmentos multiparte codificados al expandir en claro.
+        #[arg(long)]
+        merge_chunks: bool,
     },
 
     /// Escanea un archivo, directorio completo (recursivo), texto, stdin o portapapeles y muestra los datos sensibles detectados sin modificarlos.
@@ -490,6 +528,10 @@ enum Commands {
         /// Guardar sin pedir confirmación interactiva.
         #[arg(short = 'y', long)]
         yes: bool,
+
+        /// Modo para cargas codificadas legibles durante escaneo (reencode, clear u off).
+        #[arg(long, value_enum)]
+        encoded_mode: Option<CliEncodedMode>,
     },
 
     /// Monitoriza el portapapeles en tiempo real (modo escucha nativo).
@@ -513,6 +555,14 @@ enum Commands {
         /// Formato estructural (auto, json, xml, log, text).
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
+
+        /// Modo para cargas codificadas legibles en portapapeles (por defecto: clear al proteger).
+        #[arg(long, value_enum)]
+        encoded_mode: Option<CliEncodedMode>,
+
+        /// Ordenar y unir fragmentos multiparte codificados al expandir en claro.
+        #[arg(long)]
+        merge_chunks: bool,
     },
 
     /// Gestiona diccionarios de mapeos (soporta JSON y archivos cifrados .lexi).
@@ -2463,6 +2513,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         lexishield::logger::set_debug_mode(true);
     }
     let config = load_config_with_rules(cli.config.as_deref(), cli.rules.as_deref());
+    let _active_lang = lexishield::i18n::Language::resolve(
+        cli.lang.as_deref(),
+        Some(config.general.language.as_str()),
+    );
 
     match cli.command {
         Commands::Config { subcommand } => handle_config(cli.config.as_deref(), subcommand),
@@ -2487,28 +2541,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             no_save,
             export_md,
             yes,
-        } => handle_obfuscate(
-            config,
-            ObfuscateOptions {
-                input,
-                recursive,
-                no_git_ignore,
-                stdin,
-                output,
-                copy,
-                suffix,
-                clean_cache,
-                text,
-                clipboard,
-                format: format.into(),
-                save_mappings,
-                password,
-                ask_password,
-                no_save,
-                export_md,
-                yes,
-            },
-        ),
+            encoded_mode,
+            merge_chunks,
+        } => {
+            let mut cfg = config;
+            if let Some(em) = encoded_mode {
+                cfg.general.encoded_payload_mode = em.into();
+            }
+            if merge_chunks {
+                cfg.general.merge_encoded_chunks = true;
+            }
+            handle_obfuscate(
+                cfg,
+                ObfuscateOptions {
+                    input,
+                    recursive,
+                    no_git_ignore,
+                    stdin,
+                    output,
+                    copy,
+                    suffix,
+                    clean_cache,
+                    text,
+                    clipboard,
+                    format: format.into(),
+                    save_mappings,
+                    password,
+                    ask_password,
+                    no_save,
+                    export_md,
+                    yes,
+                },
+            )
+        }
 
         Commands::Restore {
             input,
@@ -2524,24 +2589,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             format,
             export_md,
             yes,
-        } => handle_deobfuscate(
-            config,
-            DeobfuscateOptions {
-                input,
-                recursive,
-                no_git_ignore,
-                stdin,
-                output,
-                text,
-                clipboard,
-                mappings,
-                password,
-                ask_password,
-                format: format.into(),
-                export_md,
-                yes,
-            },
-        ),
+            encoded_mode,
+            merge_chunks,
+        } => {
+            let mut cfg = config;
+            if let Some(em) = encoded_mode {
+                cfg.general.encoded_payload_mode = em.into();
+            }
+            if merge_chunks {
+                cfg.general.merge_encoded_chunks = true;
+            }
+            handle_deobfuscate(
+                cfg,
+                DeobfuscateOptions {
+                    input,
+                    recursive,
+                    no_git_ignore,
+                    stdin,
+                    output,
+                    text,
+                    clipboard,
+                    mappings,
+                    password,
+                    ask_password,
+                    format: format.into(),
+                    export_md,
+                    yes,
+                },
+            )
+        }
 
         Commands::Scan {
             input,
@@ -2554,21 +2630,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             password,
             ask_password,
             yes,
-        } => handle_scan(
-            config,
-            ScanOptions {
-                input,
-                recursive,
-                no_git_ignore,
-                stdin,
-                text,
-                clipboard,
-                save_mappings,
-                password,
-                ask_password,
-                yes,
-            },
-        ),
+            encoded_mode,
+        } => {
+            let mut cfg = config;
+            if let Some(em) = encoded_mode {
+                cfg.general.encoded_payload_mode = em.into();
+            }
+            handle_scan(
+                cfg,
+                ScanOptions {
+                    input,
+                    recursive,
+                    no_git_ignore,
+                    stdin,
+                    text,
+                    clipboard,
+                    save_mappings,
+                    password,
+                    ask_password,
+                    yes,
+                },
+            )
+        }
 
         Commands::Watch {
             direction,
@@ -2576,7 +2659,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             password,
             ask_password,
             format,
+            encoded_mode,
+            merge_chunks,
         } => {
+            let mut cfg = config;
+            if let Some(em) = encoded_mode {
+                cfg.general.encoded_payload_mode = em.into();
+                if matches!(em, CliEncodedMode::Reencode) {
+                    cfg.gui.studio_paste_encoded_mode = "reencode".to_string();
+                }
+            }
+            if merge_chunks {
+                cfg.general.merge_encoded_chunks = true;
+                cfg.gui.studio_paste_encoded_mode = "merge".to_string();
+            }
             let is_default = mappings.is_none();
             let map_path = mappings.or_else(|| lexishield::config::get_default_vault_path().ok());
 
@@ -2585,7 +2681,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             watch_clipboard_loop(
                 direction.into(),
                 format.into(),
-                config,
+                cfg,
                 map_path.as_deref(),
                 pwd.as_deref(),
             )

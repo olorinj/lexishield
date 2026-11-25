@@ -21,10 +21,13 @@
   let appConfig = {
     general: {
       language: "en",
+      encoded_payload_mode: "reencode",
+      merge_encoded_chunks: false,
     },
     gui: {
       default_tab: "studio",
       show_cli_dock: true,
+      studio_paste_encoded_mode: "clear",
       tabs: {
         show_studio: true,
         show_pairs: true,
@@ -233,6 +236,25 @@
   let vaultMappings = [];
   let studioDirection = "obfuscate"; // "obfuscate" (Texto claro -> Texto protegido) | "deobfuscate" (Texto protegido -> Texto claro)
   let studioDragTarget = "deobfuscated"; // "deobfuscated" | "obfuscated"
+  let rawEncodedPasteBuffer = "";
+  let encodedPasteResult = null;
+  let studioEncodedViewMode = "clear"; // "clear" | "merge" | "reencode"
+
+  function applyStudioEncodedViewMode(mode) {
+    studioEncodedViewMode = mode;
+    if (!encodedPasteResult || !rawEncodedPasteBuffer) return;
+    if (mode === "reencode") {
+      inputText = rawEncodedPasteBuffer;
+      statusMessage = `📦 Vista codificada activa: al pulsar Proteger se procesará el interior y se volverá a codificar.`;
+    } else if (mode === "merge" && encodedPasteResult.merged_chunks_text) {
+      inputText = encodedPasteResult.merged_chunks_text;
+      statusMessage = `🧩 Vista en claro con fragmentos unidos (${encodedPasteResult.multipart_groups_merged} grupo(s) ensamblados por índice).`;
+    } else {
+      inputText = encodedPasteResult.expanded_text;
+      statusMessage = `🔓 Vista en claro activa (${encodedPasteResult.blocks_decoded} bloques codificados legibles expandidos).`;
+    }
+    isEditingInput = false;
+  }
 
   function toggleStudioDirection() {
     studioDirection = studioDirection === "obfuscate" ? "deobfuscate" : "obfuscate";
@@ -572,6 +594,8 @@
           pushToSessionHistory("clear");
           inputText = "";
           outputText = "";
+          rawEncodedPasteBuffer = "";
+          encodedPasteResult = null;
           statusMessage = "Ambos paneles han sido limpiados (guardado en historial de sesión).";
         }
       }
@@ -928,6 +952,10 @@
         if (cfg.gui.show_token_badges === undefined) {
           cfg.gui.show_token_badges = true;
         }
+        if (!["clear", "merge", "reencode"].includes(cfg.gui.studio_paste_encoded_mode)) {
+          cfg.gui.studio_paste_encoded_mode = "clear";
+        }
+        studioEncodedViewMode = cfg.gui.studio_paste_encoded_mode;
         showTokenBadges = cfg.gui.show_token_badges;
         if (cfg.ignore) {
           if (cfg.ignore.ignore_netmasks === undefined) {
@@ -976,6 +1004,10 @@
       if (!["cyan", "emerald", "cobalt", "purple", "amber"].includes(appConfig?.gui?.accent_color)) {
         appConfig.gui.accent_color = "cyan";
       }
+      if (!["clear", "merge", "reencode"].includes(appConfig?.gui?.studio_paste_encoded_mode)) {
+        appConfig.gui.studio_paste_encoded_mode = "clear";
+      }
+      studioEncodedViewMode = appConfig.gui.studio_paste_encoded_mode;
       await invokeTauri("save_app_settings", { config: appConfig });
       statusMessage = "✅ Configuración guardada en ~/.lexishield/config.toml";
     } catch (e) {
@@ -1206,11 +1238,15 @@
     }
     loading = true;
     try {
+      const activeEncMode = studioEncodedViewMode === "reencode" ? "reencode" : "expand_clear";
+      const activeMerge = studioEncodedViewMode === "merge";
       const res = await invokeTauri("obfuscate_content", {
         text: inputText,
         formatStr: selectedFormat,
         vaultPath: vaultPath || null,
-        password: password || null
+        password: password || null,
+        encodedMode: activeEncMode,
+        mergeChunks: activeMerge
       });
       outputText = res.obfuscated_text;
       lastReport = res.report;
@@ -1249,12 +1285,16 @@
     }
     loading = true;
     try {
+      const activeEncMode = studioEncodedViewMode === "reencode" ? "reencode" : "expand_clear";
+      const activeMerge = studioEncodedViewMode === "merge";
       const res = await invokeTauri("deobfuscate_content", {
         text: outputText,
         formatStr: selectedFormat,
         vaultPath: vaultPath || null,
         password: password || null,
-        customMappings: null
+        customMappings: null,
+        encodedMode: activeEncMode,
+        mergeChunks: activeMerge
       });
       inputText = res.deobfuscated_text;
       lastReport = res.report;
@@ -1296,6 +1336,8 @@
       const activeSuffix = customOptions?.suffix || (reverse ? ".restaurado" : copySuffix);
       const useMd = customOptions ? (hasPandoc && customOptions.exportMarkdown) : (hasPandoc && exportMarkdown);
       const protectName = customOptions ? !!customOptions.protectFilename : false;
+      const fileEncMode = customOptions?.encodedMode || "reencode";
+      const fileMergeChunks = !!customOptions?.mergeChunks;
 
       let outPath = selected;
       if (useCopy) {
@@ -1318,7 +1360,9 @@
           reverse: reverse,
           exportMd: useMd,
           forceResources: false,
-          protectFilename: protectName
+          protectFilename: protectName,
+          encodedMode: fileEncMode,
+          mergeChunks: fileMergeChunks
         });
       } catch (e) {
         const errStr = String(e);
@@ -1334,7 +1378,9 @@
               reverse: reverse,
               exportMd: useMd,
               forceResources: true,
-              protectFilename: protectName
+              protectFilename: protectName,
+              encodedMode: fileEncMode,
+              mergeChunks: fileMergeChunks
             });
           } else {
             statusMessage = "Operación cancelada por el usuario por precaución de recursos.";
@@ -1357,6 +1403,7 @@
           { label: "Archivo Origen", value: selected.split(/[/\\]/).pop() },
           { label: "Archivo Guardado", value: outPath.split(/[/\\]/).pop() },
           { label: reverse ? "Tokens Restaurados" : "Tokens Protegidos", value: `${rep.replacements_applied}` },
+          ...(rep.encoded_blocks_processed > 0 ? [{ label: "Bloques Codificados Procesados", value: `${rep.encoded_blocks_processed}` }] : []),
           { label: "Tiempo", value: `${rep.elapsed_ms.toFixed(2)} ms` },
           { label: "Exportado a Markdown", value: useMd ? "Sí (.md)" : "No" }
         ],
@@ -1501,15 +1548,41 @@
       if (showTokenBadges) {
         isEditingInput = false;
       }
-      const textToScan = inputText.trim();
-      if (!textToScan) return;
+      const rawPasted = inputText;
+      const textToScanRaw = rawPasted.trim();
+      if (!textToScanRaw) return;
       try {
         loading = true;
         detectedItems = [];
         auditSummary = null;
 
+        // Inspeccionar si el texto pegado contiene bloques codificados legibles (Base64 / Hex / URL)
+        let effectiveScanText = textToScanRaw;
+        try {
+          const encInfo = await invokeTauri("inspect_and_decode_encoded", { text: rawPasted });
+          if (encInfo && encInfo.blocks_decoded > 0) {
+            rawEncodedPasteBuffer = rawPasted;
+            encodedPasteResult = encInfo;
+            const preferred = appConfig?.gui?.studio_paste_encoded_mode || "clear";
+            const chosenMode = (preferred === "merge" && !encInfo.merged_chunks_text) ? "clear" : preferred;
+            studioEncodedViewMode = chosenMode;
+            if (chosenMode === "merge" && encInfo.merged_chunks_text) {
+              inputText = encInfo.merged_chunks_text;
+              effectiveScanText = inputText;
+            } else if (chosenMode === "clear") {
+              inputText = encInfo.expanded_text;
+              effectiveScanText = inputText;
+            }
+          } else {
+            rawEncodedPasteBuffer = "";
+            encodedPasteResult = null;
+          }
+        } catch (decErr) {
+          console.warn("Aviso al inspeccionar contenido codificado:", decErr);
+        }
+
         const res = await invokeTauri("scan_content", {
-          content: textToScan,
+          content: effectiveScanText,
           vaultPath: pairsSelectedVault || vaultPath || null,
           password: password || null
         });
@@ -1692,7 +1765,9 @@
         saveSuffixDefault: false,
         cleanCache: true,
         exportMarkdown: hasPandoc && exportMarkdown,
-        protectFilename: false
+        protectFilename: false,
+        encodedMode: "reencode",
+        mergeChunks: false
       };
       activeTab = "studio";
       studioSubView = "transform";
@@ -1722,7 +1797,7 @@
 
   async function confirmStudioDropModal() {
     if (!studioDropModal) return;
-    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd, protectFilename: protName } = studioDropModal;
+    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd, protectFilename: protName, encodedMode: encMode, mergeChunks: mrgChunks } = studioDropModal;
     studioDropModal = null;
 
     try {
@@ -1748,7 +1823,9 @@
           copyMode,
           suffix,
           exportMarkdown: expMd,
-          protectFilename: protName
+          protectFilename: protName,
+          encodedMode: encMode === "merge" ? "expand_clear" : encMode,
+          mergeChunks: encMode === "merge" || !!mrgChunks
         });
       }
     } catch (err) {
@@ -3029,11 +3106,14 @@
         if (text && text.trim() && text !== lastSeenClipboard) {
           lastSeenClipboard = text;
           if (watchDirection === "obfuscate") {
+            const watchPref = appConfig?.gui?.studio_paste_encoded_mode || "clear";
             const res = await invokeTauri("obfuscate_content", {
               text,
               formatStr: "auto",
               vaultPath: vaultPath || null,
-              password: password || null
+              password: password || null,
+              encodedMode: watchPref === "reencode" ? "reencode" : "expand_clear",
+              mergeChunks: watchPref === "merge"
             });
             if (res.obfuscated_text !== text) {
               lastSeenClipboard = res.obfuscated_text;
@@ -3222,6 +3302,11 @@
     const cleanArg = cleanCache ? " --clean-cache" : "";
     const copyArg = copyMode ? ` --copy --suffix "${copySuffix}"` : "";
     const pwdArg = password ? ` -p "***"` : "";
+    const encArg = studioEncodedViewMode === "clear"
+      ? " --encoded-mode clear"
+      : studioEncodedViewMode === "merge"
+      ? " --encoded-mode clear --merge-chunks"
+      : "";
 
     if (activeTab === "studio") {
       if (studioSubView === "audit") {
@@ -3229,7 +3314,7 @@
         const noGitArg = noGitIgnoreScan ? " --no-git-ignore" : "";
         return `lexishield scan -i "<ruta>"${recArg}${noGitArg}${vaultArg}`;
       }
-      return `lexishield protect -f ${selectedFormat}${vaultArg}${cleanArg}${copyArg}${pwdArg}`;
+      return `lexishield protect -f ${selectedFormat}${encArg}${vaultArg}${cleanArg}${copyArg}${pwdArg}`;
     } else if (activeTab === "pairs") {
       return `lexishield dict list${vaultArg}`;
     } else if (activeTab === "vaults") {
@@ -3274,7 +3359,7 @@
           title="Transformación bidireccional y protección de datos"
         >
           {#if toolbarButtonStyle !== 'text_only'}<span>✨</span>{/if}
-          {#if toolbarButtonStyle !== 'icons_only'}<span>Transformación</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('tabs.studio') : 'Transformación'}</span>{/if}
         </button>
       {/if}
 
@@ -3285,7 +3370,7 @@
           title="Pares de sustitución y protección"
         >
           {#if toolbarButtonStyle !== 'text_only'}<span>📑</span>{/if}
-          {#if toolbarButtonStyle !== 'icons_only'}<span>Pares ({vaultMappings.length})</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('tabs.pairs') : 'Pares'} ({vaultMappings.length})</span>{/if}
         </button>
       {/if}
 
@@ -3296,7 +3381,7 @@
           title="Gestión de Bóvedas Lexi"
         >
           {#if toolbarButtonStyle !== 'text_only'}<span>🗄️</span>{/if}
-          {#if toolbarButtonStyle !== 'icons_only'}<span>Bóvedas</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('tabs.vaults') : 'Bóvedas'}</span>{/if}
         </button>
       {/if}
 
@@ -3307,7 +3392,7 @@
           title="Monitorización activa de portapapeles"
         >
           {#if toolbarButtonStyle !== 'text_only'}<span>📋</span>{/if}
-          {#if toolbarButtonStyle !== 'icons_only'}<span>Portapapeles</span>{/if}
+          {#if toolbarButtonStyle !== 'icons_only'}<span>{$t ? $t('tabs.watch') : 'Portapapeles'}</span>{/if}
         </button>
       {/if}
     </nav>
@@ -3402,7 +3487,41 @@
           {/if}
 
           <!-- Grupo Derecho: Acciones de Sesión y Ergonomía (Tier 2 Contextual de Transformación) -->
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            {#if encodedPasteResult && encodedPasteResult.blocks_decoded > 0}
+              <div class="flex items-center gap-0.5 p-0.5 bg-amber-500/10 dark:bg-amber-500/15 rounded-xl border border-amber-500/30 text-[11px]" title="Se detectaron bloques codificados legibles (Base64 / Hex / URL)">
+                <button
+                  type="button"
+                  on:click={() => applyStudioEncodedViewMode("clear")}
+                  class="px-2 py-0.5 rounded-lg font-semibold transition flex items-center gap-1 {studioEncodedViewMode === 'clear' ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300 shadow-xs border border-amber-500/30 font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}"
+                  title="Expandir bloques codificados a texto en claro celda a celda"
+                >
+                  <span>🔓</span>
+                  <span>En claro ({encodedPasteResult.blocks_decoded})</span>
+                </button>
+                {#if encodedPasteResult.multipart_groups_merged > 0 && encodedPasteResult.merged_chunks_text}
+                  <button
+                    type="button"
+                    on:click={() => applyStudioEncodedViewMode("merge")}
+                    class="px-2 py-0.5 rounded-lg font-semibold transition flex items-center gap-1 {studioEncodedViewMode === 'merge' ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300 shadow-xs border border-amber-500/30 font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}"
+                    title="Ordenar por índice y unir fragmentos multiparte en claro"
+                  >
+                    <span>🧩</span>
+                    <span>Unir fragmentos</span>
+                  </button>
+                {/if}
+                <button
+                  type="button"
+                  on:click={() => applyStudioEncodedViewMode("reencode")}
+                  class="px-2 py-0.5 rounded-lg font-semibold transition flex items-center gap-1 {studioEncodedViewMode === 'reencode' ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300 shadow-xs border border-amber-500/30 font-bold' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}"
+                  title="Mantener el texto codificado en el editor: al pulsar Proteger se procesará el interior y se volverá a codificar"
+                >
+                  <span>📦</span>
+                  <span>Codificado</span>
+                </button>
+              </div>
+            {/if}
+
             <!-- Botón Limpiar Todo (Tier 2) -->
             <button
               type="button"
@@ -3411,6 +3530,8 @@
                   pushToSessionHistory("clear");
                   inputText = "";
                   outputText = "";
+                  rawEncodedPasteBuffer = "";
+                  encodedPasteResult = null;
                   statusMessage = "Ambos paneles han sido limpiados (guardado en historial de sesión).";
                 }
               }}
@@ -3526,7 +3647,7 @@
               <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>📥</span> Texto claro
+                    <span>📥</span> {$t ? $t('studio.panel_clear') : 'Texto claro'}
                   </span>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
@@ -3540,9 +3661,9 @@
                     title="Copiar texto claro (Ctrl+Shift+C)"
                   >
                     {#if copiedInputFlash}
-                      <span>✓</span> ¡Copiado!
+                      <span>✓</span> {$t ? $t('common.success') : '¡Copiado!'}
                     {:else}
-                      <span>📋</span> Copiar
+                      <span>📋</span> {$t ? $t('studio.btn_copy') : 'Copiar'}
                     {/if}
                   </button>
                 </div>
@@ -3576,7 +3697,7 @@
                     on:focus={() => { if (!isPastingInput) isEditingInput = true; if (inputText.trim()) studioDirection = "obfuscate"; }}
                     on:blur={() => { isEditingInput = false; }}
                     on:scroll={(e) => { if (inputGutterEl) inputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                    placeholder="Pega aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."
+                    placeholder={$t ? $t('studio.input_placeholder') : "Pega aquí el texto en claro, o arrastra un archivo o carpeta para PROTEGER..."}
                     class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre {privacyBlur ? 'privacy-blurred' : ''} smooth-scroll-tokens"
                   ></textarea>
                 {/if}
@@ -3590,8 +3711,8 @@
                   on:click={handleObfuscate}
                   disabled={loading || !inputText.trim()}
                   class="px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-sm"
-                  title="Proteger datos confidenciales (Ctrl+Enter)"
-                  aria-label="Proteger datos confidenciales"
+                  title={$t ? $t('studio.btn_protect_title') : "Proteger datos confidenciales (Ctrl+Enter)"}
+                  aria-label={$t ? $t('studio.btn_protect_title') : "Proteger datos confidenciales"}
                 >
                   {#if loading}
                     <span class="animate-spin">⏳</span>
@@ -3605,8 +3726,8 @@
                   on:click={handleDeobfuscate}
                   disabled={loading || !outputText.trim()}
                   class="px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-400 hover:from-primary-500 hover:to-primary-300 text-slate-950 font-bold rounded-xl shadow-md shadow-primary-500/20 transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed group text-sm"
-                  title="Restaurar datos protegidos (Ctrl+Enter)"
-                  aria-label="Restaurar datos protegidos"
+                  title={$t ? $t('studio.btn_restore_title') : "Restaurar datos protegidos (Ctrl+Enter)"}
+                  aria-label={$t ? $t('studio.btn_restore_title') : "Restaurar datos protegidos"}
                 >
                   {#if loading}
                     <span class="animate-spin">⏳</span>
@@ -3623,7 +3744,7 @@
               <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-white/5 mb-2 gap-2 flex-wrap">
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>🛡️</span> Texto protegido
+                    <span>🛡️</span> {$t ? $t('studio.panel_protected') : 'Texto protegido'}
                   </span>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
@@ -3637,9 +3758,9 @@
                     title="Copiar texto protegido (Ctrl+Shift+C)"
                   >
                     {#if copiedOutputFlash}
-                      <span>✓</span> ¡Copiado!
+                      <span>✓</span> {$t ? $t('common.success') : '¡Copiado!'}
                     {:else}
-                      <span>📋</span> Copiar
+                      <span>📋</span> {$t ? $t('studio.btn_copy') : 'Copiar'}
                     {/if}
                   </button>
                 </div>
@@ -3673,7 +3794,7 @@
                     on:focus={() => { if (!isPastingOutput) isEditingOutput = true; if (outputText.trim()) studioDirection = "deobfuscate"; }}
                     on:blur={() => { isEditingOutput = false; }}
                     on:scroll={(e) => { if (outputGutterEl) outputGutterEl.scrollTop = e.currentTarget.scrollTop; }}
-                    placeholder="Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."
+                    placeholder={$t ? $t('studio.output_placeholder') : "Pega aquí la respuesta protegida de la IA, o arrastra un archivo para RESTAURAR..."}
                     class="flex-1 w-full bg-transparent p-3 {editorFontSizeClass} font-mono leading-5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none resize-none overflow-auto select-text whitespace-pre smooth-scroll-tokens"
                   ></textarea>
                 {/if}
@@ -3849,7 +3970,9 @@
                           saveSuffixDefault: false,
                           cleanCache: false,
                           exportMarkdown: hasPandoc && exportMarkdown,
-                          protectFilename: false
+                          protectFilename: false,
+                          encodedMode: "reencode",
+                          mergeChunks: false
                         };
                       }}
                       class="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-lg transition shadow-md flex items-center gap-1.5"
@@ -4063,7 +4186,7 @@
             <input
               type="text"
               bind:value={pairSearch}
-              placeholder="Filtrar por original o protegido..."
+              placeholder={$t ? $t('pairs.search_placeholder') : "Filtrar por original o protegido..."}
               class="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-white/5 rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
             {#if pairSearch}
@@ -4111,10 +4234,10 @@
             <thead class="bg-slate-200 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 sticky top-0 border-b border-slate-300 dark:border-white/10">
               <tr>
                 <th class="p-3 w-12 text-center">Sel</th>
-                <th class="p-3 w-40">Tipo / Estado</th>
-                <th class="p-3">Valor Original Confidencial</th>
-                <th class="p-3">Protegido</th>
-                <th class="p-3 w-36 text-center">Acciones</th>
+                <th class="p-3 w-40">{$t ? $t('pairs.col_type') : 'Tipo / Estado'}</th>
+                <th class="p-3">{$t ? $t('pairs.col_original') : 'Valor Original Confidencial'}</th>
+                <th class="p-3">{$t ? $t('pairs.col_protected') : 'Protegido'}</th>
+                <th class="p-3 w-36 text-center">{$t ? $t('pairs.col_actions') : 'Acciones'}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-white/5 text-slate-700 dark:text-slate-300">
@@ -4732,6 +4855,23 @@
                 />
                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Se añade antes de la extensión al proteger archivos (ej. <code>documento{appConfig.gui.output_suffix || '.protegido'}.docx</code>).
+                </p>
+              </div>
+
+              <div class="pt-2 border-t border-slate-200 dark:border-white/5">
+                <label for="config-encoded-paste-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Cargas codificadas legibles al pegar (Base64 / Hex / URL):</label>
+                <select
+                  id="config-encoded-paste-select"
+                  bind:value={appConfig.gui.studio_paste_encoded_mode}
+                  on:change={saveSettings}
+                  class="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="clear">Expandir en claro celda a celda (Recomendado)</option>
+                  <option value="merge">Expandir en claro y unir fragmentos por índice</option>
+                  <option value="reencode">Mantener codificado (proteger interior y re-codificar)</option>
+                </select>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Detecta automáticamente cadenas Base64 (UTF-8 / UTF-16LE), Hex o URL que contengan texto legible tipo <code>strings</code>, ignorando datos binarios cifrados.
                 </p>
               </div>
 
@@ -6070,6 +6210,25 @@
               </div>
             {/if}
           </div>
+
+          <!-- Opción Cargas Codificadas en Archivo -->
+          {#if !studioDropModal.isDir}
+            <div class="pt-2 border-t border-slate-200/60 dark:border-white/5 space-y-1">
+              <label for="modal-encoded-mode-select" class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                Cargas codificadas legibles (Base64 / Hex / URL):
+              </label>
+              <select
+                id="modal-encoded-mode-select"
+                bind:value={studioDropModal.encodedMode}
+                class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100"
+              >
+                <option value="reencode">{studioDropModal.isReverse ? 'Restaurar interior y mantener codificado (por defecto)' : 'Proteger interior y re-codificar (por defecto)'}</option>
+                <option value="expand_clear">Expandir a texto en claro celda a celda</option>
+                <option value="merge">Expandir en claro y unir fragmentos por índice</option>
+                <option value="off">No procesar bloques codificados</option>
+              </select>
+            </div>
+          {/if}
 
           <!-- Opción Proteger Nombre de Archivo -->
           {#if !studioDropModal.isReverse && !studioDropModal.isDir}

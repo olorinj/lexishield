@@ -1,0 +1,280 @@
+# LexiShield Translation Catalog - Language: it
+# Copyright (C) 2026 Julio C. Semper & LexiShield Contributors
+# This file is distributed under the same license as the LexiShield package.
+msgid ""
+msgstr ""
+"Project-Id-Version: LexiShield 3.0.0\n"
+"Report-Msgid-Bugs-To: https://gitlab.com/olorinj/lexishield/issues\n"
+"POT-Creation-Date: 2026-11-25 14:00+0100\n"
+"PO-Revision-Date: 2026-11-25 14:00+0100\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "common.cancel"
+msgstr "Annulla"
+
+msgid "common.close"
+msgstr "Chiudi"
+
+msgid "common.confirm"
+msgstr "Conferma"
+
+msgid "common.delete"
+msgstr "Elimina"
+
+msgid "common.edit"
+msgstr "Modifica"
+
+msgid "common.error"
+msgstr "Si è verificato un errore"
+
+msgid "common.info"
+msgstr "Informazione"
+
+msgid "common.loading"
+msgstr "Caricamento..."
+
+msgid "common.no"
+msgstr "No"
+
+msgid "common.save"
+msgstr "Salva"
+
+msgid "common.success"
+msgstr "Operazione completata con successo"
+
+msgid "common.warning"
+msgstr "Avviso"
+
+msgid "common.yes"
+msgstr "Sì"
+
+msgid "config.btn_reset"
+msgstr "Ripristina valori predefiniti"
+
+msgid "config.btn_save"
+msgstr "Salva impostazioni"
+
+msgid "config.font_size"
+msgstr "Dimensione del carattere"
+
+msgid "config.language"
+msgstr "Lingua dell'interfaccia"
+
+msgid "config.privacy_blur"
+msgstr "Sfocatura per la privacy (nascondi i dati alla perdita del focus)"
+
+msgid "config.section_appearance"
+msgstr "4. Aspetto, lingua e sicurezza"
+
+msgid "config.section_encoded"
+msgstr "3. Payload codificati (Base64 / Hex)"
+
+msgid "config.section_general"
+msgstr "1. Configurazione generale"
+
+msgid "config.section_studio"
+msgstr "2. Ergonomia dello studio"
+
+msgid "config.show_badges"
+msgstr "Badge token evidenziati"
+
+msgid "config.theme"
+msgstr "Tema visivo"
+
+msgid "config.theme_dark"
+msgstr "Scuro"
+
+msgid "config.theme_light"
+msgstr "Chiaro"
+
+msgid "config.theme_system"
+msgstr "Sistema"
+
+msgid "config.title"
+msgstr "Impostazioni di sistema"
+
+msgid "pairs.btn_add_pair"
+msgstr "Aggiungi coppia manuale"
+
+msgid "pairs.btn_delete_selected"
+msgstr "Elimina Selezionati"
+
+msgid "pairs.btn_export_csv"
+msgstr "Esporta CSV"
+
+msgid "pairs.btn_import_csv"
+msgstr "Importa CSV"
+
+msgid "pairs.col_actions"
+msgstr "Azioni"
+
+msgid "pairs.col_omitted"
+msgstr "Omesso"
+
+msgid "pairs.col_original"
+msgstr "Valore originale"
+
+msgid "pairs.col_protected"
+msgstr "Valore protetto"
+
+msgid "pairs.col_type"
+msgstr "Tipo di entità"
+
+msgid "pairs.filter_all"
+msgstr "Tutti i tipi di entità"
+
+msgid "pairs.no_pairs"
+msgstr "Nessuna coppia registrata nella cassaforte attiva"
+
+msgid "pairs.search_placeholder"
+msgstr "Cerca nei valori..."
+
+msgid "pairs.title"
+msgstr "Coppie di sostituzione e regole"
+
+msgid "studio.btn_anonymize"
+msgstr "Anonimizza"
+
+msgid "studio.btn_clear"
+msgstr "Pulisci"
+
+msgid "studio.btn_clear_text"
+msgstr "Visualizza in chiaro"
+
+msgid "studio.btn_copy"
+msgstr "Copia"
+
+msgid "studio.btn_deanonymize"
+msgstr "Disanonimizza"
+
+msgid "studio.btn_protect_title"
+msgstr "Proteggi i dati sensibili (Ctrl+Enter)"
+
+msgid "studio.btn_reencode"
+msgstr "Ri-codifica"
+
+msgid "studio.btn_restore_title"
+msgstr "Ripristina i dati protetti (Ctrl+Enter)"
+
+msgid "studio.detecting"
+msgstr "Analisi dei contenuti..."
+
+msgid "studio.file_open"
+msgstr "Apri file"
+
+msgid "studio.file_save"
+msgstr "Salva con nome"
+
+msgid "studio.format_auto"
+msgstr "Rilevamento automatico"
+
+msgid "studio.input_placeholder"
+msgstr "Incolla qui i tuoi log o dati sensibili..."
+
+msgid "studio.merge_chunks"
+msgstr "Unisci frammenti"
+
+msgid "studio.output_placeholder"
+msgstr "Il risultato sanificato apparirà qui..."
+
+msgid "studio.panel_clear"
+msgstr "Testo in chiaro"
+
+msgid "studio.panel_protected"
+msgstr "Testo protetto"
+
+msgid "studio.quick_samples"
+msgstr "Campioni rapidi"
+
+msgid "studio.stats_entropy"
+msgstr "Entropia preservata"
+
+msgid "studio.stats_tokens"
+msgstr "Token protetti"
+
+msgid "studio.title"
+msgstr "Studio di anonimizzazione"
+
+msgid "tabs.config"
+msgstr "Impostazioni"
+
+msgid "tabs.logs"
+msgstr "Registri"
+
+msgid "tabs.pairs"
+msgstr "Coppie & Regole"
+
+msgid "tabs.scanner"
+msgstr "Scanner"
+
+msgid "tabs.studio"
+msgstr "Studio"
+
+msgid "tabs.vaults"
+msgstr "Cassaforti"
+
+msgid "tabs.watch"
+msgstr "Sentinella"
+
+msgid "vaults.active_vault"
+msgstr "Cassaforte attiva"
+
+msgid "vaults.btn_backup"
+msgstr "Crea backup (.bak)"
+
+msgid "vaults.btn_export"
+msgstr "Esporta cassaforte"
+
+msgid "vaults.btn_import"
+msgstr "Importa cassaforte"
+
+msgid "vaults.btn_lock"
+msgstr "Blocca"
+
+msgid "vaults.btn_new"
+msgstr "Nuova cassaforte"
+
+msgid "vaults.btn_restore"
+msgstr "Ripristina backup"
+
+msgid "vaults.btn_unlock"
+msgstr "Sblocca"
+
+msgid "vaults.security_note"
+msgstr "Cifratura ChaCha20-Poly1305 con derivazione Argon2id"
+
+msgid "vaults.title"
+msgstr "Gestione cassaforti cifrate"
+
+msgid "vaults.vault_name"
+msgstr "Nome della cassaforte"
+
+msgid "vaults.vault_pass"
+msgstr "Password della cassaforte"
+
+msgid "watch.auto_clear"
+msgstr "Cancellazione automatica di sicurezza"
+
+msgid "watch.btn_start"
+msgstr "Avvia sentinella"
+
+msgid "watch.btn_stop"
+msgstr "Arresta sentinella"
+
+msgid "watch.notification_silent"
+msgstr "Silenzioso"
+
+msgid "watch.notification_toast"
+msgstr "Notifica toast"
+
+msgid "watch.status_active"
+msgstr "Monitoraggio attivo degli appunti"
+
+msgid "watch.status_inactive"
+msgstr "Sentinella in pausa"
+
+msgid "watch.title"
+msgstr "Modalità sentinella (appunti in tempo reale)"

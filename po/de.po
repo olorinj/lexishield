@@ -1,0 +1,280 @@
+# LexiShield Translation Catalog - Language: de
+# Copyright (C) 2026 Julio C. Semper & LexiShield Contributors
+# This file is distributed under the same license as the LexiShield package.
+msgid ""
+msgstr ""
+"Project-Id-Version: LexiShield 3.0.0\n"
+"Report-Msgid-Bugs-To: https://gitlab.com/olorinj/lexishield/issues\n"
+"POT-Creation-Date: 2026-11-25 14:00+0100\n"
+"PO-Revision-Date: 2026-11-25 14:00+0100\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "common.cancel"
+msgstr "Abbrechen"
+
+msgid "common.close"
+msgstr "Schließen"
+
+msgid "common.confirm"
+msgstr "Bestätigen"
+
+msgid "common.delete"
+msgstr "Löschen"
+
+msgid "common.edit"
+msgstr "Bearbeiten"
+
+msgid "common.error"
+msgstr "Ein Fehler ist aufgetreten"
+
+msgid "common.info"
+msgstr "Information"
+
+msgid "common.loading"
+msgstr "Wird geladen..."
+
+msgid "common.no"
+msgstr "Nein"
+
+msgid "common.save"
+msgstr "Speichern"
+
+msgid "common.success"
+msgstr "Vorgang erfolgreich abgeschlossen"
+
+msgid "common.warning"
+msgstr "Warnung"
+
+msgid "common.yes"
+msgstr "Ja"
+
+msgid "config.btn_reset"
+msgstr "Standardwerte Wiederherstellen"
+
+msgid "config.btn_save"
+msgstr "Einstellungen Speichern"
+
+msgid "config.font_size"
+msgstr "Schriftgröße"
+
+msgid "config.language"
+msgstr "Oberflächensprache"
+
+msgid "config.privacy_blur"
+msgstr "Privatsphären-Unschärfe (Daten bei Fokusverlust verbergen)"
+
+msgid "config.section_appearance"
+msgstr "4. Erscheinungsbild, Sprache & Sicherheit"
+
+msgid "config.section_encoded"
+msgstr "3. Kodierte Nutzdaten (Base64 / Hex)"
+
+msgid "config.section_general"
+msgstr "1. Allgemeine Konfiguration"
+
+msgid "config.section_studio"
+msgstr "2. Studio-Ergonomie"
+
+msgid "config.show_badges"
+msgstr "Hervorgehobene Token-Abzeichen"
+
+msgid "config.theme"
+msgstr "Visuelles Design"
+
+msgid "config.theme_dark"
+msgstr "Dunkel"
+
+msgid "config.theme_light"
+msgstr "Hell"
+
+msgid "config.theme_system"
+msgstr "System"
+
+msgid "config.title"
+msgstr "Systemeinstellungen"
+
+msgid "pairs.btn_add_pair"
+msgstr "Manuelles Paar hinzufügen"
+
+msgid "pairs.btn_delete_selected"
+msgstr "Ausgewählte löschen"
+
+msgid "pairs.btn_export_csv"
+msgstr "CSV Exportieren"
+
+msgid "pairs.btn_import_csv"
+msgstr "CSV Importieren"
+
+msgid "pairs.col_actions"
+msgstr "Aktionen"
+
+msgid "pairs.col_omitted"
+msgstr "Ausgelassen"
+
+msgid "pairs.col_original"
+msgstr "Ursprünglicher Wert"
+
+msgid "pairs.col_protected"
+msgstr "Geschützter Wert"
+
+msgid "pairs.col_type"
+msgstr "Entitätstyp"
+
+msgid "pairs.filter_all"
+msgstr "Alle Entitätstypen"
+
+msgid "pairs.no_pairs"
+msgstr "Keine Paare im aktiven Tresor erfasst"
+
+msgid "pairs.search_placeholder"
+msgstr "In Werten suchen..."
+
+msgid "pairs.title"
+msgstr "Ersetzungspaare und Regeln"
+
+msgid "studio.btn_anonymize"
+msgstr "Anonymisieren"
+
+msgid "studio.btn_clear"
+msgstr "Löschen"
+
+msgid "studio.btn_clear_text"
+msgstr "Klartext anzeigen"
+
+msgid "studio.btn_copy"
+msgstr "Kopieren"
+
+msgid "studio.btn_deanonymize"
+msgstr "Deanonymisieren"
+
+msgid "studio.btn_protect_title"
+msgstr "Sensible Daten schützen (Ctrl+Enter)"
+
+msgid "studio.btn_reencode"
+msgstr "Neu kodieren"
+
+msgid "studio.btn_restore_title"
+msgstr "Geschützte Daten wiederherstellen (Ctrl+Enter)"
+
+msgid "studio.detecting"
+msgstr "Inhalt analysieren..."
+
+msgid "studio.file_open"
+msgstr "Datei Öffnen"
+
+msgid "studio.file_save"
+msgstr "Speichern Unter"
+
+msgid "studio.format_auto"
+msgstr "Automatische Erkennung"
+
+msgid "studio.input_placeholder"
+msgstr "Fügen Sie hier Ihre Protokolle oder sensiblen Daten ein..."
+
+msgid "studio.merge_chunks"
+msgstr "Fragmente zusammenführen"
+
+msgid "studio.output_placeholder"
+msgstr "Das bereinigte Ergebnis wird hier angezeigt..."
+
+msgid "studio.panel_clear"
+msgstr "Klartext"
+
+msgid "studio.panel_protected"
+msgstr "Geschützter Text"
+
+msgid "studio.quick_samples"
+msgstr "Schnellbeispiele"
+
+msgid "studio.stats_entropy"
+msgstr "Erhaltene Entropie"
+
+msgid "studio.stats_tokens"
+msgstr "Geschützte Token"
+
+msgid "studio.title"
+msgstr "Anonymisierungs-Studio"
+
+msgid "tabs.config"
+msgstr "Einstellungen"
+
+msgid "tabs.logs"
+msgstr "Protokolle"
+
+msgid "tabs.pairs"
+msgstr "Paare & Regeln"
+
+msgid "tabs.scanner"
+msgstr "Scanner"
+
+msgid "tabs.studio"
+msgstr "Studio"
+
+msgid "tabs.vaults"
+msgstr "Tresore"
+
+msgid "tabs.watch"
+msgstr "Wächter"
+
+msgid "vaults.active_vault"
+msgstr "Aktiver Tresor"
+
+msgid "vaults.btn_backup"
+msgstr "Sicherung erstellen (.bak)"
+
+msgid "vaults.btn_export"
+msgstr "Tresor Exportieren"
+
+msgid "vaults.btn_import"
+msgstr "Tresor Importieren"
+
+msgid "vaults.btn_lock"
+msgstr "Sperren"
+
+msgid "vaults.btn_new"
+msgstr "Neuer Tresor"
+
+msgid "vaults.btn_restore"
+msgstr "Sicherung wiederherstellen"
+
+msgid "vaults.btn_unlock"
+msgstr "Entsperren"
+
+msgid "vaults.security_note"
+msgstr "ChaCha20-Poly1305-Verschlüsselung mit Argon2id-Ableitung"
+
+msgid "vaults.title"
+msgstr "Verschlüsselte Tresorverwaltung"
+
+msgid "vaults.vault_name"
+msgstr "Tresorname"
+
+msgid "vaults.vault_pass"
+msgstr "Tresorpasswort"
+
+msgid "watch.auto_clear"
+msgstr "Automatische Sicherheitslöschung"
+
+msgid "watch.btn_start"
+msgstr "Wächter Starten"
+
+msgid "watch.btn_stop"
+msgstr "Wächter Anhalten"
+
+msgid "watch.notification_silent"
+msgstr "Lautlos"
+
+msgid "watch.notification_toast"
+msgstr "Toast-Benachrichtigung"
+
+msgid "watch.status_active"
+msgstr "Aktive Zwischenablage-Überwachung"
+
+msgid "watch.status_inactive"
+msgstr "Wächter angehalten"
+
+msgid "watch.title"
+msgstr "Wächter-Modus (Echtzeit-Zwischenablage)"
