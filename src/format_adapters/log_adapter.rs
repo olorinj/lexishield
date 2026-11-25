@@ -135,7 +135,13 @@ impl LogAdapter {
             }
         }
 
-        let final_output = output_lines.join("\n");
+        let eol = if text.contains("\r\n") { "\r\n" } else { "\n" };
+        let mut final_output = output_lines.join(eol);
+        if text.ends_with(eol) {
+            final_output.push_str(eol);
+        } else if text.ends_with('\n') {
+            final_output.push('\n');
+        }
         Ok((final_output, total_replacements))
     }
 }

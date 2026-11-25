@@ -27,8 +27,15 @@ static DOMAIN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static HOSTNAME_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b(?:host|srv|server|dc|ws|node|app)-?[a-z0-9]{2,10}\b")
-        .expect("Regex Hostname inválida")
+    Regex::new(
+        r"(?i)\b(?:(?:host|srv|server|dc|ws|node|app)(?:-[a-z0-9]{2,12}|[a-z0-9]{0,8}\d[a-z0-9]{0,6})|(?:ec2amaz|win|desktop|laptop)-[a-z0-9]{5,15}|[a-z]{2,10}(?:web|sql|db|app|srv|dc)\d{1,4})\b",
+    )
+    .expect("Regex Hostname inválida")
+});
+
+static URL_INTERNAL_HOST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\bhttps?://([a-z][a-z0-9\-]{2,30})(?::\d{2,5}|/)")
+        .expect("Regex URL Internal Hostname inválida")
 });
 
 static RIMA_PTR_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -118,12 +125,17 @@ impl IPv4Detector {
                     return None;
                 }
 
-                let clean_str = m.as_str().replace('\\', "");
-                if let Ok(ip) = clean_str.parse::<Ipv4Addr>() {
+                let raw = m.as_str();
+                let parsed = if raw.as_bytes().contains(&b'\\') {
+                    raw.replace('\\', "").parse::<Ipv4Addr>()
+                } else {
+                    raw.parse::<Ipv4Addr>()
+                };
+                if let Ok(ip) = parsed {
                     if self.ignore_netmasks && is_ipv4_netmask(ip) {
                         return None;
                     }
-                    Some((m.start(), m.end(), m.as_str()))
+                    Some((m.start(), m.end(), raw))
                 } else {
                     None
                 }
@@ -358,17 +370,43 @@ impl HostnameDetector {
     }
 
     pub fn find_matches<'a>(&self, text: &'a str) -> Vec<(usize, usize, &'a str)> {
-        HOSTNAME_REGEX
+        let mut matches: Vec<(usize, usize, &'a str)> = HOSTNAME_REGEX
             .find_iter(text)
             .map(|m| (m.start(), m.end(), m.as_str()))
-            .collect()
+            .collect();
+
+        for cap in URL_INTERNAL_HOST_REGEX.captures_iter(text) {
+            if let Some(m) = cap.get(1) {
+                let host = m.as_str();
+                if !host.eq_ignore_ascii_case("localhost") && !host.contains('.') {
+                    matches.push((m.start(), m.end(), host));
+                }
+            }
+        }
+
+        matches.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| b.1.cmp(&a.1)));
+        let mut dedup: Vec<(usize, usize, &'a str)> = Vec::with_capacity(matches.len());
+        for (s, e, val) in matches {
+            if let Some(last) = dedup.last()
+                && s < last.1
+            {
+                continue;
+            }
+            dedup.push((s, e, val));
+        }
+        dedup
     }
 
     pub fn generate_pseudonym(&self, original: &str) -> String {
         let mut rng = rand::thread_rng();
         let id: u32 = rng.gen_range(0x1000_0000..0xFFFF_FFFF);
-        let prefix = if original.to_lowercase().starts_with("srv") {
+        let lower = original.to_ascii_lowercase();
+        let prefix = if lower.starts_with("srv") {
             "srv"
+        } else if lower.starts_with("ec2amaz-") {
+            return format!("EC2AMAZ-{:07X}", id & 0x0FFF_FFFF);
+        } else if lower.starts_with("win-") {
+            return format!("WIN-{id:08X}");
         } else {
             "host"
         };

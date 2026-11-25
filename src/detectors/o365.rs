@@ -16,28 +16,28 @@ static ORIGINATING_SERVER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 
 static ATTACHMENT_KEYWORDS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)\b(?:archivo|fichero|file|attachment|adjunto|documento|document)\s*:?\s+((?:[\p{L}\p{M}\p{N}_\-]+\s+)*[\p{L}\p{M}\p{N}_\-]+\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown))\b",
+        r"(?i)\b(?:archivo|fichero|file|attachment|adjunto|documento|document)\s*:?\s+((?:[\p{L}\p{M}\p{N}_\-]+\s+)*[\p{L}\p{M}\p{N}_\-]+\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown|config|aspx|asmx|svc|sql|bak|ini|env))\b",
     )
     .expect("Regex Attachment Keywords inválida")
 });
 
 static ATTACHMENT_QUOTED_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r#"(?i)["'`]((?:[\p{L}\p{M}\p{N}_\-\s]{2,})\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown))["'`]"#,
+        r#"(?i)["'`]((?:[\p{L}\p{M}\p{N}_\-\s]{2,})\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown|config|aspx|asmx|svc|sql|bak|ini|env))["'`]"#,
     )
     .expect("Regex Attachment Quoted inválida")
 });
 
 static ATTACHMENT_DELIMITED_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)(?:;\s*)((?:[\p{L}\p{M}\p{N}_\-]+\s+)*[\p{L}\p{M}\p{N}_\-]+\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown))\b",
+        r"(?i)(?:;\s*)((?:[\p{L}\p{M}\p{N}_\-]+\s+)*[\p{L}\p{M}\p{N}_\-]+\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown|config|aspx|asmx|svc|sql|bak|ini|env))\b",
     )
     .expect("Regex Attachment Delimited inválida")
 });
 
 static ATTACHMENT_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)\b([\p{L}\p{M}\p{N}_\-]{2,}\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown))\b",
+        r"(?i)\b([\p{L}\p{M}\p{N}_\-]{2,}\.(?:docx?|xlsx?|pdf|pptx?|jpg|png|zip|rar|7z|txt|csv|md|markdown|config|aspx|asmx|svc|sql|bak|ini|env))\b",
     )
     .expect("Regex Attachment Token inválida")
 });
@@ -116,7 +116,58 @@ impl AttachmentFileNameDetector {
         DetectorType::AttachmentFileName
     }
 
+    fn has_candidate_extension(text: &str) -> bool {
+        let bytes = text.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'.' {
+                let start = i + 1;
+                let mut end = start;
+                while end < bytes.len() && bytes[end].is_ascii_alphanumeric() && end - start < 9 {
+                    end += 1;
+                }
+                if (2..=8).contains(&(end - start)) {
+                    let ext = &bytes[start..end];
+                    if ext.eq_ignore_ascii_case(b"doc")
+                        || ext.eq_ignore_ascii_case(b"docx")
+                        || ext.eq_ignore_ascii_case(b"xls")
+                        || ext.eq_ignore_ascii_case(b"xlsx")
+                        || ext.eq_ignore_ascii_case(b"pdf")
+                        || ext.eq_ignore_ascii_case(b"ppt")
+                        || ext.eq_ignore_ascii_case(b"pptx")
+                        || ext.eq_ignore_ascii_case(b"jpg")
+                        || ext.eq_ignore_ascii_case(b"png")
+                        || ext.eq_ignore_ascii_case(b"zip")
+                        || ext.eq_ignore_ascii_case(b"rar")
+                        || ext.eq_ignore_ascii_case(b"7z")
+                        || ext.eq_ignore_ascii_case(b"txt")
+                        || ext.eq_ignore_ascii_case(b"csv")
+                        || ext.eq_ignore_ascii_case(b"md")
+                        || ext.eq_ignore_ascii_case(b"markdown")
+                        || ext.eq_ignore_ascii_case(b"config")
+                        || ext.eq_ignore_ascii_case(b"aspx")
+                        || ext.eq_ignore_ascii_case(b"asmx")
+                        || ext.eq_ignore_ascii_case(b"svc")
+                        || ext.eq_ignore_ascii_case(b"sql")
+                        || ext.eq_ignore_ascii_case(b"bak")
+                        || ext.eq_ignore_ascii_case(b"ini")
+                        || ext.eq_ignore_ascii_case(b"env")
+                    {
+                        return true;
+                    }
+                }
+                i = end;
+            } else {
+                i += 1;
+            }
+        }
+        false
+    }
+
     pub fn find_matches<'a>(&self, text: &'a str) -> Vec<(usize, usize, &'a str)> {
+        if !Self::has_candidate_extension(text) {
+            return Vec::new();
+        }
         let mut matches = Vec::new();
 
         // 1. Archivos precedidos por palabras clave (ej: "archivo Informe de auditoría.docx")

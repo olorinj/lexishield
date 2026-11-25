@@ -6,7 +6,7 @@
 
 use crate::engine::replacer::apply_single_pass_replacements_with_substring_keys;
 use crate::models::ObfuscationError;
-use quick_xml::events::{BytesCData, BytesText, Event};
+use quick_xml::events::{BytesCData, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use std::collections::{HashMap, HashSet};
@@ -108,7 +108,66 @@ impl XmlAdapter {
                         .write_event(Event::CData(BytesCData::new(&replaced_text)))
                         .map_err(|e| ObfuscationError::XmlError(e.to_string()))?;
                 }
-                // Las etiquetas de inicio, fin, comentarios y declaraciones se escriben intactas
+                Ok(Event::Start(e)) => {
+                    let (maybe_new, count) = Self::process_tag_attributes(
+                        &e,
+                        replacement_map,
+                        strict_word_boundaries,
+                        substring_keys,
+                    )?;
+                    total_replacements += count;
+                    let ev = match maybe_new {
+                        Some(rebuilt) => Event::Start(rebuilt),
+                        None => Event::Start(e),
+                    };
+                    writer
+                        .write_event(ev)
+                        .map_err(|err| ObfuscationError::XmlError(err.to_string()))?;
+                }
+                Ok(Event::Empty(e)) => {
+                    let (maybe_new, count) = Self::process_tag_attributes(
+                        &e,
+                        replacement_map,
+                        strict_word_boundaries,
+                        substring_keys,
+                    )?;
+                    total_replacements += count;
+                    let ev = match maybe_new {
+                        Some(rebuilt) => Event::Empty(rebuilt),
+                        None => Event::Empty(e),
+                    };
+                    writer
+                        .write_event(ev)
+                        .map_err(|err| ObfuscationError::XmlError(err.to_string()))?;
+                }
+                Ok(Event::Comment(c)) => {
+                    if let Ok(raw_str) = std::str::from_utf8(&c) {
+                        let (replaced_text, count) =
+                            apply_single_pass_replacements_with_substring_keys(
+                                raw_str,
+                                replacement_map,
+                                strict_word_boundaries,
+                                substring_keys,
+                            );
+                        if count > 0 && !replaced_text.contains("--") {
+                            total_replacements += count;
+                            writer
+                                .write_event(Event::Comment(BytesText::from_escaped(
+                                    &replaced_text,
+                                )))
+                                .map_err(|err| ObfuscationError::XmlError(err.to_string()))?;
+                        } else {
+                            writer
+                                .write_event(Event::Comment(c))
+                                .map_err(|err| ObfuscationError::XmlError(err.to_string()))?;
+                        }
+                    } else {
+                        writer
+                            .write_event(Event::Comment(c))
+                            .map_err(|err| ObfuscationError::XmlError(err.to_string()))?;
+                    }
+                }
+                // Las etiquetas de fin y declaraciones XML se escriben intactas
                 Ok(event) => {
                     writer
                         .write_event(event)
@@ -124,6 +183,122 @@ impl XmlAdapter {
             .map_err(|e| ObfuscationError::XmlError(e.to_string()))?;
 
         Ok((result_str, total_replacements))
+    }
+
+    fn process_tag_attributes(
+        e: &BytesStart<'_>,
+        replacement_map: &HashMap<String, String>,
+        strict_word_boundaries: bool,
+        substring_keys: &HashSet<String>,
+    ) -> Result<(Option<BytesStart<'static>>, usize), ObfuscationError> {
+        let raw_bytes = e.as_ref();
+        let raw_str = std::str::from_utf8(raw_bytes)
+            .map_err(|err| ObfuscationError::XmlError(err.to_string()))?;
+        let name_len = e.name().as_ref().len();
+        if raw_str.len() <= name_len {
+            return Ok((None, 0));
+        }
+
+        // Escanear pares key="val" o key='val' preservando exactamente espacios, saltos de línea y estilo de cierre (" />" vs "/>")
+        let mut rebuilt = String::with_capacity(raw_str.len());
+        rebuilt.push_str(&raw_str[..name_len]);
+
+        let bytes = raw_str.as_bytes();
+        let mut idx = name_len;
+        let mut tag_replacements = 0usize;
+
+        while idx < bytes.len() {
+            // Copiar espacios o separadores previos al nombre del atributo
+            let ws_start = idx;
+            while idx < bytes.len() && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            rebuilt.push_str(&raw_str[ws_start..idx]);
+            if idx >= bytes.len() {
+                break;
+            }
+
+            // Leer nombre del atributo hasta '=' o espacio
+            let key_start = idx;
+            while idx < bytes.len() && bytes[idx] != b'=' && !bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            let key_str = &raw_str[key_start..idx];
+            rebuilt.push_str(key_str);
+
+            // Copiar posibles espacios antes de '='
+            let eq_ws_start = idx;
+            while idx < bytes.len() && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            rebuilt.push_str(&raw_str[eq_ws_start..idx]);
+
+            if idx >= bytes.len() || bytes[idx] != b'=' {
+                continue;
+            }
+            // Copiar '=' y posibles espacios posteriores
+            rebuilt.push('=');
+            idx += 1;
+            let post_eq_ws = idx;
+            while idx < bytes.len() && bytes[idx].is_ascii_whitespace() {
+                idx += 1;
+            }
+            rebuilt.push_str(&raw_str[post_eq_ws..idx]);
+
+            if idx >= bytes.len() || (bytes[idx] != b'"' && bytes[idx] != b'\'') {
+                continue;
+            }
+            let quote = bytes[idx];
+            rebuilt.push(quote as char);
+            idx += 1;
+
+            let val_start = idx;
+            while idx < bytes.len() && bytes[idx] != quote {
+                idx += 1;
+            }
+            let raw_val = &raw_str[val_start..idx];
+
+            let is_ns =
+                key_str == "xmlns" || key_str.starts_with("xmlns:") || key_str.starts_with("xsi:");
+
+            if is_ns {
+                rebuilt.push_str(raw_val);
+            } else {
+                let unescaped = quick_xml::escape::unescape(raw_val)
+                    .map_err(|err| ObfuscationError::XmlError(err.to_string()))?;
+                let (replaced_val, count) = apply_single_pass_replacements_with_substring_keys(
+                    &unescaped,
+                    replacement_map,
+                    strict_word_boundaries,
+                    substring_keys,
+                );
+                if count > 0 {
+                    tag_replacements += count;
+                    let esc = quick_xml::escape::escape(&replaced_val);
+                    if quote == b'"' {
+                        rebuilt.push_str(&esc.replace('"', "&quot;"));
+                    } else {
+                        rebuilt.push_str(&esc.replace('\'', "&apos;"));
+                    }
+                } else {
+                    rebuilt.push_str(raw_val);
+                }
+            }
+
+            if idx < bytes.len() && bytes[idx] == quote {
+                rebuilt.push(quote as char);
+                idx += 1;
+            }
+        }
+
+        if tag_replacements == 0 {
+            return Ok((None, 0));
+        }
+
+        Ok((
+            Some(BytesStart::from_content(rebuilt, name_len)),
+            tag_replacements,
+        ))
     }
 }
 

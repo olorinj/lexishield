@@ -3,6 +3,9 @@
 use lexishield::clipboard::{get_clipboard_text, set_clipboard_text};
 use lexishield::config::load_config_with_rules;
 use lexishield::crypto::{load_mappings_auto, save_mappings_auto};
+use lexishield::encoded_content::{
+    DecodeInspectResult, EncodedPayloadMode, inspect_and_expand_encoded,
+};
 use lexishield::engine::ObfuscatorEngine;
 use lexishield::logger::{
     LogEntry, clear_logs, get_recent_logs, init_logger, is_debug_mode, set_debug_mode,
@@ -62,13 +65,26 @@ pub struct DetectedItem {
 }
 
 #[tauri::command]
+fn inspect_and_decode_encoded(text: String) -> Result<DecodeInspectResult, String> {
+    Ok(inspect_and_expand_encoded(&text))
+}
+
+#[tauri::command]
 fn obfuscate_content(
     text: String,
     format_str: String,
     vault_path: Option<String>,
     password: Option<String>,
+    encoded_mode: Option<String>,
+    merge_chunks: Option<bool>,
 ) -> Result<ObfuscateResponse, String> {
-    let config = load_config_with_rules(None, None);
+    let mut config = load_config_with_rules(None, None);
+    if let Some(ref em) = encoded_mode {
+        config.general.encoded_payload_mode = EncodedPayloadMode::parse_opt(em);
+    }
+    if let Some(mc) = merge_chunks {
+        config.general.merge_encoded_chunks = mc;
+    }
     let mut engine = ObfuscatorEngine::new(config);
 
     // Si se pasa una bóveda previa, cargar los mapeos existentes
@@ -122,8 +138,16 @@ fn deobfuscate_content(
     vault_path: Option<String>,
     password: Option<String>,
     custom_mappings: Option<Vec<Mapping>>,
+    encoded_mode: Option<String>,
+    merge_chunks: Option<bool>,
 ) -> Result<DeobfuscateResponse, String> {
-    let config = load_config_with_rules(None, None);
+    let mut config = load_config_with_rules(None, None);
+    if let Some(ref em) = encoded_mode {
+        config.general.encoded_payload_mode = EncodedPayloadMode::parse_opt(em);
+    }
+    if let Some(mc) = merge_chunks {
+        config.general.merge_encoded_chunks = mc;
+    }
     let mut engine = ObfuscatorEngine::new(config);
 
     if let Some(mappings) = custom_mappings {
@@ -179,8 +203,12 @@ fn scan_content(
     content: String,
     vault_path: Option<String>,
     password: Option<String>,
+    encoded_mode: Option<String>,
 ) -> Result<ScanAuditResponse, String> {
-    let config = load_config_with_rules(None, None);
+    let mut config = load_config_with_rules(None, None);
+    if let Some(ref em) = encoded_mode {
+        config.general.encoded_payload_mode = EncodedPayloadMode::parse_opt(em);
+    }
     let mut engine = ObfuscatorEngine::new(config);
 
     if let Some(ref vp) = vault_path
@@ -465,6 +493,8 @@ fn process_file_command(
     export_md: Option<bool>,
     force_resources: Option<bool>,
     protect_filename: Option<bool>,
+    encoded_mode: Option<String>,
+    merge_chunks: Option<bool>,
 ) -> Result<ObfuscationReport, String> {
     if !force_resources.unwrap_or(false)
         && let Ok(bytes) = std::fs::read(&input_path)
@@ -486,7 +516,13 @@ fn process_file_command(
         ));
     }
 
-    let config = load_config_with_rules(None, None);
+    let mut config = load_config_with_rules(None, None);
+    if let Some(ref em) = encoded_mode {
+        config.general.encoded_payload_mode = EncodedPayloadMode::parse_opt(em);
+    }
+    if let Some(mc) = merge_chunks {
+        config.general.merge_encoded_chunks = mc;
+    }
     let mut engine = ObfuscatorEngine::new(config);
 
     if let Some(ref path_str) = vault_path {
@@ -1414,6 +1450,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            inspect_and_decode_encoded,
             obfuscate_content,
             deobfuscate_content,
             scan_content,

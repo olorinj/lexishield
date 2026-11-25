@@ -185,10 +185,22 @@ pub enum WatchDirection {
 pub fn watch_clipboard_loop(
     direction: WatchDirection,
     format: FormatType,
-    config: LexiConfig,
+    mut config: LexiConfig,
     mappings_file: Option<&Path>,
     password: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // En modo monitorización de portapapeles para proteger hacia IA, si no se desactivó, expandir en claro por defecto
+    if direction == WatchDirection::Obfuscate
+        && config.general.encoded_payload_mode
+            == crate::encoded_content::EncodedPayloadMode::Reencode
+        && config.gui.studio_paste_encoded_mode != "reencode"
+    {
+        config.general.encoded_payload_mode =
+            crate::encoded_content::EncodedPayloadMode::ExpandClear;
+        if config.gui.studio_paste_encoded_mode == "merge" {
+            config.general.merge_encoded_chunks = true;
+        }
+    }
     let mut engine = ObfuscatorEngine::new(config);
 
     if let Some(map_path) = mappings_file
@@ -247,7 +259,7 @@ pub fn watch_clipboard_loop(
                                 last_seen = current_text;
                             } else {
                                 log::info!(
-                                    "Portapapeles ofuscado automáticamente ({} reemplazos aplicados).",
+                                    "Portapapeles protegido automáticamente ({} reemplazos aplicados).",
                                     report.replacements_applied
                                 );
                                 last_seen.clone_from(&obfuscated);
@@ -277,7 +289,7 @@ pub fn watch_clipboard_loop(
                                 last_seen = current_text;
                             } else {
                                 log::info!(
-                                    "Portapapeles desofuscado automáticamente ({} reemplazos restaurados).",
+                                    "Portapapeles restaurado automáticamente ({} reemplazos restaurados).",
                                     report.replacements_applied
                                 );
                                 last_seen.clone_from(&deobfuscated);

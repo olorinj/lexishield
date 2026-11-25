@@ -5,6 +5,7 @@ pub mod guid;
 pub mod identity;
 pub mod network;
 pub mod o365;
+pub mod secrets_and_paths;
 pub mod windows;
 
 use crate::models::{DetectorType, Mapping};
@@ -14,6 +15,7 @@ use guid::GuidDetector;
 use identity::{CreditCardDetector, SpanishDniNieDetector, TelephoneDetector};
 use network::{DomainDetector, EmailDetector, HostnameDetector, IPv4Detector, IPv6Detector};
 use o365::{AttachmentFileNameDetector, O365OriginatingServerDetector, O365SubjectDetector};
+use secrets_and_paths::{FilePathDetector, SecretKeyDetector};
 use std::collections::HashSet;
 use windows::{WindowsHexIdDetector, WindowsLogonIdDetector, WindowsSidDetector};
 
@@ -32,6 +34,8 @@ pub struct DetectorRegistry {
     pub sid: WindowsSidDetector,
     pub logon_id: WindowsLogonIdDetector,
     pub hex_id: WindowsHexIdDetector,
+    pub secret_key: SecretKeyDetector,
+    pub file_path: FilePathDetector,
     pub ipv4: IPv4Detector,
     pub ipv6: IPv6Detector,
     pub email: EmailDetector,
@@ -108,6 +112,8 @@ impl DetectorRegistry {
             sid: WindowsSidDetector::new(),
             logon_id: WindowsLogonIdDetector::new(),
             hex_id: WindowsHexIdDetector::new(),
+            secret_key: SecretKeyDetector::new(),
+            file_path: FilePathDetector::new(),
             ipv4: IPv4Detector::with_ignore_netmasks(ignore_netmasks),
             ipv6: IPv6Detector::new(),
             email: EmailDetector::new(),
@@ -124,8 +130,34 @@ impl DetectorRegistry {
         }
     }
 
+    /// Comprueba si un dominio corresponde a una instancia gestionada de cliente en la nube
+    /// (ej. `session-extranet.qe61rf.0001.eus2.cache.amazonaws.com`, `*.rds.amazonaws.com`, `*.database.windows.net`)
+    /// que SÍ debe protegerse aunque el sufijo pertenezca a un proveedor cloud.
+    fn is_tenant_cloud_resource_domain(candidate: &str) -> bool {
+        let lower = candidate.trim().trim_end_matches('.').to_ascii_lowercase();
+        let managed_suffixes = [
+            ".cache.amazonaws.com",
+            ".rds.amazonaws.com",
+            ".redshift.amazonaws.com",
+            ".es.amazonaws.com",
+            ".elb.amazonaws.com",
+            ".database.windows.net",
+            ".redis.cache.windows.net",
+            ".blob.core.windows.net",
+            ".vault.azure.net",
+        ];
+        managed_suffixes.iter().any(|sfx| {
+            lower
+                .strip_suffix(sfx)
+                .is_some_and(|prefix| !prefix.is_empty())
+        })
+    }
+
     /// Comprueba si un dominio o FQDN está explícitamente ignorado por el usuario o es un proveedor conocido.
     pub fn is_ignored_domain(&self, candidate: &str) -> bool {
+        if Self::is_tenant_cloud_resource_domain(candidate) {
+            return false;
+        }
         if crate::stopwords::is_known_vendor_domain(candidate) {
             return true;
         }
@@ -146,7 +178,10 @@ impl DetectorRegistry {
 
         for d in &self.ignored_domains {
             let d_clean = d.strip_prefix("www.").unwrap_or(d);
-            if domain_part.ends_with(&format!(".{d_clean}")) {
+            if domain_part
+                .strip_suffix(d_clean)
+                .is_some_and(|prefix| prefix.ends_with('.'))
+            {
                 return true;
             }
         }
@@ -160,6 +195,8 @@ impl DetectorRegistry {
             DetectorType::WindowsSid => self.sid.generate_pseudonym(original),
             DetectorType::WindowsLogonId => self.logon_id.generate_pseudonym(original),
             DetectorType::WindowsHexId => self.hex_id.generate_pseudonym(original),
+            DetectorType::SecretKey => self.secret_key.generate_pseudonym(original),
+            DetectorType::FilePath => self.file_path.generate_pseudonym(original),
             DetectorType::IPv4 => self.ipv4.generate_pseudonym(original),
             DetectorType::IPv6 => self.ipv6.generate_pseudonym(original),
             DetectorType::Email => self.email.generate_pseudonym(original),
@@ -199,8 +236,7 @@ impl DetectorRegistry {
         mut on_found: Option<&mut dyn FnMut(&Mapping)>,
     ) -> Vec<Mapping> {
         let mut found_mappings: Vec<Mapping> = Vec::new();
-        let mut seen_originals: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut seen_originals: std::collections::HashSet<&str> = std::collections::HashSet::new();
         let mut seen_pseudonyms: std::collections::HashSet<String> =
             std::collections::HashSet::new();
         let mut claimed_spans: Vec<(usize, usize)> = Vec::new();
@@ -232,7 +268,7 @@ impl DetectorRegistry {
                 }
 
                 if !seen_originals.contains(candidate) {
-                    seen_originals.insert(candidate.to_string());
+                    seen_originals.insert(candidate);
                     let mut pseudonym = custom_rule.generate_pseudonym(candidate);
                     if pseudonym != "=" {
                         let mut attempts = 0;
@@ -259,6 +295,8 @@ impl DetectorRegistry {
                 DetectorType::WindowsSid => self.sid.find_matches(text),
                 DetectorType::WindowsLogonId => self.logon_id.find_matches(text),
                 DetectorType::WindowsHexId => self.hex_id.find_matches(text),
+                DetectorType::SecretKey => self.secret_key.find_matches(text),
+                DetectorType::FilePath => self.file_path.find_matches(text),
                 DetectorType::IPv4 => self.ipv4.find_matches(text),
                 DetectorType::IPv6 => self.ipv6.find_matches(text),
                 DetectorType::Email => self.email.find_matches(text),
@@ -305,7 +343,7 @@ impl DetectorRegistry {
                 }
 
                 if !seen_originals.contains(candidate) {
-                    seen_originals.insert(candidate.to_string());
+                    seen_originals.insert(candidate);
                     let pseudonym = if matches!(dtype, DetectorType::DomainFqdn)
                         && self.is_ignored_domain(candidate)
                     {

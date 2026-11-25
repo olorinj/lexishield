@@ -312,6 +312,17 @@ pub static PROTECTED_WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 
 /// Determina si una palabra está protegida y no debe ser reemplazada genéricamente.
 pub fn is_protected_word(word: &str) -> bool {
+    if word.is_ascii() {
+        if word.len() > 32 {
+            return false;
+        }
+        let mut buf = [0u8; 32];
+        for (dst, &b) in buf.iter_mut().zip(word.as_bytes()) {
+            *dst = b.to_ascii_lowercase();
+        }
+        return std::str::from_utf8(&buf[..word.len()])
+            .is_ok_and(|lower| PROTECTED_WORDS.contains(lower));
+    }
     let lower = word.to_lowercase();
     PROTECTED_WORDS.contains(lower.as_str())
 }
@@ -402,6 +413,7 @@ pub static KNOWN_VENDOR_DOMAINS: LazyLock<HashSet<&'static str>> = LazyLock::new
         "owasp.org",
         "nist.gov",
         "rfc-editor.org",
+        "w3.org",
         "cve.org",
         "mitre.org",
         "debian.org",
@@ -433,18 +445,16 @@ pub static KNOWN_VENDOR_DOMAINS: LazyLock<HashSet<&'static str>> = LazyLock::new
 /// Determina si un dominio pertenece a un proveedor de software / cloud conocido.
 pub fn is_known_vendor_domain(domain: &str) -> bool {
     let lower = domain.trim().trim_end_matches('.').to_lowercase();
-    if KNOWN_VENDOR_DOMAINS.contains(lower.as_str()) {
+    if lower == "example.com" || KNOWN_VENDOR_DOMAINS.contains(lower.as_str()) {
         return true;
     }
-    // Comprobar si es un subdominio de alguno de los vendors
-    for vendor in KNOWN_VENDOR_DOMAINS.iter() {
-        if lower.ends_with(&format!(".{vendor}")) {
+    // Comprobar si es un subdominio de alguno de los vendors o de example.com (RFC 2606)
+    let mut rest = lower.as_str();
+    while let Some(dot) = rest.find('.') {
+        rest = &rest[dot + 1..];
+        if rest == "example.com" || KNOWN_VENDOR_DOMAINS.contains(rest) {
             return true;
         }
-    }
-    // Dominios de ejemplo RFC 2606 o ya anonimizados previamente
-    if lower == "example.com" || lower.ends_with(".example.com") {
-        return true;
     }
     false
 }

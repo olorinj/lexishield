@@ -5,6 +5,10 @@ pub mod replacer;
 
 use crate::config::LexiConfig;
 use crate::detectors::DetectorRegistry;
+use crate::encoded_content::{
+    EncodedPayloadMode, extract_decoded_views_for_scan, inspect_and_expand_encoded,
+    process_reencoded_payloads,
+};
 use crate::format_adapters::FormatOrchestrator;
 use crate::models::{FormatType, Mapping, ObfuscationError, ObfuscationReport};
 use crate::validator::SyntaxValidator;
@@ -46,6 +50,36 @@ impl ObfuscatorEngine {
     }
 
     pub fn scan_and_register_mappings_with_cb(
+        &mut self,
+        content: &str,
+        mut on_found: Option<&mut dyn FnMut(&Mapping)>,
+    ) -> Result<Vec<Mapping>, ObfuscationError> {
+        let mut newly_added = self.scan_single_view_with_cb(
+            content,
+            match &mut on_found {
+                Some(f) => Some(&mut **f),
+                None => None,
+            },
+        )?;
+
+        if self.config.general.encoded_payload_mode != EncodedPayloadMode::Off {
+            let decoded_views = extract_decoded_views_for_scan(content);
+            for view in &decoded_views {
+                let extra = self.scan_single_view_with_cb(
+                    view,
+                    match &mut on_found {
+                        Some(f) => Some(&mut **f),
+                        None => None,
+                    },
+                )?;
+                newly_added.extend(extra);
+            }
+        }
+
+        Ok(newly_added)
+    }
+
+    fn scan_single_view_with_cb(
         &mut self,
         content: &str,
         mut on_found: Option<&mut dyn FnMut(&Mapping)>,
@@ -181,23 +215,87 @@ impl ObfuscatorEngine {
 
         let replacement_map = self.manager.get_replacement_map(reverse);
         let substring_keys = self.manager.get_substring_keys(reverse);
+        let strict_wb = self.config.strict_word_boundaries();
 
-        let (result_text, replacements_count, detected_format) = self
-            .format_orchestrator
-            .process_content_with_substring_keys(
-                text,
-                format,
-                &replacement_map,
-                self.config.strict_word_boundaries(),
-                &substring_keys,
-            )?;
+        let mut encoded_blocks_processed = 0usize;
+        let effective_source;
+        let source_for_validation: &str;
+
+        let (mut result_text, mut replacements_count, detected_format) =
+            match self.config.general.encoded_payload_mode {
+                EncodedPayloadMode::ExpandClear => {
+                    let inspected = inspect_and_expand_encoded(text);
+                    encoded_blocks_processed = inspected.blocks_decoded;
+                    effective_source = if self.config.general.merge_encoded_chunks {
+                        inspected
+                            .merged_chunks_text
+                            .unwrap_or(inspected.expanded_text)
+                    } else {
+                        inspected.expanded_text
+                    };
+                    source_for_validation = &effective_source;
+                    self.format_orchestrator
+                        .process_content_with_substring_keys(
+                            &effective_source,
+                            format,
+                            &replacement_map,
+                            strict_wb,
+                            &substring_keys,
+                        )?
+                }
+                EncodedPayloadMode::Off | EncodedPayloadMode::Reencode => {
+                    source_for_validation = text;
+                    self.format_orchestrator
+                        .process_content_with_substring_keys(
+                            text,
+                            format,
+                            &replacement_map,
+                            strict_wb,
+                            &substring_keys,
+                        )?
+                }
+            };
+
+        if self.config.general.encoded_payload_mode == EncodedPayloadMode::Reencode
+            && !replacement_map.is_empty()
+        {
+            let precompiled_replacer =
+                crate::engine::replacer::CompiledReplacer::new_with_substring_keys(
+                    &replacement_map,
+                    strict_wb,
+                    &substring_keys,
+                );
+            let (reencoded_out, inner_repl, enc_blocks) =
+                process_reencoded_payloads(&result_text, reverse, |decoded_chunk| {
+                    if crate::format_adapters::json_adapter::JsonAdapter::is_valid_json(
+                        decoded_chunk,
+                    ) || crate::format_adapters::xml_adapter::XmlAdapter::is_valid_xml(
+                        decoded_chunk,
+                    ) {
+                        self.format_orchestrator
+                            .process_content_with_substring_keys(
+                                decoded_chunk,
+                                FormatType::Auto,
+                                &replacement_map,
+                                strict_wb,
+                                &substring_keys,
+                            )
+                            .map_or_else(|_| (decoded_chunk.to_string(), 0), |(s, c, _)| (s, c))
+                    } else {
+                        precompiled_replacer.replace(decoded_chunk)
+                    }
+                });
+            result_text = reencoded_out;
+            replacements_count += inner_repl;
+            encoded_blocks_processed = enc_blocks;
+        }
 
         let mut warnings = Vec::new();
         let mut syntax_valid = true;
         let mut schema_intact = true;
 
         if self.config.validate_syntax_post_process() {
-            match SyntaxValidator::validate(text, &result_text, detected_format) {
+            match SyntaxValidator::validate(source_for_validation, &result_text, detected_format) {
                 Ok(vreport) => {
                     syntax_valid = vreport.syntax_valid;
                     schema_intact = vreport.schema_keys_intact;
@@ -216,6 +314,7 @@ impl ObfuscatorEngine {
             original_length: original_len,
             result_length: result_text.len(),
             replacements_applied: replacements_count,
+            encoded_blocks_processed,
             elapsed_ms,
             schema_intact,
             syntax_valid,
@@ -253,6 +352,19 @@ impl ObfuscatorEngine {
                         None => None,
                     },
                 );
+            }
+        }
+
+        // Para archivos de texto de hasta 16 MB, analizar en bloque para detectar columnas CSV codificadas y fragmentos multiparte
+        if let Ok(meta) = file.metadata()
+            && meta.len() <= 16 * 1024 * 1024
+        {
+            file.seek(std::io::SeekFrom::Start(0))?;
+            let mut full_bytes = Vec::with_capacity(usize::try_from(meta.len()).unwrap_or(0));
+            if file.read_to_end(&mut full_bytes).is_ok()
+                && let Ok(full_text) = String::from_utf8(full_bytes)
+            {
+                return self.scan_and_register_mappings_with_cb(&full_text, on_found);
             }
         }
 
@@ -331,6 +443,7 @@ impl ObfuscatorEngine {
                 original_length: original_len,
                 result_length: output_bytes.len(),
                 replacements_applied: count,
+                encoded_blocks_processed: 0,
                 elapsed_ms,
                 schema_intact: true,
                 syntax_valid: true,

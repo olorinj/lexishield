@@ -41,27 +41,39 @@ impl SpanishDniNieDetector {
 
     /// Valida si un DNI/NIE tiene un checksum matemáticamente correcto.
     pub fn is_valid_dni_nie(raw: &str) -> bool {
-        let cleaned: String = raw.chars().filter(char::is_ascii_alphanumeric).collect();
-        if cleaned.len() != 9 {
+        let mut cleaned = [0u8; 9];
+        let mut len = 0usize;
+        for b in raw.bytes() {
+            if b.is_ascii_alphanumeric() {
+                if len == 9 {
+                    return false;
+                }
+                cleaned[len] = b;
+                len += 1;
+            }
+        }
+        if len != 9 {
             return false;
         }
 
-        let first = cleaned.chars().next().unwrap_or(' ');
-        let last = cleaned.chars().last().unwrap_or(' ').to_ascii_uppercase();
-
-        let num_str: String = match first.to_ascii_uppercase() {
-            'X' => format!("0{}", &cleaned[1..8]),
-            'Y' => format!("1{}", &cleaned[1..8]),
-            'Z' => format!("2{}", &cleaned[1..8]),
-            _ if first.is_ascii_digit() => cleaned[0..8].to_string(),
+        let first_val = match cleaned[0].to_ascii_uppercase() {
+            b'X' => 0u32,
+            b'Y' => 1u32,
+            b'Z' => 2u32,
+            b if b.is_ascii_digit() => u32::from(b - b'0'),
             _ => return false,
         };
 
-        if let Ok(num) = num_str.parse::<u32>() {
-            Self::calculate_control_letter(num) == last
-        } else {
-            false
+        let mut num = first_val;
+        for &b in &cleaned[1..8] {
+            if !b.is_ascii_digit() {
+                return false;
+            }
+            num = num * 10 + u32::from(b - b'0');
         }
+
+        let last = cleaned[8].to_ascii_uppercase() as char;
+        Self::calculate_control_letter(num) == last
     }
 
     pub fn find_matches<'a>(&self, text: &'a str) -> Vec<(usize, usize, &'a str)> {

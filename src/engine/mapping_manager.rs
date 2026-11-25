@@ -122,6 +122,12 @@ impl MappingManager {
             }
             if reverse {
                 map.insert(m.pseudonym.clone(), m.original.clone());
+                if m.pseudonym.parse::<std::net::Ipv4Addr>().is_ok() {
+                    map.entry(m.pseudonym.replace('.', r"\."))
+                        .or_insert_with(|| m.original.clone());
+                    map.entry(m.pseudonym.replace('.', "[.]"))
+                        .or_insert_with(|| m.original.clone());
+                }
             } else {
                 map.insert(m.original.clone(), m.pseudonym.clone());
             }
@@ -183,5 +189,58 @@ impl MappingManager {
     pub fn clear(&mut self) {
         self.forward.clear();
         self.reverse.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::replacer::CompiledReplacer;
+    use crate::models::{DetectorType, Mapping};
+
+    #[test]
+    fn test_reverse_map_includes_regex_ip_variants() {
+        let mut manager = MappingManager::new();
+        manager
+            .add_mapping(Mapping::new(
+                "10.0.0.1".to_string(),
+                "1.1.1.1".to_string(),
+                DetectorType::IPv4,
+            ))
+            .unwrap();
+        manager
+            .add_mapping(Mapping::new(
+                "10.0.0.2".to_string(),
+                "8.8.8.8".to_string(),
+                DetectorType::IPv4,
+            ))
+            .unwrap();
+        manager
+            .add_mapping(Mapping::new(
+                "srv-prod.local".to_string(),
+                "srv-01.internal".to_string(),
+                DetectorType::Hostname,
+            ))
+            .unwrap();
+
+        let reverse_map = manager.get_replacement_map(true);
+        assert_eq!(
+            reverse_map.get("1.1.1.1").map(String::as_str),
+            Some("10.0.0.1")
+        );
+        assert_eq!(
+            reverse_map.get(r"1\.1\.1\.1").map(String::as_str),
+            Some("10.0.0.1")
+        );
+        assert_eq!(
+            reverse_map.get("1[.]1[.]1[.]1").map(String::as_str),
+            Some("10.0.0.1")
+        );
+        assert!(!reverse_map.contains_key(r"srv-01\.internal"));
+
+        let replacer = CompiledReplacer::new(&reverse_map, true);
+        let (restored, count) = replacer.replace(r"^(1\.1\.1\.1|8[.]8[.]8[.]8)$");
+        assert_eq!(restored, "^(10.0.0.1|10.0.0.2)$");
+        assert_eq!(count, 2);
     }
 }

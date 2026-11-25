@@ -1,6 +1,7 @@
 //! Gestión de configuración y persistencia según estándares universales en formato TOML.
 
 use crate::detectors::custom::CustomRule;
+use crate::encoded_content::EncodedPayloadMode;
 use crate::models::{DetectorType, ObfuscationError};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -115,6 +116,12 @@ enforce_injective_mappings = true
 # Generar seudónimos sintácticamente válidos con checksums reales (DNI, Tarjetas).
 generate_valid_checksums = true
 
+# Tratamiento de cargas codificadas legibles (Base64 / Hex / URL): "reencode" | "expand_clear" | "off"
+encoded_payload_mode = "reencode"
+
+# Unir y ordenar automáticamente fragmentos multiparte por índice al expandir en claro
+merge_encoded_chunks = false
+
 [vault]
 # Nombre o ruta del archivo de bóveda por defecto dentro de ~/.lexishield/
 default_vault = "default.lexi"
@@ -164,6 +171,7 @@ ignored_domains = [
 default_tab = "studio"
 show_cli_dock = true
 show_token_badges = true # Mostrar insignias y badges coloreados en tokens por defecto
+studio_paste_encoded_mode = "clear" # "clear" | "merge" | "reencode"
 
 [gui.tabs]
 show_studio = true
@@ -183,6 +191,8 @@ detector_priority_order = [
     "WindowsSid",
     "WindowsLogonId",
     "WindowsHexId",
+    "SecretKey",
+    "FilePath",
     "SpanishDniNie",
     "CreditCard",
     "Email",
@@ -249,6 +259,10 @@ pub struct GeneralConfig {
     pub generate_valid_checksums: bool,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default)]
+    pub encoded_payload_mode: EncodedPayloadMode,
+    #[serde(default)]
+    pub merge_encoded_chunks: bool,
 }
 
 fn default_language() -> String {
@@ -275,6 +289,8 @@ impl Default for GeneralConfig {
             enforce_injective_mappings: true,
             generate_valid_checksums: true,
             language: default_language(),
+            encoded_payload_mode: EncodedPayloadMode::Reencode,
+            merge_encoded_chunks: false,
         }
     }
 }
@@ -482,6 +498,8 @@ pub struct GuiConfig {
     pub theme: String,
     #[serde(default = "default_accent_color")]
     pub accent_color: String,
+    #[serde(default = "default_studio_paste_encoded_mode")]
+    pub studio_paste_encoded_mode: String,
 }
 
 fn default_default_tab() -> String {
@@ -510,6 +528,10 @@ fn default_theme() -> String {
 
 fn default_accent_color() -> String {
     "cyan".to_string()
+}
+
+fn default_studio_paste_encoded_mode() -> String {
+    "clear".to_string()
 }
 
 impl GuiConfig {
@@ -557,17 +579,20 @@ impl Default for GuiConfig {
             auto_lock_minutes: 0,
             theme: default_theme(),
             accent_color: default_accent_color(),
+            studio_paste_encoded_mode: default_studio_paste_encoded_mode(),
         }
     }
 }
 
 fn default_priority_order() -> Vec<DetectorType> {
     vec![
-        // 1. Identificadores rígidos y específicos (máxima especificidad)
+        // 1. Identificadores rígidos, secretos y rutas de sistema (máxima especificidad)
         DetectorType::GuidUuid,
         DetectorType::WindowsSid,
         DetectorType::WindowsLogonId,
         DetectorType::WindowsHexId,
+        DetectorType::SecretKey,
+        DetectorType::FilePath,
         DetectorType::SpanishDniNie,
         DetectorType::CreditCard,
         // 2. Red y comunicaciones
@@ -1002,6 +1027,18 @@ pub fn load_config_with_rules(
                     cfg.custom_rules.push(r);
                 }
             }
+        }
+    }
+
+    // Garantizar migración segura de nuevos detectores estándar en config.toml preexistentes
+    for required_det in [DetectorType::SecretKey, DetectorType::FilePath] {
+        if !cfg.detector_priority_order.contains(&required_det) {
+            let insert_pos = cfg
+                .detector_priority_order
+                .iter()
+                .position(|d| matches!(d, DetectorType::SpanishDniNie | DetectorType::IPv4))
+                .unwrap_or(cfg.detector_priority_order.len());
+            cfg.detector_priority_order.insert(insert_pos, required_det);
         }
     }
 
