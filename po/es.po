@@ -2088,3 +2088,24 @@ msgstr "Al copiar texto con direcciones IP, correos, claves o tokens, verás aqu
 
 msgid "watch.zero_tokens_note"
 msgstr "0 tokens confidenciales detectados (texto íntegro mantenido)."
+
+msgid "studio.save_plain_decoded_btn"
+msgstr "Guardar en plano"
+
+msgid "studio.save_plain_decoded_tooltip"
+msgstr "Decodifica cargas legibles (Base64, Hex, URL) y delimitadores SAP IDoc a texto plano y lo guarda con otro nombre"
+
+msgid "status.plain_exported_ok"
+msgstr "Texto plano decodificado guardado"
+
+msgid "status.label_saved_plain_file"
+msgstr "Copia en plano decodificada"
+
+msgid "modals.drop_save_plain_title"
+msgstr "Guardar también copia en texto plano decodificado con otro nombre"
+
+msgid "modals.drop_save_plain_desc"
+msgstr "Expande cargas legibles Base64, Hex o URL y delimitadores SAP IDoc a texto plano sin ofuscar."
+
+msgid "modals.drop_plain_suffix_label"
+msgstr "Sufijo de la copia en plano:"

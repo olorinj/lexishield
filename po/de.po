@@ -2088,3 +2088,24 @@ msgstr "Wenn Sie Text mit IPs, E-Mails, Schlüsseln oder Token kopieren, wird di
 
 msgid "watch.zero_tokens_note"
 msgstr "0 vertrauliche Token erkannt (Originaltext unverändert übernommen)."
+
+msgid "studio.save_plain_decoded_btn"
+msgstr "Als Klartext speichern"
+
+msgid "studio.save_plain_decoded_tooltip"
+msgstr "Dekodiert lesbare Nutzdaten (Base64, Hex, URL) und SAP-IDoc-Trennzeichen in Klartext unter einem anderen Namen"
+
+msgid "status.plain_exported_ok"
+msgstr "Dekodierter Klartext gespeichert"
+
+msgid "status.label_saved_plain_file"
+msgstr "Dekodierte Klartextkopie"
+
+msgid "modals.drop_save_plain_title"
+msgstr "Zusätzlich eine dekodierte Klartextkopie unter anderem Namen speichern"
+
+msgid "modals.drop_save_plain_desc"
+msgstr "Erweitert lesbare Base64-, Hex- oder URL-Nutzdaten sowie SAP-IDoc-Steuerzeichen ohne Maskierung in Klartext."
+
+msgid "modals.drop_plain_suffix_label"
+msgstr "Suffix der Klartextkopie:"

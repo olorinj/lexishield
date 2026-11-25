@@ -28,6 +28,7 @@ impl SyntaxValidator {
         match format {
             FormatType::Json => Self::validate_json(original, obfuscated),
             FormatType::Xml => Self::validate_xml(original, obfuscated),
+            FormatType::Idoc => Ok(Self::validate_idoc(original, obfuscated)),
             FormatType::Log | FormatType::Plaintext | FormatType::Auto => Ok(ValidationReport {
                 syntax_valid: true,
                 schema_keys_intact: true,
@@ -35,6 +36,33 @@ impl SyntaxValidator {
                 obfuscated_keys_count: 0,
                 issues: Vec::new(),
             }),
+        }
+    }
+
+    fn validate_idoc(original: &str, obfuscated: &str) -> ValidationReport {
+        use crate::format_adapters::idoc_adapter::{FIELD_SEP, RECORD_SEP, SEGMENT_SEP};
+
+        let orig_f = original.matches(FIELD_SEP).count();
+        let obf_f = obfuscated.matches(FIELD_SEP).count();
+        let orig_s = original.matches(SEGMENT_SEP).count();
+        let obf_s = obfuscated.matches(SEGMENT_SEP).count();
+        let orig_r = original.matches(RECORD_SEP).count();
+        let obf_r = obfuscated.matches(RECORD_SEP).count();
+
+        let mut issues = Vec::new();
+        if orig_f != obf_f || orig_s != obf_s || orig_r != obf_r {
+            issues.push(format!(
+                "Delimitadores SAP IDoc alterados: ^A({orig_f}->{obf_f}), ^B({orig_s}->{obf_s}), ^C({orig_r}->{obf_r})"
+            ));
+        }
+
+        let intact = issues.is_empty();
+        ValidationReport {
+            syntax_valid: intact,
+            schema_keys_intact: intact,
+            original_keys_count: orig_f + orig_s + orig_r,
+            obfuscated_keys_count: obf_f + obf_s + obf_r,
+            issues,
         }
     }
 

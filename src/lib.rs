@@ -37,7 +37,7 @@ pub use config::LexiConfig;
 pub use crypto::{
     decrypt_mappings, encrypt_mappings, is_encrypted_vault, load_mappings_auto, save_mappings_auto,
 };
-pub use encoded_content::{DecodeInspectResult, EncodedPayloadMode};
+pub use encoded_content::{DecodeInspectResult, EncodedPayloadMode, export_plain_decoded_text};
 pub use engine::{MappingManager, ObfuscatorEngine};
 pub use models::{
     DetectorType, FormatType, Mapping, ObfuscationError, ObfuscationReport, ScanAuditMetrics,

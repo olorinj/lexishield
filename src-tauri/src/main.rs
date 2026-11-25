@@ -434,6 +434,7 @@ fn parse_format(f: &str) -> FormatType {
         "xml" => FormatType::Xml,
         "log" => FormatType::Log,
         "plaintext" | "text" => FormatType::Plaintext,
+        "idoc" | "sap-idoc" | "sap_idoc" => FormatType::Idoc,
         _ => FormatType::Auto,
     }
 }
@@ -481,6 +482,61 @@ fn export_office_to_md_with_pandoc(doc_path: &Path) -> Result<std::path::PathBuf
         ));
     }
     Ok(md_path)
+}
+
+#[derive(Serialize)]
+struct PlainExportReport {
+    output_path: String,
+    blocks_decoded: usize,
+    format_detected: FormatType,
+    bytes_written: usize,
+}
+
+#[tauri::command]
+fn save_plain_decoded_file(
+    input_path: String,
+    output_path: String,
+    format_str: Option<String>,
+    merge_chunks: Option<bool>,
+) -> Result<PlainExportReport, String> {
+    let in_p = Path::new(&input_path);
+    let out_p = Path::new(&output_path);
+    if in_p == out_p {
+        return Err(
+            "La ruta de salida en plano no puede sobrescribir el archivo original.".to_string(),
+        );
+    }
+    let bytes = std::fs::read(in_p).map_err(|e| e.to_string())?;
+    let content = String::from_utf8_lossy(&bytes);
+    let fmt = format_str.as_deref().map_or(FormatType::Auto, parse_format);
+    let (plain, blocks_decoded, actual_fmt) =
+        lexishield::export_plain_decoded_text(&content, fmt, merge_chunks.unwrap_or(false));
+    std::fs::write(out_p, plain.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(PlainExportReport {
+        output_path,
+        blocks_decoded,
+        format_detected: actual_fmt,
+        bytes_written: plain.len(),
+    })
+}
+
+#[tauri::command]
+fn save_plain_decoded_text(
+    text: String,
+    output_path: String,
+    format_str: Option<String>,
+    merge_chunks: Option<bool>,
+) -> Result<PlainExportReport, String> {
+    let fmt = format_str.as_deref().map_or(FormatType::Auto, parse_format);
+    let (plain, blocks_decoded, actual_fmt) =
+        lexishield::export_plain_decoded_text(&text, fmt, merge_chunks.unwrap_or(false));
+    std::fs::write(Path::new(&output_path), plain.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(PlainExportReport {
+        output_path,
+        blocks_decoded,
+        format_detected: actual_fmt,
+        bytes_written: plain.len(),
+    })
 }
 
 #[tauri::command]
@@ -1482,6 +1538,8 @@ fn main() {
             get_ignored_domains,
             save_ignored_domains,
             process_file_command,
+            save_plain_decoded_file,
+            save_plain_decoded_text,
             reset_config_command,
             get_debug_mode,
             set_debug_mode_command,

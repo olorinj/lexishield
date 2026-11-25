@@ -1,5 +1,6 @@
 //! Módulo de adaptadores de formato de LexiShield (Mejora 1: Format Adapters).
 
+pub mod idoc_adapter;
 pub mod json_adapter;
 pub mod log_adapter;
 pub mod office_adapter;
@@ -7,6 +8,7 @@ pub mod text_adapter;
 pub mod xml_adapter;
 
 use crate::models::{FormatType, ObfuscationError};
+use idoc_adapter::IdocAdapter;
 use json_adapter::JsonAdapter;
 use log_adapter::LogAdapter;
 use office_adapter::OfficeAdapter;
@@ -16,6 +18,7 @@ use xml_adapter::XmlAdapter;
 
 /// Orquestador de formatos con detección inteligente.
 pub struct FormatOrchestrator {
+    pub idoc: IdocAdapter,
     pub json: JsonAdapter,
     pub xml: XmlAdapter,
     pub log: LogAdapter,
@@ -32,6 +35,7 @@ impl Default for FormatOrchestrator {
 impl FormatOrchestrator {
     pub fn new() -> Self {
         Self {
+            idoc: IdocAdapter::new(),
             json: JsonAdapter::new(),
             xml: XmlAdapter::new(),
             log: LogAdapter::new(),
@@ -42,7 +46,9 @@ impl FormatOrchestrator {
 
     /// Detecta automáticamente el tipo de formato del documento.
     pub fn detect_format(&self, content: &str) -> FormatType {
-        if JsonAdapter::is_valid_json(content) {
+        if IdocAdapter::is_idoc_format(content) {
+            FormatType::Idoc
+        } else if JsonAdapter::is_valid_json(content) {
             FormatType::Json
         } else if XmlAdapter::is_valid_xml(content) {
             FormatType::Xml
@@ -87,6 +93,12 @@ impl FormatOrchestrator {
         log::debug!("Procesando contenido con adaptador de formato: {actual_format:?}");
 
         let (result_text, count) = match actual_format {
+            FormatType::Idoc => self.idoc.process_idoc_with_substring_keys(
+                content,
+                replacement_map,
+                strict_word_boundaries,
+                substring_keys,
+            )?,
             FormatType::Json => self.json.process_json_with_substring_keys(
                 content,
                 replacement_map,

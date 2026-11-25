@@ -59,6 +59,8 @@ enum CliFormat {
     Xml,
     Log,
     Text,
+    #[value(name = "idoc", alias = "sap-idoc")]
+    Idoc,
 }
 
 impl From<CliFormat> for FormatType {
@@ -69,6 +71,7 @@ impl From<CliFormat> for FormatType {
             CliFormat::Xml => FormatType::Xml,
             CliFormat::Log => FormatType::Log,
             CliFormat::Text => FormatType::Plaintext,
+            CliFormat::Idoc => FormatType::Idoc,
         }
     }
 }
@@ -386,9 +389,13 @@ enum Commands {
         #[arg(short, long)]
         clipboard: bool,
 
-        /// Formato estructural (auto, json, xml, log, text).
+        /// Formato estructural (auto, json, xml, log, text, idoc).
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
+
+        /// Guarda una versión del contenido original decodificada a texto plano legible con otro nombre (sin ofuscar).
+        #[arg(value_parser = parse_path, long)]
+        save_plain_as: Option<PathBuf>,
 
         /// Ruta opcional para guardar la tabla de mapeos generada (soporta JSON o cifrado).
         #[arg(value_parser = parse_path, short, long, alias = "mappings")]
@@ -466,7 +473,7 @@ enum Commands {
         #[arg(long)]
         ask_password: bool,
 
-        /// Formato estructural (auto, json, xml, log, text).
+        /// Formato estructural (auto, json, xml, log, text, idoc).
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
 
@@ -552,7 +559,7 @@ enum Commands {
         #[arg(long)]
         ask_password: bool,
 
-        /// Formato estructural (auto, json, xml, log, text).
+        /// Formato estructural (auto, json, xml, log, text, idoc).
         #[arg(short, long, value_enum, default_value_t = CliFormat::Auto)]
         format: CliFormat,
 
@@ -773,6 +780,7 @@ struct ObfuscateOptions {
     no_save: bool,
     export_md: Option<String>,
     yes: bool,
+    save_plain_as: Option<PathBuf>,
 }
 
 fn export_office_to_md_with_pandoc(
@@ -1061,6 +1069,26 @@ fn handle_obfuscate(
         opts.clipboard,
         opts.stdin,
     )?;
+
+    if let Some(ref plain_out_path) = opts.save_plain_as {
+        if let Some(ref in_path) = opts.input
+            && in_path == plain_out_path
+        {
+            return Err(
+                "La ruta de --save-plain-as no puede sobrescribir el archivo original.".into(),
+            );
+        }
+        let (plain_text, blocks_decoded, _) = lexishield::export_plain_decoded_text(
+            &content,
+            opts.format,
+            config.general.merge_encoded_chunks,
+        );
+        fs::write(plain_out_path, &plain_text)?;
+        log::info!(
+            "Versión en texto plano decodificada guardada en: {} ({blocks_decoded} bloques expandidos).",
+            plain_out_path.display()
+        );
+    }
 
     let mut engine = ObfuscatorEngine::new(config);
     if opts.clean_cache {
@@ -2543,6 +2571,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             yes,
             encoded_mode,
             merge_chunks,
+            save_plain_as,
         } => {
             let mut cfg = config;
             if let Some(em) = encoded_mode {
@@ -2571,6 +2600,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     no_save,
                     export_md,
                     yes,
+                    save_plain_as,
                 },
             )
         }

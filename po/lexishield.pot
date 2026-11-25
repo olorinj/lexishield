@@ -2782,3 +2782,24 @@ msgstr ""
 #. English reference: 0 confidential tokens detected (original text kept intact).
 msgid "watch.zero_tokens_note"
 msgstr ""
+
+msgid "studio.save_plain_decoded_btn"
+msgstr ""
+
+msgid "studio.save_plain_decoded_tooltip"
+msgstr ""
+
+msgid "status.plain_exported_ok"
+msgstr ""
+
+msgid "status.label_saved_plain_file"
+msgstr ""
+
+msgid "modals.drop_save_plain_title"
+msgstr ""
+
+msgid "modals.drop_save_plain_desc"
+msgstr ""
+
+msgid "modals.drop_plain_suffix_label"
+msgstr ""

@@ -2088,3 +2088,24 @@ msgstr "Lorsque vous copiez du texte contenant des IP, e-mails, clés ou jetons,
 
 msgid "watch.zero_tokens_note"
 msgstr "0 jeton confidentiel détecté (texte intégral conservé)."
+
+msgid "studio.save_plain_decoded_btn"
+msgstr "Enregistrer en clair"
+
+msgid "studio.save_plain_decoded_tooltip"
+msgstr "Décode les charges lisibles (Base64, Hex, URL) et les délimiteurs SAP IDoc en texte clair sous un autre nom"
+
+msgid "status.plain_exported_ok"
+msgstr "Texte clair décodé enregistré"
+
+msgid "status.label_saved_plain_file"
+msgstr "Copie en clair décodée"
+
+msgid "modals.drop_save_plain_title"
+msgstr "Enregistrer aussi une copie en texte clair décodé sous un autre nom"
+
+msgid "modals.drop_save_plain_desc"
+msgstr "Développe les charges Base64, Hex ou URL et les délimiteurs SAP IDoc en texte clair sans obfuscation."
+
+msgid "modals.drop_plain_suffix_label"
+msgstr "Suffixe de la copie en clair :"

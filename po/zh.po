@@ -2088,3 +2088,24 @@ msgstr "当您复制包含 IP、邮箱、密钥或标记的文本时，此处将
 
 msgid "watch.zero_tokens_note"
 msgstr "未检测到机密标记（保持原文本不变）。"
+
+msgid "studio.save_plain_decoded_btn"
+msgstr "保存为明文"
+
+msgid "studio.save_plain_decoded_tooltip"
+msgstr "将可读编码负载（Base64、Hex、URL）和 SAP IDoc 分隔符解码为纯文本并另存为其他名称"
+
+msgid "status.plain_exported_ok"
+msgstr "已保存解码后的纯文本"
+
+msgid "status.label_saved_plain_file"
+msgstr "解码明文副本"
+
+msgid "modals.drop_save_plain_title"
+msgstr "同时以其他名称保存解码后的纯文本副本"
+
+msgid "modals.drop_save_plain_desc"
+msgstr "将可读的 Base64、Hex 或 URL 负载及 SAP IDoc 控制分隔符展开为纯文本而不进行混淆。"
+
+msgid "modals.drop_plain_suffix_label"
+msgstr "明文副本后缀："

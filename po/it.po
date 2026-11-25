@@ -2088,3 +2088,24 @@ msgstr "Quando copi testo con IP, e-mail, chiavi o token, vedrai qui il riconosc
 
 msgid "watch.zero_tokens_note"
 msgstr "0 token riservati rilevati (testo originale mantenuto integro)."
+
+msgid "studio.save_plain_decoded_btn"
+msgstr "Salva in chiaro"
+
+msgid "studio.save_plain_decoded_tooltip"
+msgstr "Decodifica i payload leggibili (Base64, Hex, URL) e i delimitatori SAP IDoc in testo semplice con un altro nome"
+
+msgid "status.plain_exported_ok"
+msgstr "Testo semplice decodificato salvato"
+
+msgid "status.label_saved_plain_file"
+msgstr "Copia in chiaro decodificata"
+
+msgid "modals.drop_save_plain_title"
+msgstr "Salva anche una copia in testo semplice decodificato con un altro nome"
+
+msgid "modals.drop_save_plain_desc"
+msgstr "Espande i payload Base64, Hex o URL e i delimitatori SAP IDoc in testo semplice senza offuscare."
+
+msgid "modals.drop_plain_suffix_label"
+msgstr "Suffisso della copia in chiaro:"

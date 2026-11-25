@@ -1134,6 +1134,72 @@ pub fn inspect_and_expand_encoded(content: &str) -> DecodeInspectResult {
     }
 }
 
+/// Expande un contenido completo (incluyendo cargas codificadas Base64/Hex/URL y tramas SAP IDoc)
+/// a texto plano legible sin aplicar ofuscación.
+pub fn export_plain_decoded_text(
+    content: &str,
+    format: crate::models::FormatType,
+    merge_chunks: bool,
+) -> (String, usize, crate::models::FormatType) {
+    use crate::format_adapters::idoc_adapter::{FIELD_SEP, IdocAdapter, RECORD_SEP, SEGMENT_SEP};
+    use crate::models::FormatType;
+
+    let actual_format = match format {
+        FormatType::Auto => {
+            crate::format_adapters::FormatOrchestrator::new().detect_format(content)
+        }
+        other => other,
+    };
+
+    if actual_format == FormatType::Idoc {
+        let mut total_blocks = 0usize;
+        let mut expanded_idoc = String::with_capacity(content.len());
+
+        for (rec_idx, record) in content.split(RECORD_SEP).enumerate() {
+            if rec_idx > 0 {
+                expanded_idoc.push(RECORD_SEP);
+            }
+            for (seg_idx, segment) in record.split(SEGMENT_SEP).enumerate() {
+                if seg_idx > 0 {
+                    expanded_idoc.push(SEGMENT_SEP);
+                }
+                for (fld_idx, field) in segment.split(FIELD_SEP).enumerate() {
+                    if fld_idx > 0 {
+                        expanded_idoc.push(FIELD_SEP);
+                    }
+                    if field.is_empty() {
+                        continue;
+                    }
+                    let inspected = inspect_and_expand_encoded(field);
+                    total_blocks += inspected.blocks_decoded;
+                    let val = if merge_chunks {
+                        inspected
+                            .merged_chunks_text
+                            .unwrap_or(inspected.expanded_text)
+                    } else {
+                        inspected.expanded_text
+                    };
+                    expanded_idoc.push_str(&val);
+                }
+            }
+        }
+
+        let plain = IdocAdapter::format_plain_readable(&expanded_idoc);
+        return (plain, total_blocks, actual_format);
+    }
+
+    let inspected = inspect_and_expand_encoded(content);
+    let blocks_decoded = inspected.blocks_decoded;
+    let plain = if merge_chunks {
+        inspected
+            .merged_chunks_text
+            .unwrap_or(inspected.expanded_text)
+    } else {
+        inspected.expanded_text
+    };
+    (plain, blocks_decoded, actual_format)
+}
+
 fn expand_json_value(val: &mut serde_json::Value) -> usize {
     match val {
         serde_json::Value::String(s) => {
@@ -1420,5 +1486,19 @@ mod tests {
                 "La palabra común '{word}' no debe decodificarse como Base64"
             );
         }
+    }
+
+    #[test]
+    fn test_export_plain_decoded_text_idoc_and_base64() {
+        let b64_payload = encode_base64(b"admin@empresa.es IP 10.20.30.40", false, true);
+        let idoc = format!("EDI_DC40\x01{b64_payload}\x02E2EDK01\x01EUR\x03REC2\x01OK");
+        let (plain, blocks, fmt) =
+            export_plain_decoded_text(&idoc, crate::models::FormatType::Auto, false);
+        assert_eq!(fmt, crate::models::FormatType::Idoc);
+        assert_eq!(blocks, 1);
+        assert_eq!(
+            plain,
+            "EDI_DC40 | admin@empresa.es IP 10.20.30.40\nE2EDK01 | EUR\n\nREC2 | OK"
+        );
     }
 }

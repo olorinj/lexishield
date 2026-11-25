@@ -2088,3 +2088,24 @@ msgstr "When you copy text containing IPs, emails, keys, or tokens, you will see
 
 msgid "watch.zero_tokens_note"
 msgstr "0 confidential tokens detected (original text kept intact)."
+
+msgid "studio.save_plain_decoded_btn"
+msgstr "Save plain"
+
+msgid "studio.save_plain_decoded_tooltip"
+msgstr "Decode readable payloads (Base64, Hex, URL) and SAP IDoc delimiters to plain text and save with another name"
+
+msgid "status.plain_exported_ok"
+msgstr "Decoded plain text saved"
+
+msgid "status.label_saved_plain_file"
+msgstr "Plain decoded copy"
+
+msgid "modals.drop_save_plain_title"
+msgstr "Also save decoded plain copy with another name"
+
+msgid "modals.drop_save_plain_desc"
+msgstr "Expands readable Base64, Hex, or URL payloads and SAP IDoc control delimiters into plain text without obfuscating."
+
+msgid "modals.drop_plain_suffix_label"
+msgstr "Plain copy suffix:"

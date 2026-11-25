@@ -94,6 +94,7 @@
     if (selectedFormat && selectedFormat !== "auto") return selectedFormat.toUpperCase();
     const trimmed = inputText.trim();
     if (!trimmed) return "AUTO";
+    if (inputText.includes("\x01") || inputText.includes("\x02") || inputText.includes("\x03")) return "SAP IDOC";
     if (trimmed.startsWith("{") && (trimmed.includes('"wazuh"') || trimmed.includes('"rule"') || trimmed.includes('"agent"'))) return "JSON WAZUH";
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) return "JSON";
     if (trimmed.startsWith("<") && trimmed.endsWith(">")) return "XML / HTML";
@@ -1355,6 +1356,8 @@
       const protectName = customOptions ? !!customOptions.protectFilename : false;
       const fileEncMode = customOptions?.encodedMode || "reencode";
       const fileMergeChunks = !!customOptions?.mergeChunks;
+      const savePlainCopy = !!customOptions?.savePlainCopy;
+      const plainSuffix = customOptions?.plainSuffix || ".plain";
 
       let outPath = selected;
       if (useCopy) {
@@ -1407,6 +1410,23 @@
           throw e;
         }
       }
+      let plainOutPath = null;
+      let plainRep = null;
+      if (savePlainCopy) {
+        const dotIdx = selected.lastIndexOf(".");
+        if (dotIdx !== -1) {
+          plainOutPath = selected.substring(0, dotIdx) + plainSuffix + selected.substring(dotIdx);
+        } else {
+          plainOutPath = selected + plainSuffix + ".txt";
+        }
+        plainRep = await invokeTauri("save_plain_decoded_file", {
+          inputPath: selected,
+          outputPath: plainOutPath,
+          formatStr: selectedFormat,
+          mergeChunks: fileMergeChunks
+        });
+      }
+
       lastReport = rep;
       statusMessage = `✅ ${reverse ? tr("status.file_restored_title") : tr("status.file_protected_title")} (${rep.replacements_applied}). -> ${outPath}`;
       actionResultModal = {
@@ -1418,6 +1438,7 @@
         details: [
           { label: tr("status.label_source_file"), value: selected.split(/[/\\]/).pop() },
           { label: tr("status.label_saved_file"), value: outPath.split(/[/\\]/).pop() },
+          ...(plainOutPath ? [{ label: tr("status.label_saved_plain_file"), value: `${plainOutPath.split(/[/\\]/).pop()} (${plainRep?.blocks_decoded || 0})` }] : []),
           { label: reverse ? tr("status.tokens_restored_unit") : tr("status.tokens_protected_unit"), value: `${rep.replacements_applied}` },
           ...(rep.encoded_blocks_processed > 0 ? [{ label: tr("status.label_encoded_blocks"), value: `${rep.encoded_blocks_processed}` }] : []),
           { label: tr("status.label_time"), value: `${rep.elapsed_ms.toFixed(2)} ms` },
@@ -1783,7 +1804,9 @@
         exportMarkdown: hasPandoc && exportMarkdown,
         protectFilename: false,
         encodedMode: "reencode",
-        mergeChunks: false
+        mergeChunks: false,
+        savePlainCopy: false,
+        plainSuffix: ".plain"
       };
       activeTab = "studio";
       studioSubView = "transform";
@@ -1811,9 +1834,39 @@
     return `${baseStem}${sfx}${ext}`;
   }
 
+  function computePlainOutputPreview(modal) {
+    if (!modal || modal.isDir) return "";
+    const sfx = modal.plainSuffix || ".plain";
+    const dotIdx = modal.name.lastIndexOf(".");
+    const baseStem = dotIdx !== -1 ? modal.name.substring(0, dotIdx) : modal.name;
+    const ext = dotIdx !== -1 ? modal.name.substring(dotIdx) : ".txt";
+    return `${baseStem}${sfx}${ext}`;
+  }
+
+  async function savePlainDecodedFromStudio() {
+    if (!inputText) return;
+    try {
+      const destPath = await save({
+        defaultPath: "decoded_plain.txt",
+        filters: [{ name: "Plain Text", extensions: ["txt", "log", "json", "xml", "csv"] }]
+      });
+      if (!destPath) return;
+      const activeMerge = studioEncodedViewMode === "merge";
+      const rep = await invokeTauri("save_plain_decoded_text", {
+        text: rawEncodedPasteBuffer || inputText,
+        outputPath: destPath,
+        formatStr: selectedFormat,
+        mergeChunks: activeMerge
+      });
+      statusMessage = `✅ ${tr("status.plain_exported_ok")} -> ${rep.output_path} (${rep.blocks_decoded})`;
+    } catch (err) {
+      statusMessage = `${tr("status.file_process_error")} ${err}`;
+    }
+  }
+
   async function confirmStudioDropModal() {
     if (!studioDropModal) return;
-    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd, protectFilename: protName, encodedMode: encMode, mergeChunks: mrgChunks } = studioDropModal;
+    const { path, isDir, isReverse, copyMode, suffix, saveSuffixDefault, cleanCache, exportMarkdown: expMd, protectFilename: protName, encodedMode: encMode, mergeChunks: mrgChunks, savePlainCopy, plainSuffix } = studioDropModal;
     studioDropModal = null;
 
     try {
@@ -1841,7 +1894,9 @@
           exportMarkdown: expMd,
           protectFilename: protName,
           encodedMode: encMode === "merge" ? "expand_clear" : encMode,
-          mergeChunks: encMode === "merge" || !!mrgChunks
+          mergeChunks: encMode === "merge" || !!mrgChunks,
+          savePlainCopy: !!savePlainCopy,
+          plainSuffix: plainSuffix || ".plain"
         });
       }
     } catch (err) {
@@ -3672,6 +3727,14 @@
                   <span class="text-[10px] font-mono text-slate-400">
                     {inputLinesCount} {$t ? $t('studio.unit_lines') : ''} · {inputCharCount} {$t ? $t('studio.unit_chars') : ''} · {inputSizeKB}
                   </span>
+                  <button
+                    on:click={savePlainDecodedFromStudio}
+                    disabled={!inputText}
+                    class="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40"
+                    title={$t ? $t('studio.save_plain_decoded_tooltip') : ''}
+                  >
+                    <span>📄</span> {$t ? $t('studio.save_plain_decoded_btn') : ''}
+                  </button>
                   <button
                     on:click={copyInputWithFeedback}
                     disabled={!inputText}
@@ -6239,6 +6302,38 @@
                 <option value="merge">{$t ? $t('config.encoded_opt_merge') : ''}</option>
                 <option value="off">{$t ? $t('modals.drop_encoded_off') : ''}</option>
               </select>
+            </div>
+          {/if}
+
+          <!-- Opción Guardar en Texto Plano Decodificado con otro nombre -->
+          {#if !studioDropModal.isDir}
+            <div class="pt-2 border-t border-slate-200/60 dark:border-white/5 space-y-2">
+              <label class="flex items-center gap-2.5 cursor-pointer text-slate-700 dark:text-slate-300">
+                <input type="checkbox" bind:checked={studioDropModal.savePlainCopy} class="rounded accent-amber-500" />
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-white">{$t ? $t('modals.drop_save_plain_title') : ''}</span>
+                  <p class="text-[11px] text-slate-400">{$t ? $t('modals.drop_save_plain_desc') : ''}</p>
+                </div>
+              </label>
+
+              {#if studioDropModal.savePlainCopy}
+                <div class="pl-6 space-y-2 pt-1 border-l-2 border-amber-500/30 ml-2">
+                  <div class="flex items-center gap-2">
+                    <label for="modal-plain-suffix-input" class="text-[11px] font-semibold text-slate-600 dark:text-slate-400 shrink-0">{$t ? $t('modals.drop_plain_suffix_label') : ''}</label>
+                    <input
+                      id="modal-plain-suffix-input"
+                      type="text"
+                      bind:value={studioDropModal.plainSuffix}
+                      placeholder=".plain"
+                      class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none flex-1"
+                    />
+                  </div>
+                  <div class="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 text-[11px] font-mono text-amber-700 dark:text-amber-300 flex items-center gap-1.5 truncate">
+                    <span class="font-bold">{$t ? $t('modals.drop_preview_label') : ''}</span>
+                    <span class="truncate" title={computePlainOutputPreview(studioDropModal)}>{computePlainOutputPreview(studioDropModal)}</span>
+                  </div>
+                </div>
+              {/if}
             </div>
           {/if}
 

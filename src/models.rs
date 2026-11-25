@@ -11,6 +11,7 @@ pub enum FormatType {
     Xml,
     Log,
     Plaintext,
+    Idoc,
 }
 
 /// Tipos de detectores semánticos soportados por LexiShield.
