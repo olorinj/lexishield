@@ -16,6 +16,11 @@
     return $t ? $t(key) : key;
   }
 
+  function getPathBaseName(p) {
+    if (!p) return "";
+    return p.split(/[/\\]/).filter(Boolean).pop() || p;
+  }
+
   // Control de Tema Claro / Oscuro
   let darkMode = true;
 
@@ -420,20 +425,24 @@
     updateThemeClass();
     applyAccentFromConfig();
 
-    // 2. Cargar configuración
+    // 2. Cargar configuración y datos iniciales en paralelo
     await loadSettings();
 
-    // 3. Cargar lista de bóvedas, bóveda inicial y aprendizaje local de detectores
-    await refreshVaultsList();
-    await loadInitialVault();
-    await loadDetectorLearning();
+    // 3. Cargar lista de bóvedas y bóveda inicial
+    await Promise.all([
+      refreshVaultsList(),
+      loadInitialVault(),
+      loadDetectorLearning()
+    ]);
 
-    // 4. Registrar escuchas de progreso Tauri y verificar herramientas
-    try {
-      hasPandoc = await invokeTauri("check_pandoc_available");
-    } catch (e) {
-      hasPandoc = false;
-    }
+    // 4. Inicializaciones en segundo plano sin bloquear el arranque de la interfaz
+    setTimeout(async () => {
+      try {
+        hasPandoc = await invokeTauri("check_pandoc_available");
+      } catch (e) {
+        hasPandoc = false;
+      }
+    }, 100);
 
     try {
       debugMode = await invokeTauri("get_debug_mode");
@@ -642,7 +651,7 @@
         inputText: inputText,
         outputText: outputText,
         tokensCount: reportData?.replacements_applied ?? (lastReport?.replacements_applied ?? 0),
-        vaultUsed: vaultPath ? vaultPath.split('/').pop() : tr("header.vault_default")
+        vaultUsed: vaultPath ? getPathBaseName(vaultPath) : tr("header.vault_default")
       },
       ...sessionHistory
     ].slice(0, 10);
@@ -1127,7 +1136,7 @@
         vaultMappings = [];
         initVaultTarget = filePath;
         showInitVaultModal = true;
-        statusMessage = `${tr("status.vault_not_exist")} ${filePath.split('/').pop()}`;
+        statusMessage = `${tr("status.vault_not_exist")} ${getPathBaseName(filePath)}`;
         return;
       }
 
@@ -1177,7 +1186,7 @@
       return;
     }
     try {
-      const targetName = initVaultTarget ? initVaultTarget.split('/').pop() : "default.lexi";
+      const targetName = initVaultTarget ? getPathBaseName(initVaultTarget) : "default.lexi";
       const created = await invokeTauri("create_vault_file", {
         name: targetName,
         password: pwd
@@ -1463,7 +1472,7 @@
         type: "info",
         message: tr("status.file_scan_done_msg"),
         details: [
-          { label: tr("status.label_inspected_file"), value: filePath.split('/').pop() },
+          { label: tr("status.label_inspected_file"), value: getPathBaseName(filePath) },
           { label: tr("status.label_conf_tokens"), value: `${res.total_entities}` },
           { label: tr("status.label_omitted_fp"), value: `${(res.items || []).filter(i => i.omitted).length}` }
         ]
@@ -1518,7 +1527,7 @@
         type: "info",
         message: tr("status.dir_scan_done_msg"),
         details: [
-          { label: tr("status.label_directory"), value: dirPath.split('/').pop() },
+          { label: tr("status.label_directory"), value: getPathBaseName(dirPath) },
           { label: tr("audit.files_analyzed"), value: `${res.files_scanned}` },
           { label: tr("audit.files_omitted"), value: `${res.files_ignored}` },
           { label: tr("status.label_conf_tokens"), value: `${res.total_entities}` }
@@ -1939,7 +1948,7 @@
       });
 
       vaultMappings = mergedList;
-      statusMessage = `${tr("status.entities_saved_vault")} ${itemsToSave.length} -> ${targetVault.split('/').pop()}`;
+      statusMessage = `${tr("status.entities_saved_vault")} ${itemsToSave.length} -> ${getPathBaseName(targetVault)}`;
       
       // Limpiar de la pantalla los elementos guardados y regresar a Transformación
       const savedOriginals = new Set(itemsToSave.map(it => it.original));
@@ -5249,7 +5258,7 @@
       <!-- Bóveda activa -->
       <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-300/60 dark:bg-white/5 border border-slate-300/40 dark:border-white/5" title={$t ? $t('footer.active_vault_tooltip') : ''}>
         <span class="w-1.5 h-1.5 rounded-full {isVaultUnlocked ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
-        <span class="font-semibold text-slate-700 dark:text-slate-300">{vaultPath ? vaultPath.split('/').pop() : 'default.lexi'}</span>
+        <span class="font-semibold text-slate-700 dark:text-slate-300">{vaultPath ? getPathBaseName(vaultPath) : 'default.lexi'}</span>
       </div>
 
       <!-- Arquitectura Zero-Knowledge -->
