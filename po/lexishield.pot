@@ -4,9 +4,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: LexiShield 2.2.0\n"
+"Project-Id-Version: LexiShield 3.0.0\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/olorinj/lexishield/issues\n"
-"POT-Creation-Date: 2026-11-25 14:00+0100\n"
+"POT-Creation-Date: 2026-11-25 14:50+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,265 +15,2770 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#. Universal common actions
+#. English reference: all
+msgid "audit.all_label"
+msgstr ""
+
+#. English reference: Clear results
+msgid "audit.clear_results_btn"
+msgstr ""
+
+#. English reference: Clear results and reset pre-inspection
+msgid "audit.clear_results_tooltip"
+msgstr ""
+
+#. English reference: Action
+msgid "audit.col_action"
+msgstr ""
+
+#. English reference: Confidential original value
+msgid "audit.col_original"
+msgstr ""
+
+#. English reference: Protected / result
+msgid "audit.col_protected"
+msgstr ""
+
+#. English reference: Status
+msgid "audit.col_status"
+msgstr ""
+
+#. English reference: Entity type
+msgid "audit.col_type"
+msgstr ""
+
+#. English reference: Detected entities distribution
+msgid "audit.distribution_title"
+msgstr ""
+
+#. English reference: Detected confidential tokens are broken down here automatically when pasting text or dragging files in the Transform tab.
+msgid "audit.empty_desc"
+msgstr ""
+
+#. English reference: No tokens pending review
+msgid "audit.empty_title"
+msgstr ""
+
+#. English reference: Detected entities:
+msgid "audit.entities_detected"
+msgstr ""
+
+#. English reference: Entities:
+msgid "audit.entities_label"
+msgstr ""
+
+#. English reference: Analyzed files:
+msgid "audit.files_analyzed"
+msgstr ""
+
+#. English reference: Files:
+msgid "audit.files_label"
+msgstr ""
+
+#. English reference: Skipped files:
+msgid "audit.files_omitted"
+msgstr ""
+
+#. English reference: Drag files or folders, or paste text from the Transform view.
+msgid "audit.no_entities_hint"
+msgstr ""
+
+#. English reference: No audited entities yet
+msgid "audit.no_entities_yet"
+msgstr ""
+
+#. English reference: Omit
+msgid "audit.omit_btn"
+msgstr ""
+
+#. English reference: Mark as omitted (will not be protected)
+msgid "audit.omit_tooltip"
+msgstr ""
+
+#. English reference: Protect
+msgid "audit.protect_btn"
+msgstr ""
+
+#. English reference: Protect file...
+msgid "audit.protect_file_btn"
+msgstr ""
+
+#. English reference: Proceed to protect the file with verified tokens
+msgid "audit.protect_file_tooltip"
+msgstr ""
+
+#. English reference: Re-enable protection
+msgid "audit.protect_tooltip"
+msgstr ""
+
+#. English reference: Save to vault
+msgid "audit.save_vault_btn"
+msgstr ""
+
+#. English reference: Save all mappings to active vault applying selected omissions
+msgid "audit.save_vault_tooltip"
+msgstr ""
+
+#. English reference: Scanning folder in real time...
+msgid "audit.scanning_folder"
+msgstr ""
+
+#. English reference: Scanning files in progress...
+msgid "audit.scanning_in_progress"
+msgstr ""
+
+#. English reference: Scanned source:
+msgid "audit.source_scanned"
+msgstr ""
+
+#. English reference: Omitted
+msgid "audit.status_omitted"
+msgstr ""
+
+#. English reference: Protected
+msgid "audit.status_protected"
+msgstr ""
+
+#. English reference: Inspect and classify detected tokens before protecting the file. Uncheck items to omit false positives.
+msgid "audit.subtitle"
+msgstr ""
+
+#. English reference: Token pre-inspection
+msgid "audit.title"
+msgstr ""
+
+#. English reference: Select or deselect all
+msgid "audit.toggle_all_tooltip"
+msgstr ""
+
+#. English reference: Identity
+msgid "categories.identity"
+msgstr ""
+
+#. English reference: Contact / keys
+msgid "categories.keys"
+msgstr ""
+
+#. English reference: Network
+msgid "categories.network"
+msgstr ""
+
+#. English reference: Systems
+msgid "categories.systems"
+msgstr ""
+
+#. English reference: OK
+msgid "common.accept"
+msgstr ""
+
+#. English reference: Add
+msgid "common.add"
+msgstr ""
+
+#. English reference: Cancel
 msgid "common.cancel"
 msgstr ""
 
+#. English reference: Close
 msgid "common.close"
 msgstr ""
 
+#. English reference: Confirm
 msgid "common.confirm"
 msgstr ""
 
+#. English reference: Delete
 msgid "common.delete"
 msgstr ""
 
+#. English reference: Edit
 msgid "common.edit"
 msgstr ""
 
+#. English reference: (Empty)
+msgid "common.empty_parens"
+msgstr ""
+
+#. English reference: An error occurred
 msgid "common.error"
 msgstr ""
 
+#. English reference: Information
 msgid "common.info"
 msgstr ""
 
+#. English reference: Loading...
 msgid "common.loading"
 msgstr ""
 
+#. English reference: No
 msgid "common.no"
 msgstr ""
 
+#. English reference: Save
 msgid "common.save"
 msgstr ""
 
+#. English reference: Save changes
+msgid "common.save_changes"
+msgstr ""
+
+#. English reference: Copied!
 msgid "common.success"
 msgstr ""
 
+#. English reference: {n} h ago
+msgid "common.time_h_ago"
+msgstr ""
+
+#. English reference: just now
+msgid "common.time_just_now"
+msgstr ""
+
+#. English reference: {n} min ago
+msgid "common.time_min_ago"
+msgstr ""
+
+#. English reference: Warning
 msgid "common.warning"
 msgstr ""
 
+#. English reference: Yes
 msgid "common.yes"
 msgstr ""
 
-#. Configuration & settings view
+#. English reference: Amber
+msgid "config.accent_amber"
+msgstr ""
+
+#. English reference: Cobalt
+msgid "config.accent_cobalt"
+msgstr ""
+
+#. English reference: Interface accent color:
+msgid "config.accent_color_label"
+msgstr ""
+
+#. English reference: Neon cyan
+msgid "config.accent_cyan"
+msgstr ""
+
+#. English reference: Emerald
+msgid "config.accent_emerald"
+msgstr ""
+
+#. English reference: Amethyst
+msgid "config.accent_purple"
+msgstr ""
+
+#. English reference: Wipe after:
+msgid "config.auto_clear_after"
+msgstr ""
+
+#. English reference: Schedule automatic clipboard wipe after processing
+msgid "config.auto_clear_clip_label"
+msgstr ""
+
+#. English reference: seconds (default: 5s)
+msgid "config.auto_clear_seconds"
+msgstr ""
+
+#. English reference: Disabled (keep unlocked)
+msgid "config.auto_lock_0"
+msgstr ""
+
+#. English reference: Lock after 1 minute of inactivity
+msgid "config.auto_lock_1"
+msgstr ""
+
+#. English reference: Lock after 15 minutes of inactivity
+msgid "config.auto_lock_15"
+msgstr ""
+
+#. English reference: Lock after 30 minutes of inactivity
+msgid "config.auto_lock_30"
+msgstr ""
+
+#. English reference: Lock after 5 minutes of inactivity
+msgid "config.auto_lock_5"
+msgstr ""
+
+#. English reference: Vault auto-lock on inactivity:
+msgid "config.auto_lock_label"
+msgstr ""
+
+#. English reference: 1. Protection engine
+msgid "config.block1_title"
+msgstr ""
+
+#. English reference: 2. Window & system
+msgid "config.block2_title"
+msgstr ""
+
+#. English reference: 3. Clipboard & alerts
+msgid "config.block3_title"
+msgstr ""
+
+#. English reference: 4. Appearance, language & security
+msgid "config.block4_title"
+msgstr ""
+
+#. English reference: Manage exclusions
+msgid "config.btn_manage_exclusions"
+msgstr ""
+
+#. English reference: Reset defaults
 msgid "config.btn_reset"
 msgstr ""
 
+#. English reference: Restore default configuration
+msgid "config.btn_reset_tooltip"
+msgstr ""
+
+#. English reference: Review & submit
+msgid "config.btn_review_send"
+msgstr ""
+
+#. English reference: Save settings
 msgid "config.btn_save"
 msgstr ""
 
+#. English reference: Save changes to ~/.lexishield/config.toml
+msgid "config.btn_save_tooltip"
+msgstr ""
+
+#. English reference: View logs
+msgid "config.btn_view_logs"
+msgstr ""
+
+#. English reference: Open trace and event log viewer
+msgid "config.btn_view_logs_tooltip"
+msgstr ""
+
+#. English reference: Window visual flash
+msgid "config.clip_notify_flash"
+msgstr ""
+
+#. English reference: Alert when capturing clipboard data:
+msgid "config.clip_notify_label"
+msgstr ""
+
+#. English reference: System notification (taskbar / clock)
+msgid "config.clip_notify_native"
+msgstr ""
+
+#. English reference: Silent (no alerts)
+msgid "config.clip_notify_silent"
+msgstr ""
+
+#. English reference: Pop-up message (in-app toast)
+msgid "config.clip_notify_toast"
+msgstr ""
+
+#. English reference: When clicking the close button [X]:
+msgid "config.close_action_label"
+msgstr ""
+
+#. English reference: When closing the window, the program and all background services stop completely.
+msgid "config.close_help_exit"
+msgstr ""
+
+#. English reference: When closing the window, LexiShield stays active in the system tray to keep protecting your clipboard.
+msgid "config.close_help_tray"
+msgstr ""
+
+#. English reference: Quit application completely
+msgid "config.close_opt_exit"
+msgstr ""
+
+#. English reference: Minimize to system tray (background)
+msgid "config.close_opt_tray"
+msgstr ""
+
+#. English reference: Debug: active
+msgid "config.debug_active"
+msgstr ""
+
+#. English reference: Debug
+msgid "config.debug_inactive"
+msgstr ""
+
+#. English reference: Enable or disable internal operational trace capture
+msgid "config.debug_tooltip"
+msgstr ""
+
+#. English reference: Initial tab when opening LexiShield:
+msgid "config.default_tab_label"
+msgstr ""
+
+#. English reference: structural patterns learned without real data
+msgid "config.detector_learning_count"
+msgstr ""
+
+#. English reference: Detector learning (Zero-PII):
+msgid "config.detector_learning_label"
+msgstr ""
+
+#. English reference: Expand to clear text cell by cell (recommended)
+msgid "config.encoded_opt_clear"
+msgstr ""
+
+#. English reference: Expand to clear text and merge chunks by index
+msgid "config.encoded_opt_merge"
+msgstr ""
+
+#. English reference: Keep encoded (protect inner content and re-encode)
+msgid "config.encoded_opt_reencode"
+msgstr ""
+
+#. English reference: Automatically detects Base64 (UTF-8 / UTF-16LE), Hex, or URL strings containing readable text, ignoring encrypted binary data.
+msgid "config.encoded_paste_help"
+msgstr ""
+
+#. English reference: Readable encoded payloads on paste (Base64 / Hex / URL):
+msgid "config.encoded_paste_label"
+msgstr ""
+
+#. English reference: Exclude IPv4 network masks (255.255.255.0, 255.0.0.0, etc.)
+msgid "config.exclude_netmasks"
+msgstr ""
+
+#. English reference: Prevents standard subnet masks (/8../32) and default routes (0.0.0.0) from being mistaken or obfuscated as host IP addresses.
+msgid "config.exclude_netmasks_help"
+msgstr ""
+
+#. English reference: File input method:
+msgid "config.file_input_mode_label"
+msgstr ""
+
+#. English reference: File:
+msgid "config.file_label"
+msgstr ""
+
+#. English reference: Both (drag & drop + buttons)
+msgid "config.file_mode_both"
+msgstr ""
+
+#. English reference: Selection buttons only
+msgid "config.file_mode_buttons"
+msgstr ""
+
+#. English reference: Drag & drop only
+msgid "config.file_mode_drag"
+msgstr ""
+
+#. English reference: Large (14px)
+msgid "config.font_large"
+msgstr ""
+
+#. English reference: Standard (12px)
+msgid "config.font_medium"
+msgstr ""
+
+#. English reference: Font size
 msgid "config.font_size"
 msgstr ""
 
+#. English reference: Compact (11px)
+msgid "config.font_small"
+msgstr ""
+
+#. English reference: domains and URLs exempt from protection
+msgid "config.ignored_domains_count"
+msgstr ""
+
+#. English reference: Excluded URLs and domains:
+msgid "config.ignored_domains_label"
+msgstr ""
+
+#. English reference: Interface language
 msgid "config.language"
 msgstr ""
 
+#. English reference: Reactively switches the application language and persists the choice in ~/.lexishield/config.toml.
+msgid "config.language_help"
+msgstr ""
+
+#. English reference: If disabled, the minimize button [-] keeps the window in the standard taskbar.
+msgid "config.minimize_to_tray_help"
+msgstr ""
+
+#. English reference: Also send to system tray when clicking minimize [-]
+msgid "config.minimize_to_tray_label"
+msgstr ""
+
+#. English reference: Added before the file extension when protecting files
+msgid "config.output_suffix_help"
+msgstr ""
+
+#. English reference: Suffix for protected file copies:
+msgid "config.output_suffix_label"
+msgstr ""
+
+#. English reference: Enable privacy mode (blur) by default
 msgid "config.privacy_blur"
 msgstr ""
 
+#. English reference: 4. Appearance, language & security
 msgid "config.section_appearance"
 msgstr ""
 
+#. English reference: 3. Encoded payloads (Base64 / Hex)
 msgid "config.section_encoded"
 msgstr ""
 
+#. English reference: 1. General configuration
 msgid "config.section_general"
 msgstr ""
 
+#. English reference: 2. Studio ergonomics
 msgid "config.section_studio"
 msgstr ""
 
+#. English reference: Full (all detectors active)
+msgid "config.sensitivity_all"
+msgstr ""
+
+#. English reference: Technical & network (IPs, UUIDs, hostnames, logs)
+msgid "config.sensitivity_devops"
+msgstr ""
+
+#. English reference: Personal data & GDPR (emails, names, IDs, cards)
+msgid "config.sensitivity_gdpr"
+msgstr ""
+
+#. English reference: Defines which categories of confidential data are filtered and audited in the Transform view.
+msgid "config.sensitivity_help"
+msgstr ""
+
+#. English reference: Protection level and analysis scope:
+msgid "config.sensitivity_label"
+msgstr ""
+
+#. English reference: Enable colored token badges by default
 msgid "config.show_badges"
 msgstr ""
 
+#. English reference: Show bottom dock with equivalent CLI command
+msgid "config.show_cli_dock_label"
+msgstr ""
+
+#. English reference: Visual theme
 msgid "config.theme"
 msgstr ""
 
+#. English reference: Dark mode
 msgid "config.theme_dark"
 msgstr ""
 
+#. English reference: Light mode
 msgid "config.theme_light"
 msgstr ""
 
+#. English reference: Follow system theme
 msgid "config.theme_system"
 msgstr ""
 
+#. English reference: Customize protection level, window behavior on minimize or close, clipboard alerts, and visual appearance. Click Save settings in the top bar to persist changes.
+msgid "config.tip_desc"
+msgstr ""
+
+#. English reference: System preferences
+msgid "config.tip_title"
+msgstr ""
+
+#. English reference: System settings
 msgid "config.title"
 msgstr ""
 
-#. Pairs and replacement management
+#. English reference: Icon and text (full)
+msgid "config.toolbar_both"
+msgstr ""
+
+#. English reference: Icon only (minimalist)
+msgid "config.toolbar_icons"
+msgstr ""
+
+#. English reference: Button style:
+msgid "config.toolbar_style_label"
+msgstr ""
+
+#. English reference: Text only (classic)
+msgid "config.toolbar_text"
+msgstr ""
+
+#. English reference: Visible tabs in the navigation bar:
+msgid "config.visible_tabs_label"
+msgstr ""
+
+#. English reference: Postal address
+msgid "detectors.address"
+msgstr ""
+
+#. English reference: Payment card
+msgid "detectors.credit_card"
+msgstr ""
+
+#. English reference: National ID (DNI/NIE)
+msgid "detectors.dni"
+msgstr ""
+
+#. English reference: Domain / host
+msgid "detectors.domain"
+msgstr ""
+
+#. English reference: Email address
+msgid "detectors.email"
+msgstr ""
+
+#. English reference: Generic token
+msgid "detectors.generic"
+msgstr ""
+
+#. English reference: GUID / UUID
+msgid "detectors.guid"
+msgstr ""
+
+#. English reference: IPv4 address
+msgid "detectors.ipv4"
+msgstr ""
+
+#. English reference: IPv6 address
+msgid "detectors.ipv6"
+msgstr ""
+
+#. English reference: First / last name
+msgid "detectors.person_name"
+msgstr ""
+
+#. English reference: Phone number
+msgid "detectors.telephone"
+msgstr ""
+
+#. English reference: User / account
+msgid "detectors.username"
+msgstr ""
+
+#. English reference: Active protection vault
+msgid "footer.active_vault_tooltip"
+msgstr ""
+
+#. English reference: Copy CLI
+msgid "footer.copy_cli"
+msgstr ""
+
+#. English reference: Copy console command
+msgid "footer.copy_cli_tooltip"
+msgstr ""
+
+#. English reference: Detected syntactic format
+msgid "footer.detected_format_tooltip"
+msgstr ""
+
+#. English reference: Last processing performance
+msgid "footer.performance_tooltip"
+msgstr ""
+
+#. English reference: Normal
+msgid "footer.privacy_normal"
+msgstr ""
+
+#. English reference: Protected
+msgid "footer.privacy_protected"
+msgstr ""
+
+#. English reference: Visual privacy mode (blur)
+msgid "footer.privacy_tooltip"
+msgstr ""
+
+#. English reference: Local encryption with no external servers
+msgid "footer.zero_knowledge_tooltip"
+msgstr ""
+
+#. English reference: Help
+msgid "header.help"
+msgstr ""
+
+#. English reference: Contextual help and documentation for active view
+msgid "header.help_tooltip"
+msgstr ""
+
+#. English reference: Settings
+msgid "header.options"
+msgstr ""
+
+#. English reference: General system configuration
+msgid "header.options_tooltip"
+msgstr ""
+
+#. English reference: Dark
+msgid "header.theme_dark"
+msgstr ""
+
+#. English reference: Light
+msgid "header.theme_light"
+msgstr ""
+
+#. English reference: Toggle light or dark theme
+msgid "header.theme_toggle"
+msgstr ""
+
+#. English reference: Default vault
+msgid "header.vault_default"
+msgstr ""
+
+#. English reference: Locked
+msgid "header.vault_locked"
+msgstr ""
+
+#. English reference: Plain vault
+msgid "header.vault_plain"
+msgstr ""
+
+#. English reference: Unlocked
+msgid "header.vault_unlocked"
+msgstr ""
+
+#. English reference: Got it / close
+msgid "help.btn_understood"
+msgstr ""
+
+#. English reference: 1. Protection engine: select the protection level (Full, Technical & network, or Personal data & GDPR), protected copy suffix, and file input method.
+msgid "help.config_b1"
+msgstr ""
+
+#. English reference: 2. Window & system: configure what happens when clicking close [X] or minimize [-], the startup tab, and visible navigation tabs.
+msgid "help.config_b2"
+msgstr ""
+
+#. English reference: 3. Clipboard & alerts: adjust notification style when intercepting text, timed auto-wipe, and the bottom CLI dock.
+msgid "help.config_b3"
+msgstr ""
+
+#. English reference: 4. Appearance, language & security: choose language, visual theme, accent color, font size, button style, and vault inactivity auto-lock.
+msgid "help.config_b4"
+msgstr ""
+
+#. English reference: Configuration & ergonomics
+msgid "help.config_h4"
+msgstr ""
+
+#. English reference: The Settings tab is organized into 4 functional blocks with a top action bar to save, reset, or inspect logs at any time:
+msgid "help.config_p1"
+msgstr ""
+
+#. English reference: All settings are persisted in ~/.lexishield/config.toml.
+msgid "help.config_persist_note"
+msgstr ""
+
+#. English reference: Diagnostics & telemetry logs
+msgid "help.logs_h4"
+msgstr ""
+
+#. English reference: The log console records every event from the native Rust engine (Tauri calls, vault reads/writes, detections, and transformations). You can enable debug mode for verbose traces or filter by level (INFO, WARN, ERROR).
+msgid "help.logs_p1"
+msgstr ""
+
+#. English reference: Token pairs management (1:1 bijectivity)
+msgid "help.pairs_h4"
+msgstr ""
+
+#. English reference: Add pair: lets you preload custom associations (e.g. your name with a protected value of your choice).
+msgid "help.pairs_op1"
+msgstr ""
+
+#. English reference: Quick search & clear: filter by original or protected value and click ✕ to clear the search box instantly.
+msgid "help.pairs_op2"
+msgstr ""
+
+#. English reference: Omit token: if a keyword or technical term should never be replaced, select it and click Omit.
+msgid "help.pairs_op3"
+msgstr ""
+
+#. English reference: Backups (.bak): automatic backups created when modifying pairs can be restored individually from the Vaults table.
+msgid "help.pairs_op4"
+msgstr ""
+
+#. English reference: Main operations:
+msgid "help.pairs_ops_title"
+msgstr ""
+
+#. English reference: Whenever LexiShield detects or replaces a sensitive token, it creates a bijective mapping in the active vault. This guarantees that the same confidential entity always receives the exact same protected value across all your documents.
+msgid "help.pairs_p1"
+msgstr ""
+
+#. English reference: Why does LexiShield require a password for its vaults?
+msgid "help.pwd_h4"
+msgstr ""
+
+#. English reference: LexiShield was engineered to protect enterprise-grade secrets and highly confidential personal data. A password is mandatory for three non-negotiable architectural reasons:
+msgid "help.pwd_p1"
+msgstr ""
+
+#. English reference: Fundamental principle: Zero-Knowledge architecture
+msgid "help.pwd_principle"
+msgstr ""
+
+#. English reference: Immunity to physical or forensic attacks: if someone accesses your hard drive, without the master password it is mathematically impossible to reconstruct the link between protected values and real secrets.
+msgid "help.pwd_r1"
+msgstr ""
+
+#. English reference: Argon2id + ChaCha20-Poly1305 cryptography: the decryption key is never stored in any file; it is derived via memory-hard Argon2id parameters to neutralize GPU and ASIC brute-force attacks.
+msgid "help.pwd_r2"
+msgstr ""
+
+#. English reference: Strict per-project or per-client isolation: by assigning different passwords to different vaults (.lexi), you guarantee an impenetrable cryptographic wall for each client or environment.
+msgid "help.pwd_r3"
+msgstr ""
+
+#. English reference: Audit current text without modifying it
+msgid "help.sc_audit_text"
+msgstr ""
+
+#. English reference: Clear both panels (saving snapshot to history)
+msgid "help.sc_clear_panels"
+msgstr ""
+
+#. English reference: Close active dialogs and modals
+msgid "help.sc_close_modals"
+msgstr ""
+
+#. English reference: Copy resulting text to clipboard
+msgid "help.sc_copy_result"
+msgstr ""
+
+#. English reference: Open help manual and quick shortcuts
+msgid "help.sc_open_help"
+msgstr ""
+
+#. English reference: Protect or restore data (based on active direction)
+msgid "help.sc_protect_restore"
+msgstr ""
+
+#. English reference: Toggle direction (Protect ⇄ Restore)
+msgid "help.sc_toggle_dir"
+msgstr ""
+
+#. English reference: Quick keyboard shortcuts
+msgid "help.shortcuts_h4"
+msgstr ""
+
+#. English reference: Operate the entire protection and navigation workflow without taking your hands off the keyboard.
+msgid "help.shortcuts_subtitle"
+msgstr ""
+
+#. English reference: When dragging or scanning files and folders, the pre-inspection screen opens automatically. LexiShield classifies tokens by Network, Identity, Systems, or Keys, letting you omit false positives before saving them to your vault.
+msgid "help.studio_audit_desc"
+msgstr ""
+
+#. English reference: Token pre-inspection:
+msgid "help.studio_audit_title"
+msgstr ""
+
+#. English reference: How to protect text for AI prompts or data sharing
+msgid "help.studio_h4"
+msgstr ""
+
+#. English reference: View shortcuts ➔
+msgid "help.studio_kbd_btn"
+msgstr ""
+
+#. English reference: Prefer working with the keyboard? Check out the full quick shortcuts reference.
+msgid "help.studio_kbd_prompt"
+msgstr ""
+
+#. English reference: The main goal of the Transform view is to let you safely interact with language models (such as ChatGPT, Claude, Gemini, or local AIs) or share documents without exposing confidential information (client names, IDs, IBANs, passwords, IP addresses, or payment cards).
+msgid "help.studio_p1"
+msgstr ""
+
+#. English reference: If you enable saving to Markdown with Pandoc, LexiShield converts structured documents (.docx, .html, .rst) into native Markdown (.md), preserving headings, lists, and tables for optimal AI token efficiency.
+msgid "help.studio_pandoc_desc"
+msgstr ""
+
+#. English reference: Markdown conversion with Pandoc:
+msgid "help.studio_pandoc_title"
+msgstr ""
+
+#. English reference: Paste content into the Clear text panel (or drag and drop a file or folder directly onto it).
+msgid "help.studio_wf1"
+msgstr ""
+
+#. English reference: Auto detection: the engine automatically identifies the syntactic structure (JSON, XML, logs, or plain text) with zero configuration.
+msgid "help.studio_wf2"
+msgstr ""
+
+#. English reference: Click Protect: the central directional button replaces every confidential item with a consistent protected value.
+msgid "help.studio_wf3"
+msgstr ""
+
+#. English reference: Reactive Markdown mode: clicking the Markdown switch in the top bar automatically protects the original text and shows a formatted preview in both panels.
+msgid "help.studio_wf4"
+msgstr ""
+
+#. English reference: Use the text with AI: copy the Protected text and send it with complete peace of mind to any AI model or third party.
+msgid "help.studio_wf5"
+msgstr ""
+
+#. English reference: Restore the AI response: when the AI replies citing protected values, paste its reply into Protected text and click Restore to recover 100% of the real values.
+msgid "help.studio_wf6"
+msgstr ""
+
+#. English reference: Recommended workflow:
+msgid "help.studio_workflow_title"
+msgstr ""
+
+#. English reference: Key concepts, security recommendations, and workflows.
+msgid "help.subtitle"
+msgstr ""
+
+#. English reference: Keyboard shortcuts
+msgid "help.tab_shortcuts"
+msgstr ""
+
+#. English reference: LexiShield manual & contextual help
+msgid "help.title"
+msgstr ""
+
+#. English reference: The Full backup button packages all your settings and vaults into a single Bzip2-compressed archive (optionally encrypted with AES-256). With Restore backup you can recover any backup archive (.tar.bz2 or .lexibak) completely.
+msgid "help.vaults_backup_desc"
+msgstr ""
+
+#. English reference: LexiShield backup and restore:
+msgid "help.vaults_backup_title"
+msgstr ""
+
+#. English reference: Lexi vaults management and backups
+msgid "help.vaults_h4"
+msgstr ""
+
+#. English reference: Vaults (.lexi) are hermetic binary files where your tokens and mappings reside. You can create multiple vaults to separate clients, projects, or personal environments.
+msgid "help.vaults_p1"
+msgstr ""
+
+#. English reference: Top bar control: click Monitor to start listening and Stop to pause it.
+msgid "help.watch_feat1"
+msgstr ""
+
+#. English reference: Transparent notification: when copying text with no secrets, it reports 0 tokens recognized so you know the text was left untouched.
+msgid "help.watch_feat2"
+msgstr ""
+
+#. English reference: Immediate preview: history shows in real time both the captured text and the transformed result placed in the clipboard.
+msgid "help.watch_feat3"
+msgstr ""
+
+#. English reference: Secure wipe: click Clear clipboard in the top bar or schedule automatic wiping after N seconds in Settings.
+msgid "help.watch_feat4"
+msgstr ""
+
+#. English reference: Ergonomics and security features:
+msgid "help.watch_features_title"
+msgstr ""
+
+#. English reference: Active clipboard monitoring (sentinel mode)
+msgid "help.watch_h4"
+msgstr ""
+
+#. English reference: Sentinel mode turns LexiShield into a silent guardian of your clipboard. While you work, whenever you copy confidential text, the system automatically transforms it without needing to switch windows.
+msgid "help.watch_p1"
+msgstr ""
+
+#. English reference: Auto detection (recommended)
+msgid "modals.add_pair_cat_auto"
+msgstr ""
+
+#. English reference: Personal identity (username, name, phone, address, ID)
+msgid "modals.add_pair_cat_identity"
+msgstr ""
+
+#. English reference: Detection category:
+msgid "modals.add_pair_cat_label"
+msgstr ""
+
+#. English reference: Network & systems (IPv4/v6 address, email, domain, UUID)
+msgid "modals.add_pair_cat_network"
+msgstr ""
+
+#. English reference: Confirmed
+msgid "modals.add_pair_confirmed"
+msgstr ""
+
+#. English reference: Correct
+msgid "modals.add_pair_correct_btn"
+msgstr ""
+
+#. English reference: Confirm that the detected type is correct to reinforce learning
+msgid "modals.add_pair_correct_tooltip"
+msgstr ""
+
+#. English reference: Detected:
+msgid "modals.add_pair_detected"
+msgstr ""
+
+#. English reference: Learned
+msgid "modals.add_pair_learned_badge"
+msgstr ""
+
+#. English reference: Recognized from your previous learning
+msgid "modals.add_pair_learned_tooltip"
+msgstr ""
+
+#. English reference: View and share learned patterns without real data
+msgid "modals.add_pair_learning_tooltip"
+msgstr ""
+
+#. English reference: Confidential original value:
+msgid "modals.add_pair_orig_label"
+msgstr ""
+
+#. English reference: e.g.: John Doe, CORP\jdoe, 742 Oak Avenue, +1 555 234 5678, 192.168.1.10
+msgid "modals.add_pair_orig_placeholder"
+msgstr ""
+
+#. English reference: Correct...
+msgid "modals.add_pair_override_label"
+msgstr ""
+
+#. English reference: If auto-detection missed, choose the exact type to fix it and learn
+msgid "modals.add_pair_override_tooltip"
+msgstr ""
+
+#. English reference: Protected value in English / safe format (or '=' to omit):
+msgid "modals.add_pair_pseudo_label"
+msgstr ""
+
+#. English reference: e.g.: Oliver Carter, CONTOSO\jdoe, 742 Oak Avenue or 10.24.81.12
+msgid "modals.add_pair_pseudo_placeholder"
+msgstr ""
+
+#. English reference: Regenerate
+msgid "modals.add_pair_regenerate"
+msgstr ""
+
+#. English reference: Generate another unique protected value that does not collide with the vault
+msgid "modals.add_pair_regenerate_tooltip"
+msgstr ""
+
+#. English reference: Save pair
+msgid "modals.add_pair_save_btn"
+msgstr ""
+
+#. English reference: Add replacement pair
+msgid "modals.add_pair_title"
+msgstr ""
+
+#. English reference: Create backup
+msgid "modals.backup_btn"
+msgstr ""
+
+#. English reference: Packages settings, custom rules, and all vaults into a single Bzip2-compressed archive.
+msgid "modals.backup_desc"
+msgstr ""
+
+#. English reference: AES-256 encryption password (optional):
+msgid "modals.backup_pwd_label"
+msgstr ""
+
+#. English reference: Password to protect the backup...
+msgid "modals.backup_pwd_placeholder"
+msgstr ""
+
+#. English reference: LexiShield full backup
+msgid "modals.backup_title"
+msgstr ""
+
+#. English reference: Clipboard protected
+msgid "modals.clip_toast_protected"
+msgstr ""
+
+#. English reference: Clipboard restored
+msgid "modals.clip_toast_restored"
+msgstr ""
+
+#. English reference: Create vault
+msgid "modals.create_vault_btn"
+msgstr ""
+
+#. English reference: Vault name (.lexi):
+msgid "modals.create_vault_name_label"
+msgstr ""
+
+#. English reference: e.g.: clients_2026.lexi
+msgid "modals.create_vault_name_placeholder"
+msgstr ""
+
+#. English reference: Enter encryption password...
+msgid "modals.create_vault_pwd_placeholder"
+msgstr ""
+
+#. English reference: Create new Lexi vault
+msgid "modals.create_vault_title"
+msgstr ""
+
+#. English reference: Drop here to protect
+msgid "modals.drag_clear_badge"
+msgstr ""
+
+#. English reference: Confidential data (IPs, emails, names, keys) will be replaced with safe protected values. Supports single files or entire folders.
+msgid "modals.drag_clear_desc"
+msgstr ""
+
+#. English reference: Clear text panel
+msgid "modals.drag_clear_title"
+msgstr ""
+
+#. English reference: Drop here to restore
+msgid "modals.drag_prot_badge"
+msgstr ""
+
+#. English reference: Original real values will be restored from protected values using your local mapping vault.
+msgid "modals.drag_prot_desc"
+msgstr ""
+
+#. English reference: Protected text panel
+msgid "modals.drag_prot_title"
+msgstr ""
+
+#. English reference: LexiShield will audit confidential tokens without modifying original files on disk.
+msgid "modals.drag_scan_desc"
+msgstr ""
+
+#. English reference: Drop your file or folder here to scan
+msgid "modals.drag_scan_title"
+msgstr ""
+
+#. English reference: Forces a full re-scan of all files in the directory without using previous caches.
+msgid "modals.drop_clean_cache_desc"
+msgstr ""
+
+#. English reference: Clear session caches
+msgid "modals.drop_clean_cache_title"
+msgstr ""
+
+#. English reference: Keeps the original file intact and generates a processed copy.
+msgid "modals.drop_copy_mode_desc"
+msgstr ""
+
+#. English reference: Save as a suffixed copy
+msgid "modals.drop_copy_mode_title"
+msgstr ""
+
+#. English reference: You dropped an item onto Clear text. Confidential tokens will be protected by replacing them with safe protected values.
+msgid "modals.drop_desc_protect"
+msgstr ""
+
+#. English reference: You dropped an item onto Protected text. Original data will be restored using your local mapping vault.
+msgid "modals.drop_desc_restore"
+msgstr ""
+
+#. English reference: Expand to clear text cell by cell
+msgid "modals.drop_encoded_expand"
+msgstr ""
+
+#. English reference: Readable encoded payloads (Base64 / Hex / URL):
+msgid "modals.drop_encoded_label"
+msgstr ""
+
+#. English reference: Do not process encoded blocks
+msgid "modals.drop_encoded_off"
+msgstr ""
+
+#. English reference: Protect inner content and re-encode (default)
+msgid "modals.drop_encoded_protect_reencode"
+msgstr ""
+
+#. English reference: Restore inner content and keep encoded (default)
+msgid "modals.drop_encoded_restore_reencode"
+msgstr ""
+
+#. English reference: file
+msgid "modals.drop_file"
+msgstr ""
+
+#. English reference: folder
+msgid "modals.drop_folder"
+msgstr ""
+
+#. English reference: Automatically converts processed Office documents to Markdown format using Pandoc.
+msgid "modals.drop_markdown_desc"
+msgstr ""
+
+#. English reference: Save as Markdown (.md)
+msgid "modals.drop_markdown_title"
+msgstr ""
+
+#. English reference: The original file will be modified directly in its current location.
+msgid "modals.drop_overwrite_warn"
+msgstr ""
+
+#. English reference: Preview:
+msgid "modals.drop_preview_label"
+msgstr ""
+
+#. English reference: Protect
+msgid "modals.drop_protect"
+msgstr ""
+
+#. English reference: Generates a safe protected name for the output file while keeping its original extension intact.
+msgid "modals.drop_protect_filename_desc"
+msgstr ""
+
+#. English reference: Also protect the file name
+msgid "modals.drop_protect_filename_title"
+msgstr ""
+
+#. English reference: Remember this suffix as default in my settings
+msgid "modals.drop_remember_suffix"
+msgstr ""
+
+#. English reference: Restore
+msgid "modals.drop_restore"
+msgstr ""
+
+#. English reference: File suffix:
+msgid "modals.drop_suffix_label"
+msgstr ""
+
+#. English reference: Encryption password (mandatory):
+msgid "modals.enc_pwd_required_label"
+msgstr ""
+
+#. English reference: Pre-clear snapshot
+msgid "modals.history_badge_cleared"
+msgstr ""
+
+#. English reference: Protected
+msgid "modals.history_badge_protected"
+msgstr ""
+
+#. English reference: Restored
+msgid "modals.history_badge_restored"
+msgstr ""
+
+#. English reference: Clear history
+msgid "modals.history_clear_btn"
+msgstr ""
+
+#. English reference: Whenever you click Protect, Restore, or Clear all, an instant snapshot is saved here so you never lose your work.
+msgid "modals.history_empty_desc"
+msgstr ""
+
+#. English reference: No transformations in this session yet
+msgid "modals.history_empty_title"
+msgstr ""
+
+#. English reference: Load into editors
+msgid "modals.history_load_btn"
+msgstr ""
+
+#. English reference: Load these texts directly into the Transform panels
+msgid "modals.history_load_tooltip"
+msgstr ""
+
+#. English reference: In-memory RAM · Zero-Knowledge
+msgid "modals.history_ram_badge"
+msgstr ""
+
+#. English reference: Recover any text protected, restored, or cleared during the active session.
+msgid "modals.history_subtitle"
+msgstr ""
+
+#. English reference: Temporary session history
+msgid "modals.history_title"
+msgstr ""
+
+#. English reference: active domains
+msgid "modals.ignored_active_count"
+msgstr ""
+
+#. English reference: Add domain or URL (e.g. api.github.com, www.owasp.org)...
+msgid "modals.ignored_add_placeholder"
+msgstr ""
+
+#. English reference: No excluded domains. Add one above.
+msgid "modals.ignored_empty"
+msgstr ""
+
+#. English reference: No matching domains found.
+msgid "modals.ignored_no_matches"
+msgstr ""
+
+#. English reference: Remove from exclusion list
+msgid "modals.ignored_remove_tooltip"
+msgstr ""
+
+#. English reference: Reset defaults
+msgid "modals.ignored_reset_btn"
+msgstr ""
+
+#. English reference: Reset to recommended standards and cybersecurity list
+msgid "modals.ignored_reset_tooltip"
+msgstr ""
+
+#. English reference: Search list...
+msgid "modals.ignored_search_placeholder"
+msgstr ""
+
+#. English reference: These sites and FQDNs will never be modified during protection. Saved in ~/.lexishield/ignored_domains.txt.
+msgid "modals.ignored_subtitle"
+msgstr ""
+
+#. English reference: URLs and domains excluded from protection
+msgid "modals.ignored_title"
+msgstr ""
+
+#. English reference: Initialize & encrypt vault
+msgid "modals.init_btn"
+msgstr ""
+
+#. English reference: The vault will be strongly encrypted with Argon2id + ChaCha20-Poly1305.
+msgid "modals.init_crypto_note"
+msgstr ""
+
+#. English reference: Enter password to encrypt the vault...
+msgid "modals.init_pwd_placeholder"
+msgstr ""
+
+#. English reference: Protect your new vault with a strong password.
+msgid "modals.init_subtitle"
+msgstr ""
+
+#. English reference: Initialize primary vault
+msgid "modals.init_title"
+msgstr ""
+
+#. English reference: Count
+msgid "modals.learning_col_count"
+msgstr ""
+
+#. English reference: Inc.
+msgid "modals.learning_col_inc"
+msgstr ""
+
+#. English reference: Predicted ➔ Confirmed
+msgid "modals.learning_col_pred_conf"
+msgstr ""
+
+#. English reference: Remove
+msgid "modals.learning_col_remove"
+msgstr ""
+
+#. English reference: Masked skeleton
+msgid "modals.learning_col_skeleton"
+msgstr ""
+
+#. English reference: Copy JSON
+msgid "modals.learning_copy_json"
+msgstr ""
+
+#. English reference: Delete this local pattern
+msgid "modals.learning_delete_tooltip"
+msgstr ""
+
+#. English reference: When you add a pair in the Pairs tab and click Correct or override the type, LexiShield learns the structure here.
+msgid "modals.learning_empty_desc"
+msgstr ""
+
+#. English reference: No learned patterns recorded yet
+msgid "modals.learning_empty_title"
+msgstr ""
+
+#. English reference: Local file on this system:
+msgid "modals.learning_local_file"
+msgstr ""
+
+#. English reference: Original texts or local paths are never stored in exported content. Each sample is transformed into a morphological skeleton (A = uppercase, a = lowercase, 9 = digit). Nothing is sent in the background: clicking Submit to GitHub opens your browser with a pre-filled Issue so you decide whether to publish it.
+msgid "modals.learning_privacy_desc"
+msgstr ""
+
+#. English reference: Zero-Knowledge privacy guarantee:
+msgid "modals.learning_privacy_title"
+msgstr ""
+
+#. English reference: Reset all learning
+msgid "modals.learning_reset_all"
+msgstr ""
+
+#. English reference: Save .json
+msgid "modals.learning_save_json"
+msgstr ""
+
+#. English reference: 1. Select which patterns to include
+msgid "modals.learning_step1"
+msgstr ""
+
+#. English reference: 2. Literal preview of the exact JSON to be submitted or exported:
+msgid "modals.learning_step2"
+msgstr ""
+
+#. English reference: Submit to GitHub (pre-filled Issue)
+msgid "modals.learning_submit_github"
+msgstr ""
+
+#. English reference: Opens https://github.com/olorinj/lexishield/issues/new in your browser with this pre-filled JSON
+msgid "modals.learning_submit_tooltip"
+msgstr ""
+
+#. English reference: Review the exact masked patterns to be shared before submitting them to github.com/olorinj/lexishield.
+msgid "modals.learning_subtitle"
+msgstr ""
+
+#. English reference: Detector learning review & submission (Zero-PII)
+msgid "modals.learning_title"
+msgstr ""
+
+#. English reference: Debug mode: inactive
+msgid "modals.logs_debug_off"
+msgstr ""
+
+#. English reference: Debug mode: active
+msgid "modals.logs_debug_on"
+msgstr ""
+
+#. English reference: No debug logs captured.
+msgid "modals.logs_empty"
+msgstr ""
+
+#. English reference: View help on logs and diagnostics
+msgid "modals.logs_help_tooltip"
+msgstr ""
+
+#. English reference: All
+msgid "modals.logs_level_all"
+msgstr ""
+
+#. English reference: Level:
+msgid "modals.logs_level_label"
+msgstr ""
+
+#. English reference: Search traces...
+msgid "modals.logs_search_placeholder"
+msgstr ""
+
+#. English reference: Deep telemetry from the protection engine and Tauri calls.
+msgid "modals.logs_subtitle"
+msgstr ""
+
+#. English reference: Real-time debug logs
+msgid "modals.logs_title"
+msgstr ""
+
+#. English reference: Path:
+msgid "modals.path_label"
+msgstr ""
+
+#. English reference: copies inside folder
+msgid "modals.preview_dir_copies"
+msgstr ""
+
+#. English reference: original directory in-place
+msgid "modals.preview_dir_in_place"
+msgstr ""
+
+#. English reference: overwrite original file
+msgid "modals.preview_file_overwrite"
+msgstr ""
+
+#. English reference: New name:
+msgid "modals.rename_vault_label"
+msgstr ""
+
+#. English reference: Rename vault
+msgid "modals.rename_vault_title"
+msgstr ""
+
+#. English reference: View protected tokens
+msgid "modals.result_view_protected_tokens"
+msgstr ""
+
+#. English reference: Unlock vault
+msgid "modals.unlock_btn"
+msgstr ""
+
+#. English reference: Unlock password:
+msgid "modals.unlock_pwd_label"
+msgstr ""
+
+#. English reference: Enter password...
+msgid "modals.unlock_pwd_placeholder"
+msgstr ""
+
+#. English reference: A password is required to decrypt mappings.
+msgid "modals.unlock_subtitle"
+msgstr ""
+
+#. English reference: Encrypted vault detected
+msgid "modals.unlock_title"
+msgstr ""
+
+#. English reference: Add pair
 msgid "pairs.btn_add_pair"
 msgstr ""
 
+#. English reference: Add a new replacement pair to the vault
+msgid "pairs.btn_add_pair_tooltip"
+msgstr ""
+
+#. English reference: Delete
 msgid "pairs.btn_delete_selected"
 msgstr ""
 
+#. English reference: Permanently delete selected pairs
+msgid "pairs.btn_delete_selected_tooltip"
+msgstr ""
+
+#. English reference: Export CSV
 msgid "pairs.btn_export_csv"
 msgstr ""
 
+#. English reference: Ignore
+msgid "pairs.btn_ignore"
+msgstr ""
+
+#. English reference: Import CSV
 msgid "pairs.btn_import_csv"
 msgstr ""
 
+#. English reference: Omit
+msgid "pairs.btn_omit_selected"
+msgstr ""
+
+#. English reference: Set selected items as ignored or omitted
+msgid "pairs.btn_omit_selected_tooltip"
+msgstr ""
+
+#. English reference: Re-enable
+msgid "pairs.btn_reactivate_selected"
+msgstr ""
+
+#. English reference: Re-enable protection for selected items
+msgid "pairs.btn_reactivate_selected_tooltip"
+msgstr ""
+
+#. English reference: Clear filter
+msgid "pairs.clear_filter_tooltip"
+msgstr ""
+
+#. English reference: Actions
 msgid "pairs.col_actions"
 msgstr ""
 
+#. English reference: Omitted
 msgid "pairs.col_omitted"
 msgstr ""
 
+#. English reference: Confidential original value
 msgid "pairs.col_original"
 msgstr ""
 
+#. English reference: Protected value
 msgid "pairs.col_protected"
 msgstr ""
 
+#. English reference: Sel.
+msgid "pairs.col_sel"
+msgstr ""
+
+#. English reference: Type / status
 msgid "pairs.col_type"
 msgstr ""
 
+#. English reference: Delete this pair
+msgid "pairs.delete_tooltip"
+msgstr ""
+
+#. English reference: Deselect all
+msgid "pairs.deselect_all"
+msgstr ""
+
+#. English reference: Deselect all checked pairs
+msgid "pairs.deselect_all_tooltip"
+msgstr ""
+
+#. English reference: Edit protected value
+msgid "pairs.edit_tooltip"
+msgstr ""
+
+#. English reference: All entity types
 msgid "pairs.filter_all"
 msgstr ""
 
+#. English reference: Learning
+msgid "pairs.learning_btn"
+msgstr ""
+
+#. English reference: Review learned structural patterns (Zero-PII) and submit proposals to GitHub
+msgid "pairs.learning_tooltip"
+msgstr ""
+
+#. English reference: No mappings in this vault
 msgid "pairs.no_pairs"
 msgstr ""
 
+#. English reference: (Omitted: kept unchanged)
+msgid "pairs.omitted_note"
+msgstr ""
+
+#. English reference: Filter by original or protected value...
 msgid "pairs.search_placeholder"
 msgstr ""
 
+#. English reference: Select all
+msgid "pairs.select_all"
+msgstr ""
+
+#. English reference: Select all visible pairs
+msgid "pairs.select_all_tooltip"
+msgstr ""
+
+#. English reference: Ignored
+msgid "pairs.status_ignored"
+msgstr ""
+
+#. English reference: Manage, edit, or add confidential token mappings and their substitutes in the active vault.
+msgid "pairs.subtitle"
+msgstr ""
+
+#. English reference: Each pair links a confidential token (name, ID, IBAN, email, or secret) with its generated protected value. You can add manual pairs or edit existing ones. Every change syncs immediately with the encrypted vault file.
+msgid "pairs.tip_desc"
+msgstr ""
+
+#. English reference: Token pairs management
+msgid "pairs.tip_title"
+msgstr ""
+
+#. English reference: Token pairs
 msgid "pairs.title"
 msgstr ""
 
-#. Main studio view
+#. English reference: 🚫 All entities marked to omit (will not be protected).
+msgid "status.all_marked_omit"
+msgstr ""
+
+#. English reference: 🛡️ All entities re-enabled for protection.
+msgid "status.all_reactivated_protect"
+msgstr ""
+
+#. English reference: Audit reset. Returning to Transform view.
+msgid "status.audit_reset"
+msgstr ""
+
+#. English reference: 📄 Auto-copy to clipboard disabled.
+msgid "status.autocopy_off"
+msgstr ""
+
+#. English reference: 📋 Auto-copy to clipboard enabled.
+msgid "status.autocopy_on"
+msgstr ""
+
+#. English reference: Error creating backup:
+msgid "status.backup_create_error"
+msgstr ""
+
+#. English reference: Enter password to decrypt the backup archive:
+msgid "status.backup_pwd_prompt"
+msgstr ""
+
+#. English reference: ⚠️ Restore backup archive? Settings and vaults with the same name will be overwritten.
+msgid "status.backup_restore_confirm"
+msgstr ""
+
+#. English reference: Error restoring backup:
+msgid "status.backup_restore_error"
+msgstr ""
+
+#. English reference: ✅ Backup restored successfully
+msgid "status.backup_restored_ok"
+msgstr ""
+
+#. English reference: 📦 Bzip2 backup saved successfully to:
+msgid "status.backup_saved_ok"
+msgstr ""
+
+#. English reference: blocks
+msgid "status.blocks_unit"
+msgstr ""
+
+#. English reference: Could not open browser automatically. You can use Copy JSON or Save .json:
+msgid "status.browser_open_error"
+msgstr ""
+
+#. English reference: Cancelling scan...
+msgid "status.cancelling_scan"
+msgstr ""
+
+#. English reference: 📋 CLI command copied to clipboard.
+msgid "status.cli_copied"
+msgstr ""
+
+#. English reference: Clipboard protected
+msgid "status.clip_protected_toast"
+msgstr ""
+
+#. English reference: Clipboard restored
+msgid "status.clip_restored_toast"
+msgstr ""
+
+#. English reference: Clipboard verified: 0 tokens recognized
+msgid "status.clip_verified_zero"
+msgstr ""
+
+#. English reference: Error clearing clipboard:
+msgid "status.clipboard_clear_error"
+msgstr ""
+
+#. English reference: 🧹 System clipboard cleared successfully.
+msgid "status.clipboard_cleared_ok"
+msgstr ""
+
+#. English reference: Reset ~/.lexishield/config.toml to default values?
+msgid "status.config_reset_confirm"
+msgstr ""
+
+#. English reference: ✅ Settings restored to default values.
+msgid "status.config_reset_ok"
+msgstr ""
+
+#. English reference: ❌ Error saving settings:
+msgid "status.config_save_error"
+msgstr ""
+
+#. English reference: ✅ Settings saved to ~/.lexishield/config.toml
+msgid "status.config_saved"
+msgstr ""
+
+#. English reference: 📋 Copied to clipboard.
+msgid "status.copied"
+msgstr ""
+
+#. English reference:  · Copied to clipboard! 📋
+msgid "status.copied_Clipboard_suffix"
+msgstr ""
+
+#. English reference: 📋 Restored text copied to clipboard.
+msgid "status.copied_restored"
+msgstr ""
+
+#. English reference: ❌ Copy error:
+msgid "status.copy_error"
+msgstr ""
+
+#. English reference: ✅ Data protected and copied to clipboard:
+msgid "status.data_protected_copied"
+msgstr ""
+
+#. English reference: ✅ Data protected successfully:
+msgid "status.data_protected_ok"
+msgstr ""
+
+#. English reference: ✅ Data restored and copied to clipboard:
+msgid "status.data_restored_copied"
+msgstr ""
+
+#. English reference: ✅ Data restored successfully:
+msgid "status.data_restored_ok"
+msgstr ""
+
+#. English reference: ℹ️ Debug mode disabled.
+msgid "status.debug_disabled"
+msgstr ""
+
+#. English reference: 🐞 Debug mode enabled.
+msgid "status.debug_enabled"
+msgstr ""
+
+#. English reference: Error opening folder:
+msgid "status.dir_open_error"
+msgstr ""
+
+#. English reference: Directory traversal completed successfully. You can review or toggle tokens in the table below.
+msgid "status.dir_scan_done_msg"
+msgstr ""
+
+#. English reference: Directory scan completed
+msgid "status.dir_scan_done_title"
+msgstr ""
+
+#. English reference: Error scanning folder:
+msgid "status.dir_scan_error"
+msgstr ""
+
+#. English reference: Starting traversal...
+msgid "status.dir_scan_starting"
+msgstr ""
+
+#. English reference: Scanning folder:
+msgid "status.dir_scanning"
+msgstr ""
+
+#. English reference: Active direction: protect (clear text ➔ protected text).
+msgid "status.direction_protect"
+msgstr ""
+
+#. English reference: Active direction: restore (protected text ➔ clear text).
+msgid "status.direction_restore"
+msgstr ""
+
+#. English reference: Domain(s) added. Click Save changes to persist.
+msgid "status.domains_added"
+msgstr ""
+
+#. English reference: Exclusion list reset to recommended cybersecurity domains. Click Save changes.
+msgid "status.domains_reset"
+msgstr ""
+
+#. English reference: ❌ Error saving domains list:
+msgid "status.domains_save_error"
+msgstr ""
+
+#. English reference: ✅ Excluded URLs and domains list saved
+msgid "status.domains_saved"
+msgstr ""
+
+#. English reference: Error processing dropped item:
+msgid "status.dropped_item_error"
+msgstr ""
+
+#. English reference: Please enter or paste text in the panels to audit.
+msgid "status.enter_audit_text_prompt"
+msgstr ""
+
+#. English reference: Please enter text in the Clear text panel to protect.
+msgid "status.enter_clear_text_prompt"
+msgstr ""
+
+#. English reference: Please enter text in the Protected text panel to restore.
+msgid "status.enter_prot_text_prompt"
+msgstr ""
+
+#. English reference: 💾 Entities saved and merged into vault:
+msgid "status.entities_saved_vault"
+msgstr ""
+
+#. English reference: Error opening file:
+msgid "status.file_open_error"
+msgstr ""
+
+#. English reference: Error processing file:
+msgid "status.file_process_error"
+msgstr ""
+
+#. English reference: The file has been processed and saved with confidential tokens protected.
+msgid "status.file_protected_msg"
+msgstr ""
+
+#. English reference: File protected successfully
+msgid "status.file_protected_title"
+msgstr ""
+
+#. English reference: The file has been restored by reconstructing original data through your local vault.
+msgid "status.file_restored_msg"
+msgstr ""
+
+#. English reference: File restored successfully
+msgid "status.file_restored_title"
+msgstr ""
+
+#. English reference: File analysis finished successfully without modifying its original content.
+msgid "status.file_scan_done_msg"
+msgstr ""
+
+#. English reference: File scan completed
+msgid "status.file_scan_done_title"
+msgstr ""
+
+#. English reference: Error scanning file:
+msgid "status.file_scan_error"
+msgstr ""
+
+#. English reference: 🚀 Opening pre-filled GitHub Issue with the exact reviewed JSON.
+msgid "status.github_opening_direct"
+msgstr ""
+
+#. English reference: 🚀 Opening GitHub Issues (full JSON copied to clipboard ready to paste with Ctrl+V).
+msgid "status.github_opening_fallback"
+msgstr ""
+
+#. English reference: group(s)
+msgid "status.groups_unit"
+msgstr ""
+
+#. English reference: Temporary session history cleared.
+msgid "status.history_cleared"
+msgstr ""
+
+#. English reference: 🔒 Vault and session automatically locked due to inactivity.
+msgid "status.inactivity_locked"
+msgstr ""
+
+#. English reference: 📄 Item ready to process:
+msgid "status.item_ready_to_process"
+msgstr ""
+
+#. English reference: Confidential tokens
+msgid "status.label_conf_tokens"
+msgstr ""
+
+#. English reference: Directory
+msgid "status.label_directory"
+msgstr ""
+
+#. English reference: Encoded blocks processed
+msgid "status.label_encoded_blocks"
+msgstr ""
+
+#. English reference: Exported to Markdown
+msgid "status.label_exported_md"
+msgstr ""
+
+#. English reference: Inspected file
+msgid "status.label_inspected_file"
+msgstr ""
+
+#. English reference: Omitted false positives
+msgid "status.label_omitted_fp"
+msgstr ""
+
+#. English reference: Saved file
+msgid "status.label_saved_file"
+msgstr ""
+
+#. English reference: Source file
+msgid "status.label_source_file"
+msgstr ""
+
+#. English reference: Elapsed time
+msgid "status.label_time"
+msgstr ""
+
+#. English reference: Clear all locally learned structural patterns?
+msgid "status.learning_clear_confirm"
+msgstr ""
+
+#. English reference: Error deleting learned rule:
+msgid "status.learning_delete_error"
+msgstr ""
+
+#. English reference: Error exporting learning file:
+msgid "status.learning_export_error"
+msgstr ""
+
+#. English reference: 💾 Learning file exported to:
+msgid "status.learning_exported"
+msgstr ""
+
+#. English reference: 📋 Calibration JSON (Zero-PII) copied to clipboard.
+msgid "status.learning_json_copied"
+msgstr ""
+
+#. English reference: 🧹 Local detector learning reset.
+msgid "status.learning_reset_ok"
+msgstr ""
+
+#. English reference: 🧹 Logs cleared.
+msgid "status.logs_cleared"
+msgstr ""
+
+#. English reference: 📋 Logs copied to clipboard.
+msgid "status.logs_copied"
+msgstr ""
+
+#. English reference: mappings
+msgid "status.mappings_unit"
+msgstr ""
+
+#. English reference: Operation cancelled by user due to resource precaution.
+msgid "status.op_cancelled_resources"
+msgstr ""
+
+#. English reference: Error adding pair:
+msgid "status.pair_add_error"
+msgstr ""
+
+#. English reference: ✅ Pair successfully added to vault
+msgid "status.pair_added_ok"
+msgstr ""
+
+#. English reference: Delete the selected mapping?
+msgid "status.pair_delete_confirm"
+msgstr ""
+
+#. English reference: Error deleting pair:
+msgid "status.pair_delete_error"
+msgstr ""
+
+#. English reference: ✅ Mapping deleted:
+msgid "status.pair_deleted_ok"
+msgstr ""
+
+#. English reference: Please enter both the original value and the protected value.
+msgid "status.pair_inputs_required"
+msgstr ""
+
+#. English reference: Error updating pair:
+msgid "status.pair_update_error"
+msgstr ""
+
+#. English reference: ✅ Pair updated.
+msgid "status.pair_updated_ok"
+msgstr ""
+
+#. English reference: Delete selected pairs?
+msgid "status.pairs_batch_delete_confirm"
+msgstr ""
+
+#. English reference: ✅ Selected pairs deleted successfully.
+msgid "status.pairs_batch_deleted_ok"
+msgstr ""
+
+#. English reference: Both panels have been cleared (saved to session history).
+msgid "status.panels_cleared"
+msgstr ""
+
+#. English reference: 🧠 Structural pattern learned with Zero-PII
+msgid "status.pattern_learned_ok"
+msgstr ""
+
+#. English reference: Error protecting data:
+msgid "status.protect_error"
+msgstr ""
+
+#. English reference: Ready. Paste your text or choose a file to process.
+msgid "status.ready"
+msgstr ""
+
+#. English reference: ⚠️ System resource warning:
+msgid "status.resource_warning_confirm"
+msgstr ""
+
+#. English reference: Error restoring data:
+msgid "status.restore_error"
+msgstr ""
+
+#. English reference: 🧹 Session caches cleared before analyzing directory.
+msgid "status.session_cache_cleared"
+msgstr ""
+
+#. English reference: ⏱️ Session restored from
+msgid "status.session_restored"
+msgstr ""
+
+#. English reference: 🔍 Analysis complete: all tokens in the text are already recognized in the active vault.
+msgid "status.text_analyzed_all_known"
+msgstr ""
+
+#. English reference: 🔍 Text analyzed: new confidential tokens detected. Review the table to protect or omit.
+msgid "status.text_analyzed_new"
+msgstr ""
+
+#. English reference: 🔍 Analysis complete: no confidential tokens were identified in the text.
+msgid "status.text_analyzed_none"
+msgstr ""
+
+#. English reference: Error analyzing text:
+msgid "status.text_audit_error"
+msgstr ""
+
+#. English reference: 📋 Text transferred to the Transform editor.
+msgid "status.text_transferred"
+msgstr ""
+
+#. English reference: tokens protected
+msgid "status.tokens_protected_unit"
+msgstr ""
+
+#. English reference: tokens restored
+msgid "status.tokens_restored_unit"
+msgstr ""
+
+#. English reference: Error creating vault:
+msgid "status.vault_create_error"
+msgstr ""
+
+#. English reference: ✅ Vault created and encrypted:
+msgid "status.vault_created_ok"
+msgstr ""
+
+#. English reference: ⚠️ Are you sure you want to permanently delete this vault?
+msgid "status.vault_delete_confirm"
+msgstr ""
+
+#. English reference: Error deleting vault:
+msgid "status.vault_delete_error"
+msgstr ""
+
+#. English reference: ✅ Vault deleted:
+msgid "status.vault_deleted_ok"
+msgstr ""
+
+#. English reference: 🔒 Encrypted vault. Please enter its password:
+msgid "status.vault_encrypted_prompt"
+msgstr ""
+
+#. English reference: Please enter the vault password
+msgid "status.vault_enter_pwd_error"
+msgstr ""
+
+#. English reference: Error exporting:
+msgid "status.vault_export_error"
+msgstr ""
+
+#. English reference: ✅ Vault exported to:
+msgid "status.vault_exported_ok"
+msgstr ""
+
+#. English reference: Error importing:
+msgid "status.vault_import_error"
+msgstr ""
+
+#. English reference: ✅ Vault imported successfully:
+msgid "status.vault_imported_ok"
+msgstr ""
+
+#. English reference: Error initializing vault:
+msgid "status.vault_init_error"
+msgstr ""
+
+#. English reference: ✅ Vault initialized and encrypted successfully:
+msgid "status.vault_initialized"
+msgstr ""
+
+#. English reference: Error loading pairs from vault:
+msgid "status.vault_load_pairs_error"
+msgstr ""
+
+#. English reference: 🔓 Vault loaded:
+msgid "status.vault_loaded"
+msgstr ""
+
+#. English reference: Enter a name for the new vault.
+msgid "status.vault_name_required"
+msgstr ""
+
+#. English reference: ℹ️ Vault does not exist. Set a password to initialize it:
+msgid "status.vault_not_exist"
+msgstr ""
+
+#. English reference: Error opening vault:
+msgid "status.vault_open_error"
+msgstr ""
+
+#. English reference: ⚠️ A password is mandatory to initialize and protect the vault.
+msgid "status.vault_pwd_mandatory_alert"
+msgstr ""
+
+#. English reference: Error renaming:
+msgid "status.vault_rename_error"
+msgstr ""
+
+#. English reference: ✅ Vault renamed:
+msgid "status.vault_renamed_ok"
+msgstr ""
+
+#. English reference: ⚠️ Restore the vault from its latest automatic backup (.bak)? Previous state will be recovered.
+msgid "status.vault_restore_bak_confirm"
+msgstr ""
+
+#. English reference: ✅ Vault restored successfully from its previous backup (.bak):
+msgid "status.vault_restored_bak_ok"
+msgstr ""
+
+#. English reference: Error saving mappings to vault:
+msgid "status.vault_save_mappings_error"
+msgstr ""
+
+#. English reference: 🔓 Clear-text view active with expanded blocks.
+msgid "status.view_clear"
+msgstr ""
+
+#. English reference: 🧩 Clear-text view with merged chunks.
+msgid "status.view_merge"
+msgstr ""
+
+#. English reference: 📦 Encoded view active: clicking Protect will sanitize inner content and re-encode.
+msgid "status.view_reencode"
+msgstr ""
+
+#. English reference: 👀 Clipboard monitoring active (protection).
+msgid "status.watch_started_protect"
+msgstr ""
+
+#. English reference: 👀 Clipboard monitoring active (restoration).
+msgid "status.watch_started_restore"
+msgstr ""
+
+#. English reference: ⏸️ Clipboard monitoring stopped.
+msgid "status.watch_stopped"
+msgstr ""
+
+#. English reference: Auto-copy
+msgid "studio.autocopy_btn"
+msgstr ""
+
+#. English reference: Auto-copy active: copies result on protect or restore
+msgid "studio.autocopy_tooltip_active"
+msgstr ""
+
+#. English reference: Auto-copy inactive: click to enable automatic copying
+msgid "studio.autocopy_tooltip_inactive"
+msgstr ""
+
+#. English reference: Detected as
+msgid "studio.badge_detected_as"
+msgstr ""
+
+#. English reference: Original
+msgid "studio.badge_original_tooltip"
+msgstr ""
+
+#. English reference: Protected token
+msgid "studio.badge_protected_tooltip"
+msgstr ""
+
+#. English reference: Badges
+msgid "studio.badges_btn"
+msgstr ""
+
+#. English reference: Badges active: tokens visually highlighted (click to disable)
+msgid "studio.badges_tooltip_active"
+msgstr ""
+
+#. English reference: Enable badges on confidential tokens
+msgid "studio.badges_tooltip_inactive"
+msgstr ""
+
+#. English reference: Protect
 msgid "studio.btn_anonymize"
 msgstr ""
 
+#. English reference: Clear
 msgid "studio.btn_clear"
 msgstr ""
 
+#. English reference: View clear text
 msgid "studio.btn_clear_text"
 msgstr ""
 
+#. English reference: Copy
 msgid "studio.btn_copy"
 msgstr ""
 
+#. English reference: Restore
 msgid "studio.btn_deanonymize"
 msgstr ""
 
+#. English reference: Protect confidential data (Ctrl+Enter)
+msgid "studio.btn_protect_title"
+msgstr ""
+
+#. English reference: Re-encode
 msgid "studio.btn_reencode"
 msgstr ""
 
+#. English reference: Restore protected data (Ctrl+Enter)
+msgid "studio.btn_restore_title"
+msgstr ""
+
+#. English reference: Clear all
+msgid "studio.clear_all"
+msgstr ""
+
+#. English reference: Clear both panels (Ctrl+Shift+L)
+msgid "studio.clear_all_tooltip"
+msgstr ""
+
+#. English reference: Click to edit text
+msgid "studio.click_to_edit"
+msgstr ""
+
+#. English reference: Dismiss notice
+msgid "studio.close_notice"
+msgstr ""
+
+#. English reference: Copy clear text (Ctrl+Shift+C)
+msgid "studio.copy_clear_tooltip"
+msgstr ""
+
+#. English reference: Copy protected text (Ctrl+Shift+C)
+msgid "studio.copy_protected_tooltip"
+msgstr ""
+
+#. English reference: Analyzing content...
 msgid "studio.detecting"
 msgstr ""
 
+#. English reference: Do not show again
+msgid "studio.dismiss_tip"
+msgstr ""
+
+#. English reference: Clear text
+msgid "studio.encoded_clear"
+msgstr ""
+
+#. English reference: Expand encoded blocks to clear text cell by cell
+msgid "studio.encoded_clear_tooltip"
+msgstr ""
+
+#. English reference: Readable encoded blocks detected (Base64 / Hex / URL)
+msgid "studio.encoded_detected_tooltip"
+msgstr ""
+
+#. English reference: Merge chunks
+msgid "studio.encoded_merge"
+msgstr ""
+
+#. English reference: Sort by index and merge multipart chunks in clear text
+msgid "studio.encoded_merge_tooltip"
+msgstr ""
+
+#. English reference: Encoded
+msgid "studio.encoded_reencode"
+msgstr ""
+
+#. English reference: Keep text encoded: inner content is sanitized and re-encoded
+msgid "studio.encoded_reencode_tooltip"
+msgstr ""
+
+#. English reference: Load file
 msgid "studio.file_open"
 msgstr ""
 
+#. English reference: Save as
 msgid "studio.file_save"
 msgstr ""
 
+#. English reference: Auto detect
 msgid "studio.format_auto"
 msgstr ""
 
+#. English reference: PLAIN TEXT
+msgid "studio.format_plain"
+msgstr ""
+
+#. English reference: History
+msgid "studio.history_btn"
+msgstr ""
+
+#. English reference: View temporary in-memory session history
+msgid "studio.history_tooltip"
+msgstr ""
+
+#. English reference: Paste text into Clear text to protect it before sending to AI, or drag any file or folder over it. When you receive the AI response, paste it into Protected text and click Restore to recover the original values.
+msgid "studio.how_to_text"
+msgstr ""
+
+#. English reference: How to use Transform?
+msgid "studio.how_to_title"
+msgstr ""
+
+#. English reference: Paste clear text here, or drag and drop a file or folder to protect...
 msgid "studio.input_placeholder"
 msgstr ""
 
+#. English reference: Merge chunks
 msgid "studio.merge_chunks"
 msgstr ""
 
+#. English reference: No content to preview.
+msgid "studio.no_markdown_preview"
+msgstr ""
+
+#. English reference: Paste the protected AI response here, or drag and drop a file to restore...
 msgid "studio.output_placeholder"
 msgstr ""
 
+#. English reference: Clear text
+msgid "studio.panel_clear"
+msgstr ""
+
+#. English reference: Protected text
+msgid "studio.panel_protected"
+msgstr ""
+
+#. English reference: Privacy
+msgid "studio.privacy_active"
+msgstr ""
+
+#. English reference: Public
+msgid "studio.privacy_inactive"
+msgstr ""
+
+#. English reference: Privacy mode active: original values blurred
+msgid "studio.privacy_tooltip_active"
+msgstr ""
+
+#. English reference: Enable privacy mode (blur data for screen sharing)
+msgid "studio.privacy_tooltip_inactive"
+msgstr ""
+
+#. English reference: Quick samples
 msgid "studio.quick_samples"
 msgstr ""
 
+#. English reference: View details
+msgid "studio.see_details"
+msgstr ""
+
+#. English reference: Preserved entropy
 msgid "studio.stats_entropy"
 msgstr ""
 
+#. English reference: Protected tokens
 msgid "studio.stats_tokens"
 msgstr ""
 
+#. English reference: Anonymization studio
 msgid "studio.title"
 msgstr ""
 
-#. Top-level application tabs
+#. English reference: ch
+msgid "studio.unit_chars"
+msgstr ""
+
+#. English reference: ln
+msgid "studio.unit_lines"
+msgstr ""
+
+#. English reference: Editor
+msgid "studio.view_editor"
+msgstr ""
+
+#. English reference: Editor mode (editable text on both panels)
+msgid "studio.view_editor_tooltip"
+msgstr ""
+
+#. English reference: Markdown
+msgid "studio.view_markdown"
+msgstr ""
+
+#. English reference: Markdown mode (auto-protects and renders formatted preview)
+msgid "studio.view_markdown_tooltip"
+msgstr ""
+
+#. English reference: Return to transform
+msgid "studio.view_return"
+msgstr ""
+
+#. English reference: Return to transform panels
+msgid "studio.view_return_tooltip"
+msgstr ""
+
+#. English reference: View tokens
+msgid "studio.view_tokens"
+msgstr ""
+
+#. English reference: Settings
 msgid "tabs.config"
 msgstr ""
 
+#. English reference: Logs
 msgid "tabs.logs"
 msgstr ""
 
+#. English reference: Pairs
 msgid "tabs.pairs"
 msgstr ""
 
+#. English reference: Replacement and protection pairs
+msgid "tabs.pairs_tooltip"
+msgstr ""
+
+#. English reference: Scanner
 msgid "tabs.scanner"
 msgstr ""
 
+#. English reference: Transform
 msgid "tabs.studio"
 msgstr ""
 
+#. English reference: Bidirectional data transformation and protection
+msgid "tabs.studio_tooltip"
+msgstr ""
+
+#. English reference: Vaults
 msgid "tabs.vaults"
 msgstr ""
 
+#. English reference: Lexi vaults management
+msgid "tabs.vaults_tooltip"
+msgstr ""
+
+#. English reference: Clipboard
 msgid "tabs.watch"
 msgstr ""
 
-#. Encrypted vaults
+#. English reference: Active clipboard monitoring
+msgid "tabs.watch_tooltip"
+msgstr ""
+
+#. English reference: Set as active vault
+msgid "vaults.activate_tooltip"
+msgstr ""
+
+#. English reference: Active vault
 msgid "vaults.active_vault"
 msgstr ""
 
+#. English reference: Active
+msgid "vaults.badge_active"
+msgstr ""
+
+#. English reference: Activate
+msgid "vaults.btn_activate"
+msgstr ""
+
+#. English reference: Full backup
 msgid "vaults.btn_backup"
 msgstr ""
 
+#. English reference: Create a compressed backup of all LexiShield settings and vaults
+msgid "vaults.btn_backup_tooltip"
+msgstr ""
+
+#. English reference: Export vault
 msgid "vaults.btn_export"
 msgstr ""
 
+#. English reference: Import vault
 msgid "vaults.btn_import"
 msgstr ""
 
+#. English reference: Lock
 msgid "vaults.btn_lock"
 msgstr ""
 
+#. English reference: New vault
 msgid "vaults.btn_new"
 msgstr ""
 
+#. English reference: Restore backup
 msgid "vaults.btn_restore"
 msgstr ""
 
+#. English reference: Restore a LexiShield backup archive (.tar.bz2 / .lexibak)
+msgid "vaults.btn_restore_tooltip"
+msgstr ""
+
+#. English reference: Unlock
 msgid "vaults.btn_unlock"
 msgstr ""
 
+#. English reference: Actions
+msgid "vaults.col_actions"
+msgstr ""
+
+#. English reference: File name
+msgid "vaults.col_filename"
+msgstr ""
+
+#. English reference: Absolute path
+msgid "vaults.col_path"
+msgstr ""
+
+#. English reference: Size
+msgid "vaults.col_size"
+msgstr ""
+
+#. English reference: Status
+msgid "vaults.col_status"
+msgstr ""
+
+#. English reference: Double-click to activate
+msgid "vaults.dblclick_activate_tooltip"
+msgstr ""
+
+#. English reference: Delete
+msgid "vaults.delete_tooltip"
+msgstr ""
+
+#. English reference: No vaults available
+msgid "vaults.empty"
+msgstr ""
+
+#. English reference: Export file
+msgid "vaults.export_tooltip"
+msgstr ""
+
+#. English reference: Rename
+msgid "vaults.rename_tooltip"
+msgstr ""
+
+#. English reference: Restore from latest automatic backup (.bak)
+msgid "vaults.restore_bak_tooltip"
+msgstr ""
+
+#. English reference: ChaCha20-Poly1305 encryption with Argon2id derivation
 msgid "vaults.security_note"
 msgstr ""
 
+#. English reference: Encrypted
+msgid "vaults.status_encrypted"
+msgstr ""
+
+#. English reference: Plain
+msgid "vaults.status_plain"
+msgstr ""
+
+#. English reference: Manage all vaults in your profile (~/.lexishield) and perform high-compression backups.
+msgid "vaults.subtitle"
+msgstr ""
+
+#. English reference: Vaults (.lexi) are isolated cryptographic containers. Each client, project, or environment can have its own independent vault protected with an Argon2id password. You can also create high-compression Bzip2 backups.
+msgid "vaults.tip_desc"
+msgstr ""
+
+#. English reference: Lexi vaults manager
+msgid "vaults.tip_title"
+msgstr ""
+
+#. English reference: Lexi vaults and Bzip2 backups
 msgid "vaults.title"
 msgstr ""
 
+#. English reference: Vault name
 msgid "vaults.vault_name"
 msgstr ""
 
+#. English reference: Vault password
 msgid "vaults.vault_pass"
 msgstr ""
 
-#. Real-time sentinel clipboard monitor
+#. English reference: Why a password?
+msgid "vaults.why_password_btn"
+msgstr ""
+
+#. English reference: Why is a password mandatory for vaults?
+msgid "vaults.why_password_tooltip"
+msgstr ""
+
+#. English reference: Automatic security wipe
 msgid "watch.auto_clear"
 msgstr ""
 
+#. English reference: Protection
+msgid "watch.badge_protection"
+msgstr ""
+
+#. English reference: Restoration
+msgid "watch.badge_restoration"
+msgstr ""
+
+#. English reference: Clear clipboard
+msgid "watch.btn_clear_clip"
+msgstr ""
+
+#. English reference: Monitor
 msgid "watch.btn_start"
 msgstr ""
 
+#. English reference: Stop
 msgid "watch.btn_stop"
 msgstr ""
 
+#. English reference: Captured text:
+msgid "watch.captured_text"
+msgstr ""
+
+#. English reference: Clear history
+msgid "watch.clear_history"
+msgstr ""
+
+#. English reference: Clipboard result:
+msgid "watch.clipboard_result"
+msgstr ""
+
+#. English reference: Transformation direction
+msgid "watch.direction_title"
+msgstr ""
+
+#. English reference: entities recognized
+msgid "watch.entities_recognized"
+msgstr ""
+
+#. English reference: events
+msgid "watch.events_unit"
+msgstr ""
+
+#. English reference: Original ➔ Protected
+msgid "watch.flow_orig_to_prot"
+msgstr ""
+
+#. English reference: Protected ➔ Original
+msgid "watch.flow_prot_to_orig"
+msgstr ""
+
+#. English reference: If you use Wayland (KDE Plasma / GNOME), install the wl-clipboard package (sudo apt install wl-clipboard or sudo pacman -S wl-clipboard) or make sure Klipper / XWayland is active.
+msgid "watch.linux_warn_desc"
+msgstr ""
+
+#. English reference: Linux clipboard access notice
+msgid "watch.linux_warn_title"
+msgstr ""
+
+#. English reference: Listening status
+msgid "watch.listen_status_title"
+msgstr ""
+
+#. English reference: Live intercepted tokens and entities
+msgid "watch.live_inspector_title"
+msgstr ""
+
+#. English reference: Protect mode
+msgid "watch.mode_protect"
+msgstr ""
+
+#. English reference: Restore mode
+msgid "watch.mode_restore"
+msgstr ""
+
+#. English reference: Silent
 msgid "watch.notification_silent"
 msgstr ""
 
+#. English reference: Toast notification
 msgid "watch.notification_toast"
 msgstr ""
 
+#. English reference: Auto-protect: detects confidential data and replaces it with protected values before sending to AI or chats
+msgid "watch.protect_card_tooltip"
+msgstr ""
+
+#. English reference: Auto-restore: recovers original values from protected values returned by AI
+msgid "watch.restore_card_tooltip"
+msgstr ""
+
+#. English reference: Actively listening to clipboard...
 msgid "watch.status_active"
 msgstr ""
 
+#. English reference: Stopped (inactive)
 msgid "watch.status_inactive"
 msgstr ""
 
+#. English reference: Captures text copied to the clipboard and applies instant automatic transformations.
+msgid "watch.subtitle"
+msgstr ""
+
+#. English reference: When monitoring is active, every time you copy text with Ctrl+C (or Cmd+C), LexiShield intercepts sensitive tokens, protects them in the background using your vault, and places the sanitized text ready to paste into AI tools or chats. When copying an AI reply, switch direction to Restore to recover original values instantly.
+msgid "watch.tip_desc"
+msgstr ""
+
+#. English reference: Clipboard monitoring (sentinel mode)
+msgid "watch.tip_title"
+msgstr ""
+
+#. English reference: Active clipboard monitoring
 msgid "watch.title"
 msgstr ""
 
+#. English reference: Waiting for clipboard activity...
+msgid "watch.waiting_activity"
+msgstr ""
+
+#. English reference: When you copy text containing IPs, emails, keys, or tokens, you will see live recognition here.
+msgid "watch.waiting_hint"
+msgstr ""
+
+#. English reference: 0 confidential tokens detected (original text kept intact).
+msgid "watch.zero_tokens_note"
+msgstr ""

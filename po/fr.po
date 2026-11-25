@@ -13,6 +13,126 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+msgid "audit.all_label"
+msgstr "tous"
+
+msgid "audit.clear_results_btn"
+msgstr "Effacer les résultats"
+
+msgid "audit.clear_results_tooltip"
+msgstr "Effacer les résultats et réinitialiser l'inspection"
+
+msgid "audit.col_action"
+msgstr "Action"
+
+msgid "audit.col_original"
+msgstr "Valeur originale confidentielle"
+
+msgid "audit.col_protected"
+msgstr "Protégé / résultat"
+
+msgid "audit.col_status"
+msgstr "État"
+
+msgid "audit.col_type"
+msgstr "Type d'entité"
+
+msgid "audit.distribution_title"
+msgstr "Répartition des entités détectées"
+
+msgid "audit.empty_desc"
+msgstr "Les jetons confidentiels détectés sont détaillés ici automatiquement lors du collage de texte ou du glisser-déposer de fichiers."
+
+msgid "audit.empty_title"
+msgstr "Aucun jeton en attente de révision"
+
+msgid "audit.entities_detected"
+msgstr "Entités détectées :"
+
+msgid "audit.entities_label"
+msgstr "Entités :"
+
+msgid "audit.files_analyzed"
+msgstr "Fichiers analysés :"
+
+msgid "audit.files_label"
+msgstr "Fichiers :"
+
+msgid "audit.files_omitted"
+msgstr "Fichiers ignorés :"
+
+msgid "audit.no_entities_hint"
+msgstr "Glissez des fichiers ou dossiers, ou collez du texte depuis la vue Transformation."
+
+msgid "audit.no_entities_yet"
+msgstr "Aucune entité auditée pour l'instant"
+
+msgid "audit.omit_btn"
+msgstr "Omettre"
+
+msgid "audit.omit_tooltip"
+msgstr "Marquer comme omis (ne seront pas protégés)"
+
+msgid "audit.protect_btn"
+msgstr "Protéger"
+
+msgid "audit.protect_file_btn"
+msgstr "Protéger le fichier..."
+
+msgid "audit.protect_file_tooltip"
+msgstr "Procéder à la protection du fichier avec les jetons vérifiés"
+
+msgid "audit.protect_tooltip"
+msgstr "Réactiver la protection"
+
+msgid "audit.save_vault_btn"
+msgstr "Enregistrer dans le coffre"
+
+msgid "audit.save_vault_tooltip"
+msgstr "Enregistrer tous les mappages dans le coffre actif avec les omissions sélectionnées"
+
+msgid "audit.scanning_folder"
+msgstr "Analyse du dossier en temps réel..."
+
+msgid "audit.scanning_in_progress"
+msgstr "Analyse des fichiers en cours..."
+
+msgid "audit.source_scanned"
+msgstr "Source analysée :"
+
+msgid "audit.status_omitted"
+msgstr "Omis"
+
+msgid "audit.status_protected"
+msgstr "Protégé"
+
+msgid "audit.subtitle"
+msgstr "Inspectez et classez les jetons détectés avant de protéger le fichier. Décochez les cases pour omettre les faux positifs."
+
+msgid "audit.title"
+msgstr "Inspection préalable des jetons"
+
+msgid "audit.toggle_all_tooltip"
+msgstr "Tout sélectionner ou désélectionner"
+
+msgid "categories.identity"
+msgstr "Identité"
+
+msgid "categories.keys"
+msgstr "Contact / clés"
+
+msgid "categories.network"
+msgstr "Réseau"
+
+msgid "categories.systems"
+msgstr "Systèmes"
+
+msgid "common.accept"
+msgstr "Accepter"
+
+msgid "common.add"
+msgstr "Ajouter"
+
 msgid "common.cancel"
 msgstr "Annuler"
 
@@ -27,6 +147,9 @@ msgstr "Supprimer"
 
 msgid "common.edit"
 msgstr "Modifier"
+
+msgid "common.empty_parens"
+msgstr "(Vide)"
 
 msgid "common.error"
 msgstr "Une erreur est survenue"
@@ -43,8 +166,20 @@ msgstr "Non"
 msgid "common.save"
 msgstr "Enregistrer"
 
+msgid "common.save_changes"
+msgstr "Enregistrer les modifications"
+
 msgid "common.success"
-msgstr "Opération terminée avec succès"
+msgstr "Copié !"
+
+msgid "common.time_h_ago"
+msgstr "il y a {n} h"
+
+msgid "common.time_just_now"
+msgstr "à l'instant"
+
+msgid "common.time_min_ago"
+msgstr "il y a {n} min"
 
 msgid "common.warning"
 msgstr "Avertissement"
@@ -52,20 +187,209 @@ msgstr "Avertissement"
 msgid "common.yes"
 msgstr "Oui"
 
+msgid "config.accent_amber"
+msgstr "Ambre"
+
+msgid "config.accent_cobalt"
+msgstr "Cobalt"
+
+msgid "config.accent_color_label"
+msgstr "Couleur d'accentuation de l'interface :"
+
+msgid "config.accent_cyan"
+msgstr "Cyan néon"
+
+msgid "config.accent_emerald"
+msgstr "Émeraude"
+
+msgid "config.accent_purple"
+msgstr "Améthyste"
+
+msgid "config.auto_clear_after"
+msgstr "Vider après :"
+
+msgid "config.auto_clear_clip_label"
+msgstr "Programmer le vidage automatique du presse-papiers après traitement"
+
+msgid "config.auto_clear_seconds"
+msgstr "secondes (par défaut : 5 s)"
+
+msgid "config.auto_lock_0"
+msgstr "Désactivé (maintenir déverrouillé)"
+
+msgid "config.auto_lock_1"
+msgstr "Verrouiller après 1 minute d'inactivité"
+
+msgid "config.auto_lock_15"
+msgstr "Verrouiller après 15 minutes d'inactivité"
+
+msgid "config.auto_lock_30"
+msgstr "Verrouiller après 30 minutes d'inactivité"
+
+msgid "config.auto_lock_5"
+msgstr "Verrouiller après 5 minutes d'inactivité"
+
+msgid "config.auto_lock_label"
+msgstr "Verrouillage automatique du coffre par inactivité :"
+
+msgid "config.block1_title"
+msgstr "1. Moteur de protection"
+
+msgid "config.block2_title"
+msgstr "2. Fenêtre et système"
+
+msgid "config.block3_title"
+msgstr "3. Presse-papiers et alertes"
+
+msgid "config.block4_title"
+msgstr "4. Apparence, langue et sécurité"
+
+msgid "config.btn_manage_exclusions"
+msgstr "Gérer les exclusions"
+
 msgid "config.btn_reset"
-msgstr "Restaurer les valeurs par défaut"
+msgstr "Réinitialiser"
+
+msgid "config.btn_reset_tooltip"
+msgstr "Restaurer la configuration par défaut"
+
+msgid "config.btn_review_send"
+msgstr "Examiner et envoyer"
 
 msgid "config.btn_save"
 msgstr "Enregistrer les paramètres"
 
+msgid "config.btn_save_tooltip"
+msgstr "Enregistrer les modifications dans ~/.lexishield/config.toml"
+
+msgid "config.btn_view_logs"
+msgstr "Voir les journaux"
+
+msgid "config.btn_view_logs_tooltip"
+msgstr "Ouvrir la visionneuse de traces et d'événements"
+
+msgid "config.clip_notify_flash"
+msgstr "Clignotement visuel de la fenêtre"
+
+msgid "config.clip_notify_label"
+msgstr "Alerte lors de la capture du presse-papiers :"
+
+msgid "config.clip_notify_native"
+msgstr "Notification système (barre des tâches / horloge)"
+
+msgid "config.clip_notify_silent"
+msgstr "Silencieux (aucune alerte)"
+
+msgid "config.clip_notify_toast"
+msgstr "Message contextuel (toast dans l'application)"
+
+msgid "config.close_action_label"
+msgstr "Lors du clic sur le bouton fermer [X] :"
+
+msgid "config.close_help_exit"
+msgstr "À la fermeture de la fenêtre, le programme et tous ses services en arrière-plan s'arrêtent complètement."
+
+msgid "config.close_help_tray"
+msgstr "À la fermeture de la fenêtre, LexiShield reste actif près de l'horloge pour continuer à protéger le presse-papiers."
+
+msgid "config.close_opt_exit"
+msgstr "Quitter complètement l'application"
+
+msgid "config.close_opt_tray"
+msgstr "Réduire dans la barre d'état système (arrière-plan)"
+
+msgid "config.debug_active"
+msgstr "Débogage : actif"
+
+msgid "config.debug_inactive"
+msgstr "Débogage"
+
+msgid "config.debug_tooltip"
+msgstr "Activer ou désactiver la capture des traces internes"
+
+msgid "config.default_tab_label"
+msgstr "Onglet initial à l'ouverture de LexiShield :"
+
+msgid "config.detector_learning_count"
+msgstr "modèles structurels appris sans données réelles"
+
+msgid "config.detector_learning_label"
+msgstr "Apprentissage des détecteurs (Zero-PII) :"
+
+msgid "config.encoded_opt_clear"
+msgstr "Développer en clair cellule par cellule (recommandé)"
+
+msgid "config.encoded_opt_merge"
+msgstr "Développer en clair et fusionner les fragments par index"
+
+msgid "config.encoded_opt_reencode"
+msgstr "Conserver encodé (protéger l'intérieur et ré-encoder)"
+
+msgid "config.encoded_paste_help"
+msgstr "Détecte automatiquement les chaînes Base64 (UTF-8 / UTF-16LE), Hex ou URL contenant du texte lisible, en ignorant les données binaires chiffrées."
+
+msgid "config.encoded_paste_label"
+msgstr "Charges encodées lisibles au collage (Base64 / Hex / URL) :"
+
+msgid "config.exclude_netmasks"
+msgstr "Exclure les masques de sous-réseau IPv4 (255.255.255.0, 255.0.0.0, etc.)"
+
+msgid "config.exclude_netmasks_help"
+msgstr "Évite que les masques de sous-réseau standard (/8../32) et les routes par défaut (0.0.0.0) soient confondus avec des adresses IP d'hôte."
+
+msgid "config.file_input_mode_label"
+msgstr "Méthode d'entrée des fichiers :"
+
+msgid "config.file_label"
+msgstr "Fichier :"
+
+msgid "config.file_mode_both"
+msgstr "Les deux (glisser-déposer + boutons)"
+
+msgid "config.file_mode_buttons"
+msgstr "Boutons de sélection uniquement"
+
+msgid "config.file_mode_drag"
+msgstr "Glisser-déposer uniquement"
+
+msgid "config.font_large"
+msgstr "Grande (14 px)"
+
+msgid "config.font_medium"
+msgstr "Standard (12 px)"
+
 msgid "config.font_size"
 msgstr "Taille de police"
+
+msgid "config.font_small"
+msgstr "Compacte (11 px)"
+
+msgid "config.ignored_domains_count"
+msgstr "domaines et URL exemptés de protection"
+
+msgid "config.ignored_domains_label"
+msgstr "URL et domaines exclus :"
 
 msgid "config.language"
 msgstr "Langue de l'interface"
 
+msgid "config.language_help"
+msgstr "Change réactivement la langue de l'application et conserve le choix dans ~/.lexishield/config.toml."
+
+msgid "config.minimize_to_tray_help"
+msgstr "Si désactivé, le bouton réduire [-] laissera la fenêtre dans la barre des tâches habituelle."
+
+msgid "config.minimize_to_tray_label"
+msgstr "Envoyer également dans la barre d'état système lors du clic sur réduire [-]"
+
+msgid "config.output_suffix_help"
+msgstr "Ajouté avant l'extension lors de la protection de fichiers"
+
+msgid "config.output_suffix_label"
+msgstr "Suffixe pour les copies de fichiers protégés :"
+
 msgid "config.privacy_blur"
-msgstr "Flou de confidentialité (masquer les données en cas de perte de focus)"
+msgstr "Activer le mode confidentialité (flou) par défaut"
 
 msgid "config.section_appearance"
 msgstr "4. Apparence, langue et sécurité"
@@ -79,23 +403,125 @@ msgstr "1. Configuration générale"
 msgid "config.section_studio"
 msgstr "2. Ergonomie du studio"
 
+msgid "config.sensitivity_all"
+msgstr "Complet (tous les détecteurs actifs)"
+
+msgid "config.sensitivity_devops"
+msgstr "Technique et réseau (IP, UUID, noms d'hôte, journaux)"
+
+msgid "config.sensitivity_gdpr"
+msgstr "Données personnelles et RGPD (e-mails, noms, pièces d'identité, cartes)"
+
+msgid "config.sensitivity_help"
+msgstr "Définit quelles catégories de données confidentielles sont filtrées et auditées dans la vue Transformation."
+
+msgid "config.sensitivity_label"
+msgstr "Niveau de protection et portée d'analyse :"
+
 msgid "config.show_badges"
-msgstr "Badges de jetons mis en évidence"
+msgstr "Activer les badges colorés de jetons par défaut"
+
+msgid "config.show_cli_dock_label"
+msgstr "Afficher la barre inférieure avec la commande CLI équivalente"
 
 msgid "config.theme"
 msgstr "Thème visuel"
 
 msgid "config.theme_dark"
-msgstr "Sombre"
+msgstr "Mode sombre"
 
 msgid "config.theme_light"
-msgstr "Clair"
+msgstr "Mode clair"
 
 msgid "config.theme_system"
-msgstr "Système"
+msgstr "Suivre le thème du système"
+
+msgid "config.tip_desc"
+msgstr "Personnalisez le niveau de protection, le comportement de la fenêtre, les alertes du presse-papiers et l'apparence visuelle. Cliquez sur Enregistrer les paramètres dans la barre supérieure pour conserver vos choix."
+
+msgid "config.tip_title"
+msgstr "Préférences du système"
 
 msgid "config.title"
-msgstr "Paramètres du système"
+msgstr "Options du système"
+
+msgid "config.toolbar_both"
+msgstr "Icône et texte (complet)"
+
+msgid "config.toolbar_icons"
+msgstr "Icône seule (minimaliste)"
+
+msgid "config.toolbar_style_label"
+msgstr "Style des boutons :"
+
+msgid "config.toolbar_text"
+msgstr "Texte seul (classique)"
+
+msgid "config.visible_tabs_label"
+msgstr "Onglets visibles dans la barre de navigation :"
+
+msgid "detectors.address"
+msgstr "Adresse postale"
+
+msgid "detectors.credit_card"
+msgstr "Carte bancaire"
+
+msgid "detectors.dni"
+msgstr "Pièce d'identité (DNI/NIE)"
+
+msgid "detectors.domain"
+msgstr "Domaine / hôte"
+
+msgid "detectors.email"
+msgstr "Adresse e-mail"
+
+msgid "detectors.generic"
+msgstr "Jeton générique"
+
+msgid "detectors.guid"
+msgstr "GUID / UUID"
+
+msgid "detectors.ipv4"
+msgstr "Adresse IPv4"
+
+msgid "detectors.ipv6"
+msgstr "Adresse IPv6"
+
+msgid "detectors.person_name"
+msgstr "Nom / prénom"
+
+msgid "detectors.telephone"
+msgstr "Téléphone"
+
+msgid "detectors.username"
+msgstr "Utilisateur / compte"
+
+msgid "footer.active_vault_tooltip"
+msgstr "Coffre de protection actif"
+
+msgid "footer.copy_cli"
+msgstr "Copier CLI"
+
+msgid "footer.copy_cli_tooltip"
+msgstr "Copier la commande de console"
+
+msgid "footer.detected_format_tooltip"
+msgstr "Format syntaxique détecté"
+
+msgid "footer.performance_tooltip"
+msgstr "Performance du dernier traitement"
+
+msgid "footer.privacy_normal"
+msgstr "Normal"
+
+msgid "footer.privacy_protected"
+msgstr "Protégé"
+
+msgid "footer.privacy_tooltip"
+msgstr "Mode de confidentialité visuelle (flou)"
+
+msgid "footer.zero_knowledge_tooltip"
+msgstr "Chiffrement local sans serveurs externes"
 
 msgid "header.help"
 msgstr "Aide"
@@ -130,17 +556,620 @@ msgstr "Coffre simple"
 msgid "header.vault_unlocked"
 msgstr "Déverrouillé"
 
+msgid "help.btn_understood"
+msgstr "Compris / fermer"
+
+msgid "help.config_b1"
+msgstr "1. Moteur de protection : sélectionnez le niveau de protection (Complet, Technique et réseau ou Données personnelles et RGPD), le suffixe et la méthode d'entrée."
+
+msgid "help.config_b2"
+msgstr "2. Fenêtre et système : configurez l'action des boutons fermer [X] et réduire [-], l'onglet initial et les onglets visibles."
+
+msgid "help.config_b3"
+msgstr "3. Presse-papiers et alertes : ajustez le type d'alerte lors de l'interception, le vidage automatique temporisé et la barre CLI inférieure."
+
+msgid "help.config_b4"
+msgstr "4. Apparence, langue et sécurité : choisissez la langue, le thème visuel, la couleur d'accentuation, la taille de police, le style des boutons et le verrouillage automatique."
+
+msgid "help.config_h4"
+msgstr "Configuration et ergonomie"
+
+msgid "help.config_p1"
+msgstr "L'onglet Options est organisé en 4 blocs fonctionnels avec une barre d'actions supérieure pour enregistrer, réinitialiser ou consulter les journaux :"
+
+msgid "help.config_persist_note"
+msgstr "Tous les paramètres sont conservés dans ~/.lexishield/config.toml."
+
+msgid "help.logs_h4"
+msgstr "Diagnostic et journaux de télémétrie"
+
+msgid "help.logs_p1"
+msgstr "La console de journaux enregistre chaque événement du moteur natif Rust (appels Tauri, lectures/écritures de coffres, détections et transformations). Activez le mode débogage ou filtrez par niveau (INFO, WARN, ERROR)."
+
+msgid "help.pairs_h4"
+msgstr "Gestion des paires de jetons (bijectivité 1:1)"
+
+msgid "help.pairs_op1"
+msgstr "Ajouter une paire : permet de précharger des associations personnalisées (ex. votre nom avec une valeur choisie)."
+
+msgid "help.pairs_op2"
+msgstr "Recherche et nettoyage rapides : filtrez par valeur originale ou protégée et cliquez sur ✕ pour vider le champ."
+
+msgid "help.pairs_op3"
+msgstr "Omettre un jeton : si un mot-clé ou terme technique ne doit jamais être remplacé, sélectionnez-le et cliquez sur Omettre."
+
+msgid "help.pairs_op4"
+msgstr "Sauvegardes (.bak) : les copies automatiques générées lors de la modification de paires peuvent être restaurées depuis l'onglet Coffres."
+
+msgid "help.pairs_ops_title"
+msgstr "Opérations principales :"
+
+msgid "help.pairs_p1"
+msgstr "Chaque fois que LexiShield détecte ou remplace un jeton sensible, il crée une correspondance bijective dans le coffre actif, garantissant que la même entité reçoive toujours la même valeur protégée."
+
+msgid "help.pwd_h4"
+msgstr "Pourquoi LexiShield exige-t-il un mot de passe pour ses coffres ?"
+
+msgid "help.pwd_p1"
+msgstr "LexiShield a été conçu pour protéger des secrets d'entreprise et des données personnelles hautement confidentielles. Un mot de passe est obligatoire pour trois raisons architecturales :"
+
+msgid "help.pwd_principle"
+msgstr "Principe fondamental : architecture à divulgation nulle de connaissance (Zero-Knowledge)"
+
+msgid "help.pwd_r1"
+msgstr "Immunité contre les attaques physiques ou forensiques : en cas d'accès à votre disque dur, sans le mot de passe maître, il est mathématiquement impossible de reconstruire le lien entre valeurs protégées et secrets réels."
+
+msgid "help.pwd_r2"
+msgstr "Cryptographie Argon2id + ChaCha20-Poly1305 : la clé de déchiffrement n'est stockée dans aucun fichier ; elle est dérivée via Argon2id avec des paramètres intensifs en mémoire RAM contre la force brute GPU/ASIC."
+
+msgid "help.pwd_r3"
+msgstr "Isolation stricte par projet ou client : en attribuant des mots de passe distincts à différents coffres (.lexi), chaque client ou environnement conserve une barrière cryptographique impénétrable."
+
+msgid "help.sc_audit_text"
+msgstr "Auditer le texte actuel sans le modifier"
+
+msgid "help.sc_clear_panels"
+msgstr "Effacer les deux panneaux (avec sauvegarde dans l'historique)"
+
+msgid "help.sc_close_modals"
+msgstr "Fermer les fenêtres et boîtes de dialogue actives"
+
+msgid "help.sc_copy_result"
+msgstr "Copier le texte résultant dans le presse-papiers"
+
+msgid "help.sc_open_help"
+msgstr "Ouvrir le manuel d'aide et les raccourcis rapides"
+
+msgid "help.sc_protect_restore"
+msgstr "Protéger ou restaurer les données (selon la direction active)"
+
+msgid "help.sc_toggle_dir"
+msgstr "Basculer la direction (Protéger ⇄ Restaurer)"
+
+msgid "help.shortcuts_h4"
+msgstr "Raccourcis clavier rapides"
+
+msgid "help.shortcuts_subtitle"
+msgstr "Pilotez tout le flux de protection et de navigation sans quitter le clavier des mains."
+
+msgid "help.studio_audit_desc"
+msgstr "Lors du glisser-déposer ou de l'analyse de fichiers et dossiers, l'écran d'inspection préalable s'ouvre automatiquement. LexiShield classe les jetons par Réseau, Identité, Systèmes ou Clés pour omettre les faux positifs."
+
+msgid "help.studio_audit_title"
+msgstr "Inspection préalable des jetons :"
+
+msgid "help.studio_h4"
+msgstr "Comment protéger du texte pour l'intelligence artificielle ou le partage de données"
+
+msgid "help.studio_kbd_btn"
+msgstr "Voir les raccourcis ➔"
+
+msgid "help.studio_kbd_prompt"
+msgstr "Vous préférez utiliser le clavier ? Consultez le guide complet des raccourcis rapides."
+
+msgid "help.studio_p1"
+msgstr "L'objectif principal de la vue Transformation est de vous permettre d'interagir en toute sécurité avec des modèles de langage (ChatGPT, Claude, Gemini ou IA locales) ou de partager des documents sans divulguer d'informations confidentielles (noms, pièces d'identité, IBAN, mots de passe, adresses IP ou cartes)."
+
+msgid "help.studio_pandoc_desc"
+msgstr "Si vous activez l'enregistrement en Markdown avec Pandoc, LexiShield convertit les documents structurés (.docx, .html, .rst) en Markdown natif (.md), en préservant titres, listes et tableaux."
+
+msgid "help.studio_pandoc_title"
+msgstr "Conversion en Markdown avec Pandoc :"
+
+msgid "help.studio_wf1"
+msgstr "Collez le contenu dans le panneau Texte en clair (ou glissez-déposez un fichier ou dossier directement dessus)."
+
+msgid "help.studio_wf2"
+msgstr "Détection automatique : le moteur identifie automatiquement la structure syntaxique (JSON, XML, journaux ou texte brut) sans configuration."
+
+msgid "help.studio_wf3"
+msgstr "Cliquez sur Protéger : le bouton directionnel central remplace chaque donnée confidentielle par une valeur protégée cohérente."
+
+msgid "help.studio_wf4"
+msgstr "Mode Markdown réactif : en cliquant sur le commutateur Markdown dans la barre supérieure, LexiShield protège automatiquement le texte et affiche l'aperçu formaté."
+
+msgid "help.studio_wf5"
+msgstr "Utilisez le texte avec l'IA : copiez le Texte protégé et envoyez-le en toute sérénité à n'importe quel modèle d'IA ou tiers."
+
+msgid "help.studio_wf6"
+msgstr "Restaurez la réponse de l'IA : lorsque l'IA répond en citant les valeurs protégées, collez sa réponse dans Texte protégé et cliquez sur Restaurer pour récupérer 100 % des valeurs réelles."
+
+msgid "help.studio_workflow_title"
+msgstr "Flux de travail recommandé :"
+
+msgid "help.subtitle"
+msgstr "Concepts clés, recommandations de sécurité et flux de travail."
+
+msgid "help.tab_shortcuts"
+msgstr "Raccourcis clavier"
+
+msgid "help.title"
+msgstr "Manuel et aide contextuelle de LexiShield"
+
+msgid "help.vaults_backup_desc"
+msgstr "Le bouton Sauvegarde complète regroupe toute votre configuration et vos coffres dans une archive Bzip2 (chiffrable en AES-256). Avec Restaurer une sauvegarde, récupérez intégralement n'importe quelle archive (.tar.bz2 ou .lexibak)."
+
+msgid "help.vaults_backup_title"
+msgstr "Sauvegarde et restauration de LexiShield :"
+
+msgid "help.vaults_h4"
+msgstr "Gestion des coffres Lexi et sauvegardes"
+
+msgid "help.vaults_p1"
+msgstr "Les coffres (.lexi) sont des fichiers binaires hermétiques où résident vos jetons et correspondances. Créez plusieurs coffres pour séparer vos clients ou projets."
+
+msgid "help.watch_feat1"
+msgstr "Contrôle dans la barre supérieure : cliquez sur Surveiller pour activer l'écoute et sur Arrêter pour la suspendre."
+
+msgid "help.watch_feat2"
+msgstr "Notification transparente : lorsque vous copiez du texte sans secret, 0 jeton reconnu est indiqué pour confirmer que le texte n'a pas été modifié."
+
+msgid "help.watch_feat3"
+msgstr "Aperçu immédiat : l'historique affiche en temps réel le texte capturé ainsi que le résultat placé dans le presse-papiers."
+
+msgid "help.watch_feat4"
+msgstr "Vidage sécurisé : cliquez sur Vider le presse-papiers dans la barre supérieure ou programmez le vidage automatique dans les Paramètres."
+
+msgid "help.watch_features_title"
+msgstr "Caractéristiques d'ergonomie et de sécurité :"
+
+msgid "help.watch_h4"
+msgstr "Surveillance active du presse-papiers (mode sentinelle)"
+
+msgid "help.watch_p1"
+msgstr "Le mode sentinelle transforme LexiShield en gardien silencieux de votre presse-papiers. Pendant que vous travaillez, chaque texte confidentiel copié est automatiquement transformé."
+
+msgid "modals.add_pair_cat_auto"
+msgstr "Détection automatique (recommandé)"
+
+msgid "modals.add_pair_cat_identity"
+msgstr "Identité personnelle (utilisateur, nom, téléphone, adresse, ID)"
+
+msgid "modals.add_pair_cat_label"
+msgstr "Catégorie de détection :"
+
+msgid "modals.add_pair_cat_network"
+msgstr "Réseau et systèmes (adresse IP v4/v6, e-mail, domaine, UUID)"
+
+msgid "modals.add_pair_confirmed"
+msgstr "Confirmé"
+
+msgid "modals.add_pair_correct_btn"
+msgstr "Correct"
+
+msgid "modals.add_pair_correct_tooltip"
+msgstr "Confirmer que le type détecté est exact pour renforcer l'apprentissage"
+
+msgid "modals.add_pair_detected"
+msgstr "Détecté :"
+
+msgid "modals.add_pair_learned_badge"
+msgstr "Appris"
+
+msgid "modals.add_pair_learned_tooltip"
+msgstr "Reconnu grâce à votre apprentissage précédent"
+
+msgid "modals.add_pair_learning_tooltip"
+msgstr "Voir et partager les modèles appris sans données réelles"
+
+msgid "modals.add_pair_orig_label"
+msgstr "Valeur originale confidentielle :"
+
+msgid "modals.add_pair_orig_placeholder"
+msgstr "ex. : Jean Dupont, CORP\\jdupont, 14 rue de la Paix, +33 6 12 34 56 78, 192.168.1.10"
+
+msgid "modals.add_pair_override_label"
+msgstr "Corriger..."
+
+msgid "modals.add_pair_override_tooltip"
+msgstr "Si la détection automatique s'est trompée, choisissez le type exact pour corriger et apprendre"
+
+msgid "modals.add_pair_pseudo_label"
+msgstr "Valeur protégée en anglais / format sûr (ou '=' pour omettre) :"
+
+msgid "modals.add_pair_pseudo_placeholder"
+msgstr "ex. : Oliver Carter, CONTOSO\\jdoe, 742 Oak Avenue ou 10.24.81.12"
+
+msgid "modals.add_pair_regenerate"
+msgstr "Régénérer"
+
+msgid "modals.add_pair_regenerate_tooltip"
+msgstr "Générer une autre valeur protégée unique sans collision dans le coffre"
+
+msgid "modals.add_pair_save_btn"
+msgstr "Enregistrer la paire"
+
+msgid "modals.add_pair_title"
+msgstr "Ajouter une paire de remplacement"
+
+msgid "modals.backup_btn"
+msgstr "Créer la sauvegarde"
+
+msgid "modals.backup_desc"
+msgstr "Regroupe la configuration, les règles personnalisées et tous les coffres dans une archive unique compressée avec Bzip2."
+
+msgid "modals.backup_pwd_label"
+msgstr "Mot de passe de chiffrement AES-256 (optionnel) :"
+
+msgid "modals.backup_pwd_placeholder"
+msgstr "Mot de passe pour protéger la sauvegarde..."
+
+msgid "modals.backup_title"
+msgstr "Sauvegarde complète de LexiShield"
+
+msgid "modals.clip_toast_protected"
+msgstr "Presse-papiers protégé"
+
+msgid "modals.clip_toast_restored"
+msgstr "Presse-papiers restauré"
+
+msgid "modals.create_vault_btn"
+msgstr "Créer le coffre"
+
+msgid "modals.create_vault_name_label"
+msgstr "Nom du coffre (.lexi) :"
+
+msgid "modals.create_vault_name_placeholder"
+msgstr "ex. : clients_2026.lexi"
+
+msgid "modals.create_vault_pwd_placeholder"
+msgstr "Saisissez le mot de passe de chiffrement..."
+
+msgid "modals.create_vault_title"
+msgstr "Créer un nouveau coffre Lexi"
+
+msgid "modals.drag_clear_badge"
+msgstr "Déposez ici pour protéger"
+
+msgid "modals.drag_clear_desc"
+msgstr "Les données confidentielles (IP, e-mails, noms, clés) seront remplacées par des valeurs protégées sûres. Accepte les fichiers ou dossiers complets."
+
+msgid "modals.drag_clear_title"
+msgstr "Panneau texte en clair"
+
+msgid "modals.drag_prot_badge"
+msgstr "Déposez ici pour restaurer"
+
+msgid "modals.drag_prot_desc"
+msgstr "Les valeurs réelles d'origine seront restaurées à partir des valeurs protégées grâce à votre coffre local."
+
+msgid "modals.drag_prot_title"
+msgstr "Panneau texte protégé"
+
+msgid "modals.drag_scan_desc"
+msgstr "LexiShield auditera les jetons confidentiels sans modifier les fichiers originaux sur le disque."
+
+msgid "modals.drag_scan_title"
+msgstr "Déposez votre fichier ou dossier ici pour analyser"
+
+msgid "modals.drop_clean_cache_desc"
+msgstr "Force la réanalyse complète de tous les fichiers du dossier sans utiliser les caches précédents."
+
+msgid "modals.drop_clean_cache_title"
+msgstr "Vider les caches de session"
+
+msgid "modals.drop_copy_mode_desc"
+msgstr "Conserve le fichier original intact et génère une copie traitée."
+
+msgid "modals.drop_copy_mode_title"
+msgstr "Enregistrer dans une copie avec suffixe"
+
+msgid "modals.drop_desc_protect"
+msgstr "Vous avez déposé un élément dans Texte en clair. Les jetons confidentiels seront remplacés par des valeurs protégées sûres."
+
+msgid "modals.drop_desc_restore"
+msgstr "Vous avez déposé un élément dans Texte protégé. Les données originales seront restaurées à l'aide de votre coffre local."
+
+msgid "modals.drop_encoded_expand"
+msgstr "Développer en texte clair cellule par cellule"
+
+msgid "modals.drop_encoded_label"
+msgstr "Charges encodées lisibles (Base64 / Hex / URL) :"
+
+msgid "modals.drop_encoded_off"
+msgstr "Ne pas traiter les blocs encodés"
+
+msgid "modals.drop_encoded_protect_reencode"
+msgstr "Protéger l'intérieur et ré-encoder (par défaut)"
+
+msgid "modals.drop_encoded_restore_reencode"
+msgstr "Restaurer l'intérieur et conserver encodé (par défaut)"
+
+msgid "modals.drop_file"
+msgstr "fichier"
+
+msgid "modals.drop_folder"
+msgstr "dossier"
+
+msgid "modals.drop_markdown_desc"
+msgstr "Convertit automatiquement les documents Office traités au format Markdown avec Pandoc."
+
+msgid "modals.drop_markdown_title"
+msgstr "Enregistrer en Markdown (.md)"
+
+msgid "modals.drop_overwrite_warn"
+msgstr "Le fichier original sera modifié directement à son emplacement actuel."
+
+msgid "modals.drop_preview_label"
+msgstr "Aperçu :"
+
+msgid "modals.drop_protect"
+msgstr "Protéger"
+
+msgid "modals.drop_protect_filename_desc"
+msgstr "Génère un nom protégé sûr pour le fichier de sortie tout en conservant son extension d'origine."
+
+msgid "modals.drop_protect_filename_title"
+msgstr "Protéger également le nom du fichier"
+
+msgid "modals.drop_remember_suffix"
+msgstr "Mémoriser ce suffixe par défaut dans mes paramètres"
+
+msgid "modals.drop_restore"
+msgstr "Restaurer"
+
+msgid "modals.drop_suffix_label"
+msgstr "Suffixe du fichier :"
+
+msgid "modals.enc_pwd_required_label"
+msgstr "Mot de passe de chiffrement (obligatoire) :"
+
+msgid "modals.history_badge_cleared"
+msgstr "État avant effacement"
+
+msgid "modals.history_badge_protected"
+msgstr "Protégé"
+
+msgid "modals.history_badge_restored"
+msgstr "Restauré"
+
+msgid "modals.history_clear_btn"
+msgstr "Vider l'historique"
+
+msgid "modals.history_empty_desc"
+msgstr "Chaque fois que vous cliquez sur Protéger, Restaurer ou Tout effacer, un instantané est créé ici pour ne jamais perdre votre travail."
+
+msgid "modals.history_empty_title"
+msgstr "Aucune transformation dans cette session pour l'instant"
+
+msgid "modals.history_load_btn"
+msgstr "Charger dans les éditeurs"
+
+msgid "modals.history_load_tooltip"
+msgstr "Charger ces textes directement dans les panneaux de Transformation"
+
+msgid "modals.history_ram_badge"
+msgstr "En mémoire RAM · Zero-Knowledge"
+
+msgid "modals.history_subtitle"
+msgstr "Récupérez tout texte protégé, restauré ou effacé au cours de la session active."
+
+msgid "modals.history_title"
+msgstr "Historique temporaire de session"
+
+msgid "modals.ignored_active_count"
+msgstr "domaines actifs"
+
+msgid "modals.ignored_add_placeholder"
+msgstr "Ajouter un domaine ou une URL (ex. api.github.com, www.owasp.org)..."
+
+msgid "modals.ignored_empty"
+msgstr "Aucun domaine exclu. Ajoutez-en un ci-dessus."
+
+msgid "modals.ignored_no_matches"
+msgstr "Aucun domaine correspondant trouvé."
+
+msgid "modals.ignored_remove_tooltip"
+msgstr "Supprimer de la liste d'exclusion"
+
+msgid "modals.ignored_reset_btn"
+msgstr "Rétablir la liste standard"
+
+msgid "modals.ignored_reset_tooltip"
+msgstr "Rétablir la liste recommandée de normes et cybersécurité"
+
+msgid "modals.ignored_search_placeholder"
+msgstr "Rechercher dans la liste..."
+
+msgid "modals.ignored_subtitle"
+msgstr "Ces sites et domaines ne seront jamais modifiés lors de la protection. Enregistrés dans ~/.lexishield/ignored_domains.txt."
+
+msgid "modals.ignored_title"
+msgstr "URL et domaines exclus de la protection"
+
+msgid "modals.init_btn"
+msgstr "Initialiser et chiffrer le coffre"
+
+msgid "modals.init_crypto_note"
+msgstr "Le coffre sera chiffré de manière inviolable avec Argon2id + ChaCha20-Poly1305."
+
+msgid "modals.init_pwd_placeholder"
+msgstr "Saisissez le mot de passe pour chiffrer le coffre..."
+
+msgid "modals.init_subtitle"
+msgstr "Protégez votre nouveau coffre avec un mot de passe sécurisé."
+
+msgid "modals.init_title"
+msgstr "Initialiser le coffre principal"
+
+msgid "modals.learning_col_count"
+msgstr "Fois"
+
+msgid "modals.learning_col_inc"
+msgstr "Incl."
+
+msgid "modals.learning_col_pred_conf"
+msgstr "Prédit ➔ Confirmé"
+
+msgid "modals.learning_col_remove"
+msgstr "Retirer"
+
+msgid "modals.learning_col_skeleton"
+msgstr "Squelette masqué"
+
+msgid "modals.learning_copy_json"
+msgstr "Copier le JSON"
+
+msgid "modals.learning_delete_tooltip"
+msgstr "Supprimer ce modèle local"
+
+msgid "modals.learning_empty_desc"
+msgstr "Lorsque vous ajoutez une paire dans l'onglet Paires et cliquez sur Correct ou corrigez le type, LexiShield apprend la structure ici."
+
+msgid "modals.learning_empty_title"
+msgstr "Aucun modèle appris enregistré pour l'instant"
+
+msgid "modals.learning_local_file"
+msgstr "Fichier local sur ce système :"
+
+msgid "modals.learning_privacy_desc"
+msgstr "Aucun texte original ni chemin local n'est enregistré. Chaque échantillon est transformé en squelette morphologique (A = majuscule, a = minuscule, 9 = chiffre). Rien n'est envoyé en arrière-plan : cliquer sur Envoyer à GitHub ouvre votre navigateur avec le ticket pré-rempli."
+
+msgid "modals.learning_privacy_title"
+msgstr "Garantie de confidentialité Zero-Knowledge :"
+
+msgid "modals.learning_reset_all"
+msgstr "Réinitialiser tout l'apprentissage"
+
+msgid "modals.learning_save_json"
+msgstr "Enregistrer .json"
+
+msgid "modals.learning_step1"
+msgstr "1. Sélectionnez les modèles à inclure"
+
+msgid "modals.learning_step2"
+msgstr "2. Aperçu littéral du JSON exact qui sera envoyé ou exporté :"
+
+msgid "modals.learning_submit_github"
+msgstr "Envoyer à GitHub (ticket pré-rempli)"
+
+msgid "modals.learning_submit_tooltip"
+msgstr "Ouvre https://github.com/olorinj/lexishield/issues/new dans votre navigateur avec ce JSON pré-rempli"
+
+msgid "modals.learning_subtitle"
+msgstr "Vérifiez exactement quels modèles masqués seront partagés avant de les envoyer sur github.com/olorinj/lexishield."
+
+msgid "modals.learning_title"
+msgstr "Révision et envoi de l'apprentissage des détecteurs (Zero-PII)"
+
+msgid "modals.logs_debug_off"
+msgstr "Mode débogage : inactif"
+
+msgid "modals.logs_debug_on"
+msgstr "Mode débogage : actif"
+
+msgid "modals.logs_empty"
+msgstr "Aucun journal de débogage capturé."
+
+msgid "modals.logs_help_tooltip"
+msgstr "Voir l'aide sur les journaux et le diagnostic"
+
+msgid "modals.logs_level_all"
+msgstr "Tous"
+
+msgid "modals.logs_level_label"
+msgstr "Niveau :"
+
+msgid "modals.logs_search_placeholder"
+msgstr "Rechercher dans les traces..."
+
+msgid "modals.logs_subtitle"
+msgstr "Télémétrie détaillée du moteur de protection et des appels Tauri."
+
+msgid "modals.logs_title"
+msgstr "Journaux de débogage en temps réel"
+
+msgid "modals.path_label"
+msgstr "Chemin :"
+
+msgid "modals.preview_dir_copies"
+msgstr "copies dans le dossier"
+
+msgid "modals.preview_dir_in_place"
+msgstr "dossier original sur place"
+
+msgid "modals.preview_file_overwrite"
+msgstr "écraser le fichier original"
+
+msgid "modals.rename_vault_label"
+msgstr "Nouveau nom :"
+
+msgid "modals.rename_vault_title"
+msgstr "Renommer le coffre"
+
+msgid "modals.result_view_protected_tokens"
+msgstr "Voir les jetons protégés"
+
+msgid "modals.unlock_btn"
+msgstr "Déverrouiller le coffre"
+
+msgid "modals.unlock_pwd_label"
+msgstr "Mot de passe de déverrouillage :"
+
+msgid "modals.unlock_pwd_placeholder"
+msgstr "Saisissez le mot de passe..."
+
+msgid "modals.unlock_subtitle"
+msgstr "Un mot de passe est requis pour déchiffrer les mappages."
+
+msgid "modals.unlock_title"
+msgstr "Coffre chiffré détecté"
+
 msgid "pairs.btn_add_pair"
-msgstr "Ajouter une paire manuelle"
+msgstr "Ajouter une paire"
+
+msgid "pairs.btn_add_pair_tooltip"
+msgstr "Ajouter une nouvelle paire de remplacement au coffre"
 
 msgid "pairs.btn_delete_selected"
-msgstr "Supprimer la sélection"
+msgstr "Supprimer"
+
+msgid "pairs.btn_delete_selected_tooltip"
+msgstr "Supprimer définitivement les paires sélectionnées"
 
 msgid "pairs.btn_export_csv"
 msgstr "Exporter CSV"
 
+msgid "pairs.btn_ignore"
+msgstr "Ignorer"
+
 msgid "pairs.btn_import_csv"
 msgstr "Importer CSV"
+
+msgid "pairs.btn_omit_selected"
+msgstr "Omettre"
+
+msgid "pairs.btn_omit_selected_tooltip"
+msgstr "Définir les éléments sélectionnés comme ignorés ou omis"
+
+msgid "pairs.btn_reactivate_selected"
+msgstr "Réactiver"
+
+msgid "pairs.btn_reactivate_selected_tooltip"
+msgstr "Réactiver la protection pour la sélection"
+
+msgid "pairs.clear_filter_tooltip"
+msgstr "Effacer le filtre"
 
 msgid "pairs.col_actions"
 msgstr "Actions"
@@ -149,31 +1178,145 @@ msgid "pairs.col_omitted"
 msgstr "Omis"
 
 msgid "pairs.col_original"
-msgstr "Valeur originale"
+msgstr "Valeur originale confidentielle"
 
 msgid "pairs.col_protected"
 msgstr "Valeur protégée"
 
+msgid "pairs.col_sel"
+msgstr "Sél."
+
 msgid "pairs.col_type"
-msgstr "Type d'entité"
+msgstr "Type / état"
+
+msgid "pairs.delete_tooltip"
+msgstr "Supprimer cette paire"
+
+msgid "pairs.deselect_all"
+msgstr "Tout désélectionner"
+
+msgid "pairs.deselect_all_tooltip"
+msgstr "Désélectionner toutes les paires cochées"
+
+msgid "pairs.edit_tooltip"
+msgstr "Modifier la valeur protégée"
 
 msgid "pairs.filter_all"
 msgstr "Tous les types d'entités"
 
+msgid "pairs.learning_btn"
+msgstr "Apprentissage"
+
+msgid "pairs.learning_tooltip"
+msgstr "Examiner les modèles structurels appris (sans données sensibles) et soumettre à GitHub"
+
 msgid "pairs.no_pairs"
-msgstr "Aucune paire enregistrée dans le coffre actif"
+msgstr "Aucun mappage dans ce coffre"
+
+msgid "pairs.omitted_note"
+msgstr "(Omis : non modifié)"
 
 msgid "pairs.search_placeholder"
-msgstr "Rechercher dans les valeurs..."
+msgstr "Filtrer par valeur originale ou protégée..."
+
+msgid "pairs.select_all"
+msgstr "Tout sélectionner"
+
+msgid "pairs.select_all_tooltip"
+msgstr "Sélectionner toutes les paires visibles"
+
+msgid "pairs.status_ignored"
+msgstr "Ignoré"
+
+msgid "pairs.subtitle"
+msgstr "Gérez, modifiez ou ajoutez des correspondances de jetons confidentiels et leurs substituts dans le coffre actif."
+
+msgid "pairs.tip_desc"
+msgstr "Chaque paire associe un jeton confidentiel (nom, pièce d'identité, IBAN, e-mail ou secret) à sa valeur protégée. Vous pouvez ajouter des paires manuelles ou modifier celles existantes. Toute modification est synchronisée immédiatement avec le coffre chiffré."
+
+msgid "pairs.tip_title"
+msgstr "Gestion des paires de jetons"
 
 msgid "pairs.title"
-msgstr "Paires de remplacement et règles"
+msgstr "Paires de jetons"
+
+msgid "status.all_marked_omit"
+msgstr "🚫 Toutes les entités sont marquées comme omises (ne seront pas protégées)."
+
+msgid "status.all_reactivated_protect"
+msgstr "🛡️ Toutes les entités ont été réactivées pour la protection."
+
+msgid "status.audit_reset"
+msgstr "Audit réinitialisé. Retour à la vue Transformation."
+
+msgid "status.autocopy_off"
+msgstr "📄 Copie automatique dans le presse-papiers désactivée."
+
+msgid "status.autocopy_on"
+msgstr "📋 Copie automatique dans le presse-papiers activée."
+
+msgid "status.backup_create_error"
+msgstr "Erreur lors de la création de la sauvegarde :"
+
+msgid "status.backup_pwd_prompt"
+msgstr "Saisissez le mot de passe pour déchiffrer la sauvegarde :"
+
+msgid "status.backup_restore_confirm"
+msgstr "⚠️ Restaurer la sauvegarde ? Les paramètres et coffres portant le même nom seront écrasés."
+
+msgid "status.backup_restore_error"
+msgstr "Erreur lors de la restauration de la sauvegarde :"
+
+msgid "status.backup_restored_ok"
+msgstr "✅ Sauvegarde restaurée avec succès"
+
+msgid "status.backup_saved_ok"
+msgstr "📦 Sauvegarde Bzip2 enregistrée avec succès dans :"
+
+msgid "status.blocks_unit"
+msgstr "blocs"
+
+msgid "status.browser_open_error"
+msgstr "Impossible d'ouvrir le navigateur automatiquement. Utilisez Copier le JSON ou Enregistrer .json :"
+
+msgid "status.cancelling_scan"
+msgstr "Annulation de l'analyse..."
 
 msgid "status.cli_copied"
 msgstr "📋 Commande CLI copiée dans le presse-papiers."
 
+msgid "status.clip_protected_toast"
+msgstr "Presse-papiers protégé"
+
+msgid "status.clip_restored_toast"
+msgstr "Presse-papiers restauré"
+
+msgid "status.clip_verified_zero"
+msgstr "Presse-papiers vérifié : 0 jeton reconnu"
+
+msgid "status.clipboard_clear_error"
+msgstr "Erreur lors du vidage du presse-papiers :"
+
+msgid "status.clipboard_cleared_ok"
+msgstr "🧹 Presse-papiers du système vidé avec succès."
+
+msgid "status.config_reset_confirm"
+msgstr "Rétablir ~/.lexishield/config.toml aux valeurs par défaut ?"
+
+msgid "status.config_reset_ok"
+msgstr "✅ Configuration rétablie aux valeurs par défaut."
+
+msgid "status.config_save_error"
+msgstr "❌ Erreur lors de l'enregistrement des paramètres :"
+
+msgid "status.config_saved"
+msgstr "✅ Configuration enregistrée dans ~/.lexishield/config.toml"
+
 msgid "status.copied"
 msgstr "📋 Copié dans le presse-papiers."
+
+msgid "status.copied_Clipboard_suffix"
+msgstr " · Copié dans le presse-papiers ! 📋"
 
 msgid "status.copied_restored"
 msgstr "📋 Texte restauré copié dans le presse-papiers."
@@ -181,14 +1324,323 @@ msgstr "📋 Texte restauré copié dans le presse-papiers."
 msgid "status.copy_error"
 msgstr "❌ Erreur de copie :"
 
+msgid "status.data_protected_copied"
+msgstr "✅ Données protégées et copiées dans le presse-papiers :"
+
+msgid "status.data_protected_ok"
+msgstr "✅ Données protégées avec succès :"
+
+msgid "status.data_restored_copied"
+msgstr "✅ Données restaurées et copiées dans le presse-papiers :"
+
+msgid "status.data_restored_ok"
+msgstr "✅ Données restaurées avec succès :"
+
+msgid "status.debug_disabled"
+msgstr "ℹ️ Mode débogage désactivé."
+
+msgid "status.debug_enabled"
+msgstr "🐞 Mode débogage activé."
+
+msgid "status.dir_open_error"
+msgstr "Erreur lors de l'ouverture du dossier :"
+
+msgid "status.dir_scan_done_msg"
+msgstr "Le parcours du dossier s'est terminé avec succès. Vous pouvez vérifier les jetons dans le tableau ci-dessous."
+
+msgid "status.dir_scan_done_title"
+msgstr "Analyse du dossier terminée"
+
+msgid "status.dir_scan_error"
+msgstr "Erreur lors de l'analyse du dossier :"
+
+msgid "status.dir_scan_starting"
+msgstr "Démarrage du parcours..."
+
+msgid "status.dir_scanning"
+msgstr "Analyse du dossier :"
+
 msgid "status.direction_protect"
 msgstr "Direction active : protéger (texte en clair ➔ texte protégé)."
 
 msgid "status.direction_restore"
-msgstr "Direction active : restaurar (texte protégé ➔ texte en clair)."
+msgstr "Direction active : restaurer (texte protégé ➔ texte en clair)."
+
+msgid "status.domains_added"
+msgstr "Domaine(s) ajouté(s). Cliquez sur Enregistrer les modifications pour confirmer."
+
+msgid "status.domains_reset"
+msgstr "Liste d'exclusion rétablie aux domaines de cybersécurité recommandés. Cliquez sur Enregistrer les modifications."
+
+msgid "status.domains_save_error"
+msgstr "❌ Erreur lors de l'enregistrement de la liste de domaines :"
+
+msgid "status.domains_saved"
+msgstr "✅ Liste des URL et domaines exclus enregistrée"
+
+msgid "status.dropped_item_error"
+msgstr "Erreur lors du traitement de l'élément déposé :"
+
+msgid "status.enter_audit_text_prompt"
+msgstr "Veuillez saisir ou coller du texte dans les panneaux pour l'auditer."
+
+msgid "status.enter_clear_text_prompt"
+msgstr "Veuillez saisir du texte dans le panneau Texte en clair pour le protéger."
+
+msgid "status.enter_prot_text_prompt"
+msgstr "Veuillez saisir du texte dans le panneau Texte protégé pour le restaurer."
+
+msgid "status.entities_saved_vault"
+msgstr "💾 Entités enregistrées et intégrées dans le coffre :"
+
+msgid "status.file_open_error"
+msgstr "Erreur lors de l'ouverture du fichier :"
+
+msgid "status.file_process_error"
+msgstr "Erreur lors du traitement du fichier :"
+
+msgid "status.file_protected_msg"
+msgstr "Le fichier a été traité et enregistré avec les jetons confidentiels protégés."
+
+msgid "status.file_protected_title"
+msgstr "Fichier protégé avec succès"
+
+msgid "status.file_restored_msg"
+msgstr "Le fichier a été restauré en reconstruisant les données d'origine via votre coffre local."
+
+msgid "status.file_restored_title"
+msgstr "Fichier restauré avec succès"
+
+msgid "status.file_scan_done_msg"
+msgstr "L'analyse du fichier s'est terminée avec succès sans modifier son contenu original."
+
+msgid "status.file_scan_done_title"
+msgstr "Analyse du fichier terminée"
+
+msgid "status.file_scan_error"
+msgstr "Erreur lors de l'analyse du fichier :"
+
+msgid "status.github_opening_direct"
+msgstr "🚀 Ouverture du ticket pré-rempli sur GitHub avec le JSON exact révisé."
+
+msgid "status.github_opening_fallback"
+msgstr "🚀 Ouverture de GitHub Issues (le JSON complet a été copié dans le presse-papiers pour Ctrl+V)."
+
+msgid "status.groups_unit"
+msgstr "groupe(s)"
+
+msgid "status.history_cleared"
+msgstr "Historique temporaire de session vidé."
+
+msgid "status.inactivity_locked"
+msgstr "🔒 Coffre et session verrouillés automatiquement pour inactivité."
+
+msgid "status.item_ready_to_process"
+msgstr "📄 Élément prêt à être traité :"
+
+msgid "status.label_conf_tokens"
+msgstr "Jetons confidentiels"
+
+msgid "status.label_directory"
+msgstr "Dossier"
+
+msgid "status.label_encoded_blocks"
+msgstr "Blocs encodés traités"
+
+msgid "status.label_exported_md"
+msgstr "Exporté en Markdown"
+
+msgid "status.label_inspected_file"
+msgstr "Fichier inspecté"
+
+msgid "status.label_omitted_fp"
+msgstr "Faux positifs omis"
+
+msgid "status.label_saved_file"
+msgstr "Fichier enregistré"
+
+msgid "status.label_source_file"
+msgstr "Fichier source"
+
+msgid "status.label_time"
+msgstr "Temps écoulé"
+
+msgid "status.learning_clear_confirm"
+msgstr "Vider tous les modèles structurels appris localement ?"
+
+msgid "status.learning_delete_error"
+msgstr "Erreur lors de la suppression de la règle apprise :"
+
+msgid "status.learning_export_error"
+msgstr "Erreur lors de l'exportation du fichier d'apprentissage :"
+
+msgid "status.learning_exported"
+msgstr "💾 Fichier d'apprentissage exporté vers :"
+
+msgid "status.learning_json_copied"
+msgstr "📋 JSON de calibration (sans données sensibles) copié dans le presse-papiers."
+
+msgid "status.learning_reset_ok"
+msgstr "🧹 Apprentissage local des détecteurs réinitialisé."
+
+msgid "status.logs_cleared"
+msgstr "🧹 Journaux effacés."
+
+msgid "status.logs_copied"
+msgstr "📋 Journaux copiés dans le presse-papiers."
+
+msgid "status.mappings_unit"
+msgstr "mappages"
+
+msgid "status.op_cancelled_resources"
+msgstr "Opération annulée par l'utilisateur par précaution sur les ressources."
+
+msgid "status.pair_add_error"
+msgstr "Erreur lors de l'ajout de la paire :"
+
+msgid "status.pair_added_ok"
+msgstr "✅ Paire ajoutée avec succès au coffre"
+
+msgid "status.pair_delete_confirm"
+msgstr "Supprimer le mappage sélectionné ?"
+
+msgid "status.pair_delete_error"
+msgstr "Erreur lors de la suppression de la paire :"
+
+msgid "status.pair_deleted_ok"
+msgstr "✅ Mappage supprimé :"
+
+msgid "status.pair_inputs_required"
+msgstr "Veuillez saisir la valeur originale et la valeur protégée."
+
+msgid "status.pair_update_error"
+msgstr "Erreur lors de la mise à jour de la paire :"
+
+msgid "status.pair_updated_ok"
+msgstr "✅ Paire mise à jour."
+
+msgid "status.pairs_batch_delete_confirm"
+msgstr "Supprimer les paires sélectionnées ?"
+
+msgid "status.pairs_batch_deleted_ok"
+msgstr "✅ Paires sélectionnées supprimées avec succès."
+
+msgid "status.panels_cleared"
+msgstr "Les deux panneaux ont été effacés (enregistré dans l'historique de session)."
+
+msgid "status.pattern_learned_ok"
+msgstr "🧠 Modèle structurel appris sans données sensibles"
+
+msgid "status.protect_error"
+msgstr "Erreur lors de la protection des données :"
 
 msgid "status.ready"
 msgstr "Prêt. Collez votre texte ou choisissez un fichier à traiter."
+
+msgid "status.resource_warning_confirm"
+msgstr "⚠️ Avertissement sur les ressources système :"
+
+msgid "status.restore_error"
+msgstr "Erreur lors de la restauration des données :"
+
+msgid "status.session_cache_cleared"
+msgstr "🧹 Caches de session vidés avant l'analyse du dossier."
+
+msgid "status.session_restored"
+msgstr "⏱️ Session récupérée de"
+
+msgid "status.text_analyzed_all_known"
+msgstr "🔍 Analyse terminée : tous les jetons du texte sont déjà reconnus dans le coffre actif."
+
+msgid "status.text_analyzed_new"
+msgstr "🔍 Texte analysé : nouveaux jetons confidentiels détectés. Vérifiez le tableau pour protéger ou omettre."
+
+msgid "status.text_analyzed_none"
+msgstr "🔍 Analyse terminée : aucun jeton confidentiel identifié dans le texte."
+
+msgid "status.text_audit_error"
+msgstr "Erreur lors de l'analyse du texte :"
+
+msgid "status.text_transferred"
+msgstr "📋 Texte transféré vers l'éditeur de Transformation."
+
+msgid "status.tokens_protected_unit"
+msgstr "jetons protégés"
+
+msgid "status.tokens_restored_unit"
+msgstr "jetons restaurés"
+
+msgid "status.vault_create_error"
+msgstr "Erreur lors de la création du coffre :"
+
+msgid "status.vault_created_ok"
+msgstr "✅ Coffre créé et chiffré :"
+
+msgid "status.vault_delete_confirm"
+msgstr "⚠️ Voulez-vous vraiment supprimer définitivement ce coffre ?"
+
+msgid "status.vault_delete_error"
+msgstr "Erreur lors de la suppression du coffre :"
+
+msgid "status.vault_deleted_ok"
+msgstr "✅ Coffre supprimé :"
+
+msgid "status.vault_encrypted_prompt"
+msgstr "🔒 Coffre chiffré. Veuillez saisir son mot de passe :"
+
+msgid "status.vault_enter_pwd_error"
+msgstr "Veuillez saisir le mot de passe du coffre"
+
+msgid "status.vault_export_error"
+msgstr "Erreur lors de l'exportation :"
+
+msgid "status.vault_exported_ok"
+msgstr "✅ Coffre exporté vers :"
+
+msgid "status.vault_import_error"
+msgstr "Erreur lors de l'importation :"
+
+msgid "status.vault_imported_ok"
+msgstr "✅ Coffre importé avec succès :"
+
+msgid "status.vault_init_error"
+msgstr "Erreur lors de l'initialisation du coffre :"
+
+msgid "status.vault_initialized"
+msgstr "✅ Coffre initialisé et chiffré avec succès :"
+
+msgid "status.vault_load_pairs_error"
+msgstr "Erreur lors du chargement des paires du coffre :"
+
+msgid "status.vault_loaded"
+msgstr "🔓 Coffre chargé :"
+
+msgid "status.vault_name_required"
+msgstr "Saisissez un nom pour le nouveau coffre."
+
+msgid "status.vault_not_exist"
+msgstr "ℹ️ Le coffre n'existe pas. Définissez un mot de passe pour l'initialiser :"
+
+msgid "status.vault_open_error"
+msgstr "Erreur lors de l'ouverture du coffre :"
+
+msgid "status.vault_pwd_mandatory_alert"
+msgstr "⚠️ Un mot de passe est obligatoire pour initialiser et protéger le coffre."
+
+msgid "status.vault_rename_error"
+msgstr "Erreur lors du renommage :"
+
+msgid "status.vault_renamed_ok"
+msgstr "✅ Coffre renommé :"
+
+msgid "status.vault_restore_bak_confirm"
+msgstr "⚠️ Restaurer le coffre depuis sa dernière sauvegarde automatique (.bak) ? L'état précédent sera récupéré."
+
+msgid "status.vault_restored_bak_ok"
+msgstr "✅ Coffre restauré avec succès depuis sa sauvegarde (.bak) :"
+
+msgid "status.vault_save_mappings_error"
+msgstr "Erreur lors de l'enregistrement des mappages dans le coffre :"
 
 msgid "status.view_clear"
 msgstr "🔓 Vue en clair active avec blocs développés."
@@ -197,7 +1649,16 @@ msgid "status.view_merge"
 msgstr "🧩 Vue en clair avec fragments fusionnés."
 
 msgid "status.view_reencode"
-msgstr "📦 Vue encodée active : appuyer sur Protéger traitera l'intérieur et ré-encodera."
+msgstr "📦 Vue encodée active : cliquer sur Protéger traitera l'intérieur et ré-encodera."
+
+msgid "status.watch_started_protect"
+msgstr "👀 Surveillance du presse-papiers active (protection)."
+
+msgid "status.watch_started_restore"
+msgstr "👀 Surveillance du presse-papiers active (restauration)."
+
+msgid "status.watch_stopped"
+msgstr "⏸️ Surveillance du presse-papiers arrêtée."
 
 msgid "studio.autocopy_btn"
 msgstr "Copie auto"
@@ -207,6 +1668,15 @@ msgstr "Copie auto active : copie le résultat lors de la protection ou restaura
 
 msgid "studio.autocopy_tooltip_inactive"
 msgstr "Copie auto désactivée : cliquer pour activer"
+
+msgid "studio.badge_detected_as"
+msgstr "Détecté comme"
+
+msgid "studio.badge_original_tooltip"
+msgstr "Original"
+
+msgid "studio.badge_protected_tooltip"
+msgstr "Jeton protégé"
 
 msgid "studio.badges_btn"
 msgstr "Badges"
@@ -218,7 +1688,7 @@ msgid "studio.badges_tooltip_inactive"
 msgstr "Activer les badges sur les jetons confidentiels"
 
 msgid "studio.btn_anonymize"
-msgstr "Anonymiser"
+msgstr "Protéger"
 
 msgid "studio.btn_clear"
 msgstr "Effacer"
@@ -230,25 +1700,34 @@ msgid "studio.btn_copy"
 msgstr "Copier"
 
 msgid "studio.btn_deanonymize"
-msgstr "Désanonymiser"
+msgstr "Restaurer"
 
 msgid "studio.btn_protect_title"
-msgstr "Protéger les données sensibles (Ctrl+Enter)"
+msgstr "Protéger les données confidentielles (Ctrl+Entrée)"
 
 msgid "studio.btn_reencode"
 msgstr "Ré-encoder"
 
 msgid "studio.btn_restore_title"
-msgstr "Restaurer les données protégées (Ctrl+Enter)"
+msgstr "Restaurer les données protégées (Ctrl+Entrée)"
 
 msgid "studio.clear_all"
 msgstr "Tout effacer"
 
 msgid "studio.clear_all_tooltip"
-msgstr "Effacer les deux panneaux (Ctrl+Shift+L)"
+msgstr "Effacer les deux panneaux (Ctrl+Maj+L)"
+
+msgid "studio.click_to_edit"
+msgstr "Cliquez pour modifier le texte"
 
 msgid "studio.close_notice"
 msgstr "Fermer l'avis"
+
+msgid "studio.copy_clear_tooltip"
+msgstr "Copier le texte en clair (Ctrl+Maj+C)"
+
+msgid "studio.copy_protected_tooltip"
+msgstr "Copier le texte protégé (Ctrl+Maj+C)"
 
 msgid "studio.detecting"
 msgstr "Analyse du contenu..."
@@ -261,6 +1740,9 @@ msgstr "En clair"
 
 msgid "studio.encoded_clear_tooltip"
 msgstr "Développer les blocs encodés en clair cellule par cellule"
+
+msgid "studio.encoded_detected_tooltip"
+msgstr "Blocs encodés lisibles détectés (Base64 / Hex / URL)"
 
 msgid "studio.encoded_merge"
 msgstr "Fusionner les fragments"
@@ -283,6 +1765,9 @@ msgstr "Enregistrer sous"
 msgid "studio.format_auto"
 msgstr "Détection automatique"
 
+msgid "studio.format_plain"
+msgstr "TEXTE BRUT"
+
 msgid "studio.history_btn"
 msgstr "Historique"
 
@@ -290,19 +1775,22 @@ msgid "studio.history_tooltip"
 msgstr "Afficher l'historique temporaire en mémoire RAM"
 
 msgid "studio.how_to_text"
-msgstr "Collez du texte dans Texte en clair pour le protéger avant de l'envoyer à l'IA, ou glissez-déposez un fichier/dossier. Dès réception de la réponse de l'IA, collez-la dans Texte protégé et cliquez sur Restaurer pour récupérer les données originales."
+msgstr "Collez du texte dans Texte en clair pour le protéger avant de l'envoyer à l'IA, ou glissez un fichier ou dossier dessus. Dès réception de la réponse de l'IA, collez-la dans Texte protégé et cliquez sur Restaurer pour récupérer les valeurs d'origine."
 
 msgid "studio.how_to_title"
 msgstr "Comment utiliser la transformation ?"
 
 msgid "studio.input_placeholder"
-msgstr "Collez ici vos journaux ou données sensibles..."
+msgstr "Collez ici le texte en clair, ou glissez un fichier ou dossier à protéger..."
 
 msgid "studio.merge_chunks"
 msgstr "Fusionner les fragments"
 
+msgid "studio.no_markdown_preview"
+msgstr "Aucun contenu à prévisualiser."
+
 msgid "studio.output_placeholder"
-msgstr "Le résultat nettoyé apparaîtra ici..."
+msgstr "Collez ici la réponse protégée de l'IA, ou glissez un fichier à restaurer..."
 
 msgid "studio.panel_clear"
 msgstr "Texte en clair"
@@ -337,6 +1825,12 @@ msgstr "Jetons protégés"
 msgid "studio.title"
 msgstr "Studio d'anonymisation"
 
+msgid "studio.unit_chars"
+msgstr "car."
+
+msgid "studio.unit_lines"
+msgstr "lig."
+
 msgid "studio.view_editor"
 msgstr "Éditeur"
 
@@ -365,31 +1859,55 @@ msgid "tabs.logs"
 msgstr "Journaux"
 
 msgid "tabs.pairs"
-msgstr "Paires & Règles"
+msgstr "Paires"
+
+msgid "tabs.pairs_tooltip"
+msgstr "Paires de remplacement et de protection"
 
 msgid "tabs.scanner"
 msgstr "Scanner"
 
 msgid "tabs.studio"
-msgstr "Studio"
+msgstr "Transformation"
+
+msgid "tabs.studio_tooltip"
+msgstr "Transformation bidirectionnelle et protection des données"
 
 msgid "tabs.vaults"
 msgstr "Coffres"
 
+msgid "tabs.vaults_tooltip"
+msgstr "Gestion des coffres Lexi"
+
 msgid "tabs.watch"
-msgstr "Sentinelle"
+msgstr "Presse-papiers"
+
+msgid "tabs.watch_tooltip"
+msgstr "Surveillance active du presse-papiers"
+
+msgid "vaults.activate_tooltip"
+msgstr "Définir comme coffre actif"
 
 msgid "vaults.active_vault"
 msgstr "Coffre actif"
 
+msgid "vaults.badge_active"
+msgstr "Actif"
+
+msgid "vaults.btn_activate"
+msgstr "Activer"
+
 msgid "vaults.btn_backup"
-msgstr "Créer une sauvegarde (.bak)"
+msgstr "Sauvegarde complète"
+
+msgid "vaults.btn_backup_tooltip"
+msgstr "Créer une sauvegarde compressée de tous les paramètres et coffres LexiShield"
 
 msgid "vaults.btn_export"
 msgstr "Exporter le coffre"
 
 msgid "vaults.btn_import"
-msgstr "Importer le coffre"
+msgstr "Importer un coffre"
 
 msgid "vaults.btn_lock"
 msgstr "Verrouiller"
@@ -398,16 +1916,67 @@ msgid "vaults.btn_new"
 msgstr "Nouveau coffre"
 
 msgid "vaults.btn_restore"
-msgstr "Restaurer la sauvegarde"
+msgstr "Restaurer une sauvegarde"
+
+msgid "vaults.btn_restore_tooltip"
+msgstr "Restaurer une archive de sauvegarde LexiShield (.tar.bz2 / .lexibak)"
 
 msgid "vaults.btn_unlock"
 msgstr "Déverrouiller"
 
+msgid "vaults.col_actions"
+msgstr "Actions"
+
+msgid "vaults.col_filename"
+msgstr "Nom du fichier"
+
+msgid "vaults.col_path"
+msgstr "Chemin absolu"
+
+msgid "vaults.col_size"
+msgstr "Taille"
+
+msgid "vaults.col_status"
+msgstr "État"
+
+msgid "vaults.dblclick_activate_tooltip"
+msgstr "Double-cliquer pour activer"
+
+msgid "vaults.delete_tooltip"
+msgstr "Supprimer"
+
+msgid "vaults.empty"
+msgstr "Aucun coffre disponible"
+
+msgid "vaults.export_tooltip"
+msgstr "Exporter le fichier"
+
+msgid "vaults.rename_tooltip"
+msgstr "Renommer"
+
+msgid "vaults.restore_bak_tooltip"
+msgstr "Restaurer depuis la dernière sauvegarde automatique (.bak)"
+
 msgid "vaults.security_note"
 msgstr "Chiffrement ChaCha20-Poly1305 avec dérivation Argon2id"
 
+msgid "vaults.status_encrypted"
+msgstr "Chiffré"
+
+msgid "vaults.status_plain"
+msgstr "Simple"
+
+msgid "vaults.subtitle"
+msgstr "Gérez tous les coffres de votre profil (~/.lexishield) et effectuez des sauvegardes à haute compression."
+
+msgid "vaults.tip_desc"
+msgstr "Les coffres (.lexi) sont des conteneurs cryptographiques isolés. Chaque client, projet ou environnement peut disposer de son propre coffre indépendant protégé par mot de passe Argon2id. Vous pouvez également créer des sauvegardes compressées Bzip2."
+
+msgid "vaults.tip_title"
+msgstr "Gestionnaire de coffres Lexi"
+
 msgid "vaults.title"
-msgstr "Gestion des coffres chiffrés"
+msgstr "Coffres Lexi et sauvegardes Bzip2"
 
 msgid "vaults.vault_name"
 msgstr "Nom du coffre"
@@ -415,14 +1984,71 @@ msgstr "Nom du coffre"
 msgid "vaults.vault_pass"
 msgstr "Mot de passe du coffre"
 
+msgid "vaults.why_password_btn"
+msgstr "Pourquoi un mot de passe ?"
+
+msgid "vaults.why_password_tooltip"
+msgstr "Pourquoi le mot de passe est-il obligatoire pour les coffres ?"
+
 msgid "watch.auto_clear"
 msgstr "Effacement automatique de sécurité"
 
+msgid "watch.badge_protection"
+msgstr "Protection"
+
+msgid "watch.badge_restoration"
+msgstr "Restauration"
+
+msgid "watch.btn_clear_clip"
+msgstr "Vider le presse-papiers"
+
 msgid "watch.btn_start"
-msgstr "Démarrer la sentinelle"
+msgstr "Surveiller"
 
 msgid "watch.btn_stop"
-msgstr "Arrêter la sentinelle"
+msgstr "Arrêter"
+
+msgid "watch.captured_text"
+msgstr "Texte capturé :"
+
+msgid "watch.clear_history"
+msgstr "Effacer l'historique"
+
+msgid "watch.clipboard_result"
+msgstr "Résultat dans le presse-papiers :"
+
+msgid "watch.direction_title"
+msgstr "Direction de transformation"
+
+msgid "watch.entities_recognized"
+msgstr "entités reconnues"
+
+msgid "watch.events_unit"
+msgstr "événements"
+
+msgid "watch.flow_orig_to_prot"
+msgstr "Original ➔ Protégé"
+
+msgid "watch.flow_prot_to_orig"
+msgstr "Protégé ➔ Original"
+
+msgid "watch.linux_warn_desc"
+msgstr "Si vous utilisez Wayland (KDE Plasma / GNOME), installez le paquet wl-clipboard (sudo apt install wl-clipboard ou sudo pacman -S wl-clipboard) ou vérifiez que Klipper / XWayland est actif."
+
+msgid "watch.linux_warn_title"
+msgstr "Avis d'accès au presse-papiers sous Linux"
+
+msgid "watch.listen_status_title"
+msgstr "État d'écoute"
+
+msgid "watch.live_inspector_title"
+msgstr "Jetons et entités interceptés en direct"
+
+msgid "watch.mode_protect"
+msgstr "Mode protéger"
+
+msgid "watch.mode_restore"
+msgstr "Mode restaurer"
 
 msgid "watch.notification_silent"
 msgstr "Silencieux"
@@ -430,11 +2056,35 @@ msgstr "Silencieux"
 msgid "watch.notification_toast"
 msgstr "Notification toast"
 
+msgid "watch.protect_card_tooltip"
+msgstr "Protéger automatiquement : détecte les données confidentielles et les remplace par des valeurs protégées"
+
+msgid "watch.restore_card_tooltip"
+msgstr "Restaurer automatiquement : récupère les valeurs originales à partir des valeurs protégées renvoyées par l'IA"
+
 msgid "watch.status_active"
-msgstr "Surveillance active du presse-papiers"
+msgstr "Écoute active du presse-papiers..."
 
 msgid "watch.status_inactive"
-msgstr "Sentinelle en pause"
+msgstr "Arrêté (inactif)"
+
+msgid "watch.subtitle"
+msgstr "Capture le texte copié dans le presse-papiers et applique des transformations automatiques instantanées."
+
+msgid "watch.tip_desc"
+msgstr "Lorsque l'écoute est activée, chaque fois que vous copiez du texte avec Ctrl+C (ou Cmd+C), LexiShield intercepte les jetons sensibles, les protège en arrière-plan avec votre coffre et place le texte sécurisé prêt à être collé. Si vous copiez une réponse d'IA, passez en mode Restaurer pour récupérer les valeurs réelles instantanément."
+
+msgid "watch.tip_title"
+msgstr "Surveillance du presse-papiers (mode sentinelle)"
 
 msgid "watch.title"
-msgstr "Mode sentinelle (presse-papiers en temps réel)"
+msgstr "Surveillance active du presse-papiers"
+
+msgid "watch.waiting_activity"
+msgstr "En attente d'activité dans le presse-papiers..."
+
+msgid "watch.waiting_hint"
+msgstr "Lorsque vous copiez du texte contenant des IP, e-mails, clés ou jetons, leur reconnaissance s'affiche ici en direct."
+
+msgid "watch.zero_tokens_note"
+msgstr "0 jeton confidentiel détecté (texte intégral conservé)."
